@@ -1,0 +1,167 @@
+.hero-sheet .equipment-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.specialization-summary {
+  margin-top: 28px;
+}
+.specialization-summary > div:last-child {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.specialization-summary article {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #1c271b80;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 20px;
+}
+.specialization-summary article b {
+  font-size: 12px;
+  color: var(--gold-bright);
+}
+.specialization-summary article p {
+  font-size: 11px;
+  line-height: 1.8;
+  margin-top: 7px;
+  color: #a4b198;
+}
+.gear-set-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 14px 0 2px;
+  font-size: 10px;
+}
+.gear-set-preview > b {
+  color: #c9b985;
+  line-height: 1.6;
+}
+.gear-set-preview > b > small {
+  color: var(--muted);
+  display: block;
+  font-weight: 400;
+  margin-top: 2px;
+}
+.set-bonus {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  color: #808b79;
+  line-height: 1.6;
+}
+.set-bonus .icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.set-bonus.active {
+  color: #b5cc93;
+}
+.equipped-set-bonuses {
+  padding-bottom: 7px;
+}
+.equipped-set-bonuses .gear-set-preview {
+  padding-bottom: 18px;
+  border-bottom: 1px solid #354034;
+}
+.gear-comparison {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border-top: 1px solid #34422e;
+  padding-top: 12px;
+  margin-top: 15px;
+  font-size: 10px;
+}
+.gear-comparison > small {
+  color: #89977d;
+  font-size: 7px;
+  letter-spacing: 0.9px;
+  margin-bottom: 4px;
+}
+.positive {
+  color: #a6c891;
+}
+.negative {
+  color: #d89d87;
+}
+.recipe-toolbar {
+  display: grid;
+  grid-template-columns: auto 230px 1fr;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 22px;
+  padding: 17px 20px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #1c241b;
+}
+.recipe-toolbar label {
+  font-size: 11px;
+  color: #c2cbb5;
+}
+.recipe-toolbar select {
+  width: 100%;
+  padding: 10px 12px;
+  background: #151e15;
+  border: 1px solid #45563c;
+  border-radius: 3px;
+  color: #c8d3b9;
+  font-size: 11px;
+}
+.recipe-toolbar > span {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.7;
+  text-align: right;
+}
+.recipe-mastery {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 9px;
+  margin: 15px 0 12px;
+  padding-top: 12px;
+  border-top: 1px solid #384631;
+  font-size: 9px;
+  color: #9eb488;
+}
+.recipe-mastery > span:last-child {
+  color: var(--muted);
+}
+.recipe-output {
+  margin-top: 14px;
+}
+.recipe-output .gear-bonuses {
+  min-height: 0;
+}
+@media (max-width: 950px) {
+  .specialization-summary > div:last-child {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .recipe-toolbar {
+    grid-template-columns: auto 1fr;
+  }
+  .recipe-toolbar > span {
+    grid-column: 1/-1;
+    text-align: left;
+  }
+}
+@media (max-width: 760px) {
+  .specialization-summary > div:last-child {
+    grid-template-columns: 1fr;
+  }
+  .specialization-summary .section-heading {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .recipe-toolbar {
+    padding: 15px;
+  }
+  .gear-set-preview,
+  .gear-comparison {
+    font-size: 11px;
+  }
+}

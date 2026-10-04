@@ -1,0 +1,214 @@
+.resource-store {
+  margin: 0 0 30px;
+}
+.resource-store > p {
+  color: #aab69e;
+  font-size: 12px;
+  line-height: 1.8;
+  max-width: 900px;
+}
+.resource-families {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.resource-family {
+  padding: 17px;
+  border: 1px solid #66744f66;
+  border-radius: 5px;
+  background: #23312240;
+  min-width: 0;
+}
+.resource-family-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--material-color);
+  margin-bottom: 12px;
+}
+.resource-family h3 {
+  font-family: var(--serif);
+  font-weight: 500;
+  margin: 0;
+  font-size: 17px;
+}
+.resource-family-heading small {
+  margin-left: auto;
+  color: #a2ae94;
+  font-size: 10px;
+}
+.resource-grade {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid #a2b48318;
+}
+.resource-tier {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 27px;
+  height: 27px;
+  border: 1px solid #b5a16d44;
+  border-radius: 50%;
+  font-size: 10px;
+  color: #c9b47b;
+}
+.resource-grade > span:nth-child(2) {
+  min-width: 0;
+}
+.resource-grade b {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: #d4d2b6;
+  overflow-wrap: anywhere;
+}
+.resource-grade small {
+  display: block;
+  margin-top: 4px;
+  color: #98a98c;
+  font-size: 9px;
+  line-height: 1.5;
+}
+.resource-grade strong {
+  font-family: var(--serif);
+  font-weight: 500;
+  margin-left: auto;
+  color: var(--material-color);
+  font-size: 17px;
+}
+.resource-family summary,
+.resource-field-guide summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: #c6b37e;
+  font-size: 11px;
+}
+.resource-family details p,
+.resource-field-guide > p {
+  color: #aab79d;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.resource-field-guide {
+  border: 1px solid #7c805244;
+  border-radius: 4px;
+  margin-top: 14px;
+  padding: 0 17px;
+}
+.resource-field-guide > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 18px;
+}
+.resource-field-guide div p {
+  display: grid;
+  gap: 6px;
+  font-size: 11px;
+  color: #acae98;
+  line-height: 1.6;
+}
+.resource-field-guide b {
+  color: #d5c696;
+  font-weight: 500;
+}
+.exploration-heading .fieldwork-toggle {
+  min-height: 44px;
+  margin-left: auto;
+  border: 1px solid #ac996e55;
+  background: #35412966;
+  color: #d2bf8c;
+  border-radius: 3px;
+  padding: 5px 10px;
+  font-size: 10px;
+}
+.exploration-heading > span {
+  margin-left: 0;
+}
+.fieldwork-families {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 8px;
+}
+.fieldwork-families button {
+  padding: 4px;
+  min-height: 44px;
+  border: 1px solid #9ea87844;
+  border-radius: 3px;
+  background: #1d2c23;
+  color: #aebda1;
+  font-size: 10px;
+}
+.fieldwork-families button[aria-pressed="true"] {
+  background: #485338;
+  color: #e3d2a3;
+  border-color: #b9a773;
+}
+.fieldwork-locked {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: #a7b699;
+  font-size: 10px;
+  cursor: pointer;
+}
+.fieldwork-locked input {
+  accent-color: #b9a773;
+  width: 17px;
+  height: 17px;
+}
+.fieldwork-target {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+#gather-arrow {
+  display: inline-block;
+  color: #d3c292;
+  font-size: 25px;
+}
+.fieldwork-target b {
+  font-weight: 500;
+  display: block;
+  font-size: 11px;
+  color: #e0d8b6;
+}
+.fieldwork-target small {
+  display: block;
+  font-size: 9px;
+  color: #a3b796;
+  margin-top: 5px;
+}
+#gather-reason {
+  color: #c1b286;
+  font-size: 10px;
+  line-height: 1.5;
+  margin: 8px 0 4px;
+}
+#gather-practice {
+  font-size: 9px;
+  color: #a8bd9b;
+  line-height: 1.5;
+}
+@media (max-width: 1100px) {
+  .resource-families {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .resource-families {
+    grid-template-columns: 1fr;
+  }
+  .resource-family {
+    padding: 13px;
+  }
+  .resource-field-guide > div {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,253 @@
+.boss-hud,
+.world-hud {
+  position: absolute;
+  background: #101e17e8;
+  border: 1px solid #a8976370;
+  border-radius: 5px;
+  color: #e0d8b6;
+}
+[hidden] {
+  display: none !important;
+}
+.boss-hud {
+  top: 112px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(440px, 45vw);
+  padding: 12px 16px;
+  pointer-events: none;
+}
+.boss-hud > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.boss-hud b {
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: 500;
+}
+.boss-hud span {
+  color: #e2a58c;
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+.boss-health-track {
+  height: 8px;
+  background: #291c19;
+  border: 1px solid #a8655555;
+  margin-top: 9px;
+}
+.boss-health-track i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #9f5249, #d6a081);
+}
+.boss-hud p {
+  margin: 8px 0 0;
+  color: #d9bea2;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.world-hud {
+  top: 115px;
+  left: 26px;
+  width: 244px;
+  padding: 13px;
+}
+.exploration-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #c4b17e;
+}
+.exploration-heading b {
+  font-size: 9px;
+  letter-spacing: 0.7px;
+  font-weight: 500;
+}
+.exploration-heading > span {
+  margin-left: auto;
+  font-size: 8px;
+  color: #9eb28d;
+}
+.landmark-compass {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 11px;
+}
+#compass-arrow {
+  font-size: 25px;
+  color: #d6c998;
+  line-height: 1;
+  display: inline-block;
+}
+.landmark-compass b {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+}
+.landmark-compass small {
+  display: block;
+  margin-top: 4px;
+  color: #a5b39a;
+  font-size: 9px;
+  line-height: 1.4;
+}
+.encounter-progress {
+  height: 5px;
+  background: #263327;
+  margin: 12px 0 6px;
+}
+.encounter-progress i {
+  height: 100%;
+  display: block;
+  background: #a1bd86;
+}
+#encounter-detail {
+  font-size: 9px;
+  color: #bdcaa4;
+  line-height: 1.5;
+}
+.landmark-button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 12px;
+  padding: 8px 10px;
+  color: #ead6a7;
+  background: #3c4128;
+  border: 1px solid #b3a36a88;
+  border-radius: 3px;
+  font-size: 11px;
+}
+.landmark-button .icon {
+  margin-left: auto;
+}
+.landmark-button:hover {
+  background: #525333;
+}
+.shrine-leave {
+  display: block;
+  margin: 21px auto 0;
+  padding: 10px;
+}
+.result-exploration {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  align-items: center;
+  color: #bbc69d;
+  margin: 20px 0;
+  font-size: 12px;
+}
+@media (max-width: 950px) and (min-width: 761px) {
+  .world-hud {
+    left: 16px;
+    width: 220px;
+  }
+  .boss-hud {
+    left: auto;
+    right: 16px;
+    transform: none;
+    width: 380px;
+  }
+}
+@media (max-width: 760px) {
+  .game-timer {
+    top: 73px;
+    left: 0;
+    transform: none;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-align: left;
+    padding: 3px 0;
+  }
+  .game-timer > span {
+    font-size: 10px;
+  }
+  .game-timer b {
+    font-size: 21px;
+  }
+  .game-timer small {
+    display: none;
+  }
+  .world-hud {
+    top: 128px;
+    left: 12px;
+    width: 222px;
+    padding: 10px;
+  }
+  .boss-hud {
+    top: 126px;
+    width: calc(100% - 24px);
+    max-width: 440px;
+    padding: 10px 12px;
+  }
+  .has-boss .world-hud {
+    top: 225px;
+  }
+  .boss-hud b {
+    font-size: 13px;
+  }
+  .boss-hud p {
+    font-size: 9px;
+  }
+  .landmark-button {
+    font-size: 10px;
+  }
+}
+#landmark-preview {
+  display: block;
+  margin-top: 8px;
+  color: #b3be9c;
+  font-size: 9px;
+  line-height: 1.6;
+}
+.pause-blessings {
+  margin: 18px 0;
+  display: grid;
+  gap: 10px;
+}
+.pause-blessings span {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 5px 8px;
+  color: #d5c496;
+}
+.pause-blessings b {
+  font-size: 11px;
+  font-weight: 500;
+}
+.pause-blessings small {
+  grid-column: 2;
+  font-size: 10px;
+  color: #adb99b;
+  line-height: 1.5;
+}
+.in-game #toast-root {
+  bottom: 220px;
+}
+.in-game.has-modal #toast-root {
+  display: none;
+}
+@media (max-width: 760px) {
+  .in-game #toast-root {
+    bottom: 280px;
+  }
+}
+@media (max-height: 540px) and (min-width: 761px) {
+  .world-hud {
+    width: 220px;
+    top: 100px;
+  }
+  .boss-hud {
+    top: 100px;
+  }
+}

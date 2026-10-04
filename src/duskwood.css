@@ -1,0 +1,105 @@
+.zone-duskwood .world-image {
+  background-image: url("/art/duskwood-camp.svg");
+  filter: none;
+}
+.zone-duskwood .world-overlay {
+  background:
+    linear-gradient(90deg, #19252ff0 5%, #19252f60 90%),
+    linear-gradient(0deg, #17212de8, transparent 85%);
+}
+.zone-mini.duskwood {
+  background: linear-gradient(140deg, #39484c, #25283b);
+  color: #b5cfc7;
+}
+.zone-duskwood .world-kicker {
+  color: #c4d3b4;
+}
+.game-shell[data-zone="duskwood"].has-boss .world-hud,
+.game-shell[data-zone="duskwood"].has-boss .travel-action {
+  display: none;
+}
+.duskwood-preview {
+  margin: 28px 0;
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #1c2429;
+}
+.duskwood-preview .section-heading p {
+  color: var(--muted);
+  max-width: 630px;
+  line-height: 1.6;
+}
+.duskwood-gate {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: #dfbb86;
+}
+.duskwood-landmarks {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 0;
+  list-style: none;
+}
+.duskwood-landmarks li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #3a4547;
+  border-radius: 7px;
+  padding: 14px;
+  color: #c6d3be;
+}
+.duskwood-landmarks b,
+.duskwood-landmarks small {
+  display: block;
+}
+.duskwood-landmarks b {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.duskwood-landmarks small {
+  color: #9aa8a6;
+  margin-top: 4px;
+  font-size: 12px;
+}
+.duskwood-tactics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  margin: 24px 0;
+}
+.duskwood-tactics b {
+  display: block;
+  margin-top: 10px;
+  color: #dbc594;
+}
+.duskwood-tactics p {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #abb8b6;
+}
+@media (max-width: 800px) {
+  .duskwood-landmarks {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .duskwood-tactics {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .duskwood-preview {
+    padding: 20px;
+  }
+}
+@media (max-width: 450px) {
+  .duskwood-landmarks {
+    grid-template-columns: 1fr;
+  }
+  .duskwood-preview .section-heading {
+    align-items: start;
+    flex-direction: column;
+    gap: 12px;
+  }
+}

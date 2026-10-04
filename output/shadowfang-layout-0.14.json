@@ -1,0 +1,78 @@
+{
+  "layouts": [
+    {
+      "width": 360,
+      "scroll": 360,
+      "destinations": 6,
+      "nav": 8,
+      "minimumDestinationHeight": 50.5
+    },
+    {
+      "width": 390,
+      "scroll": 390,
+      "destinations": 6,
+      "nav": 8,
+      "minimumDestinationHeight": 50.5
+    },
+    {
+      "width": 760,
+      "scroll": 760,
+      "destinations": 6,
+      "nav": 8,
+      "minimumDestinationHeight": 53
+    },
+    {
+      "width": 800,
+      "scroll": 800,
+      "destinations": 6,
+      "nav": 8,
+      "minimumDestinationHeight": 53
+    },
+    {
+      "width": 1024,
+      "scroll": 1024,
+      "destinations": 6,
+      "nav": 8,
+      "minimumDestinationHeight": 55
+    },
+    {
+      "width": 1440,
+      "scroll": 1440,
+      "destinations": 6,
+      "nav": 8,
+      "minimumDestinationHeight": 63
+    }
+  ],
+  "art": {
+    "loaded": true,
+    "creatures": 9,
+    "atlas": "shadowfang-sprites.png",
+    "rows": [
+      0,
+      395,
+      820,
+      1254
+    ],
+    "columns": [
+      [
+        0,
+        418,
+        836,
+        1254
+      ],
+      [
+        0,
+        418,
+        880,
+        1254
+      ],
+      [
+        0,
+        418,
+        900,
+        1254
+      ]
+    ]
+  },
+  "errors": []
+}

@@ -1,0 +1,92 @@
+[
+  {
+    "name": "starter",
+    "victories": 27,
+    "attempts": 27,
+    "timeouts": 0,
+    "firstLevelRange": [
+      6,
+      48
+    ],
+    "successfulDuration": [
+      364,
+      419
+    ],
+    "unchangedFrom012": true
+  },
+  {
+    "name": "core-heroic",
+    "victories": 19,
+    "attempts": 27,
+    "timeouts": 0,
+    "firstLevelRange": [
+      6,
+      45
+    ],
+    "successfulDuration": [
+      482,
+      548
+    ],
+    "unchangedFrom012": true
+  },
+  {
+    "name": "trainer-heroic",
+    "victories": 23,
+    "attempts": 27,
+    "timeouts": 0,
+    "firstLevelRange": [
+      6,
+      45
+    ],
+    "successfulDuration": [
+      482,
+      562
+    ],
+    "unchangedFrom012": true
+  },
+  {
+    "name": "wardrobe-heroic",
+    "victories": 21,
+    "attempts": 27,
+    "timeouts": 0,
+    "firstLevelRange": [
+      6,
+      26
+    ],
+    "successfulDuration": [
+      483,
+      518
+    ],
+    "unchangedFrom012": null
+  },
+  {
+    "name": "wardrobe-deadmines-entry",
+    "victories": 27,
+    "attempts": 27,
+    "timeouts": 0,
+    "firstLevelRange": [
+      5,
+      13
+    ],
+    "successfulDuration": [
+      327,
+      386
+    ],
+    "unchangedFrom012": null
+  },
+  {
+    "name": "wardrobe-ragefire-entry",
+    "victories": 27,
+    "attempts": 27,
+    "timeouts": 0,
+    "firstLevelRange": [
+      5,
+      12
+    ],
+    "successfulDuration": [
+      332,
+      369
+    ],
+    "unchangedFrom012": null
+  }
+]

@@ -1,0 +1,451 @@
+.stable-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr);
+  gap: 24px;
+  margin-bottom: 36px;
+}
+.stable-preview,
+.riding-trainer,
+.travel-card,
+.travel-guide,
+.stable-catalog {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #12201ee8;
+}
+.stable-preview {
+  position: relative;
+  overflow: hidden;
+  padding: 28px;
+  background:
+    radial-gradient(ellipse at 50% 40%, #41524677, transparent 65%),
+    linear-gradient(145deg, #1d302b, #14211f);
+}
+.stable-preview h2 {
+  margin: 10px 0 0;
+  font-family: var(--serif);
+  font-size: 26px;
+}
+.travel-art {
+  width: 100%;
+  aspect-ratio: 1.5;
+  background-image: url("/art/travel-sprites.png");
+  background-size: 300% 300%;
+  background-position: var(--travel-x) var(--travel-y);
+  background-repeat: no-repeat;
+}
+.travel-art.featured {
+  max-width: 430px;
+  margin: 0 auto;
+}
+.travel-art.swift {
+  filter: drop-shadow(0 0 12px #cda86655);
+}
+.stable-preview-copy > span {
+  display: block;
+  color: #d8be87;
+  font-size: 14px;
+}
+.stable-preview-copy p,
+.riding-trainer p,
+.travel-guide p,
+.stable-catalog p,
+.stable-review p {
+  font-size: 13px;
+  line-height: 1.75;
+  color: #a6b4aa;
+}
+.riding-trainer {
+  padding: 28px;
+}
+.stable-emblem {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 20px;
+  border: 1px solid #b4995a66;
+  border-radius: 50%;
+  color: #d6b982;
+  background: #ba9a4a11;
+}
+.riding-trainer h2 {
+  font-family: var(--serif);
+  margin: 10px 0;
+}
+.riding-ranks {
+  display: grid;
+  gap: 12px;
+  margin: 24px 0;
+}
+.riding-rank {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: #09151266;
+  border: 1px solid #7b8d7744;
+  border-radius: 4px;
+  color: #6e7f72;
+}
+.riding-rank div {
+  display: grid;
+  gap: 6px;
+}
+.riding-rank b {
+  font-size: 13px;
+  color: #c7d1bf;
+}
+.riding-rank small {
+  font-size: 11px;
+  color: #98a58f;
+}
+.riding-rank.trained {
+  color: #d8bb81;
+  border-color: #ae935644;
+}
+.riding-trainer .button {
+  width: 100%;
+  min-height: 44px;
+}
+.trainer-restriction {
+  display: block;
+  margin-top: 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #a4b198;
+}
+.riding-complete {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.travel-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.travel-grid:has(.travel-card:nth-child(2):last-child) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.travel-card {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.travel-card.selected {
+  border-color: #cbb27a;
+}
+.travel-card > .travel-art {
+  background-color: #24342b;
+}
+.travel-card-copy {
+  padding: 22px;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+.travel-card-copy > small {
+  color: #aab699;
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+.travel-card h3 {
+  font-family: var(--serif);
+  margin: 10px 0;
+  font-size: 20px;
+}
+.travel-card-copy > p {
+  font-size: 12px;
+  color: #a6b4a4;
+  line-height: 1.7;
+}
+.travel-card-meta {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0;
+  font-size: 12px;
+}
+.travel-card-meta b {
+  color: #d8bd83;
+}
+.travel-card-meta span {
+  color: #9fac98;
+}
+.travel-card-copy .travel-eligibility {
+  margin-top: auto;
+  min-height: 42px;
+}
+.travel-card .button {
+  width: 100%;
+  min-height: 44px;
+}
+.travel-guide,
+.stable-catalog {
+  padding: 24px;
+  margin-top: 26px;
+}
+.travel-guide h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--serif);
+}
+.stable-catalog summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: #d4bb86;
+}
+.stable-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+.stable-catalog-grid > div {
+  min-width: 0;
+}
+.stable-catalog-grid b,
+.stable-catalog-grid span {
+  display: block;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.stable-catalog-grid span {
+  font-size: 11px;
+  color: #a8b3a0;
+}
+.stable-review .travel-art {
+  max-width: 320px;
+  margin: auto;
+}
+.stable-review h2 {
+  font-family: var(--serif);
+  font-size: 24px;
+  margin: 12px 0;
+}
+.stable-review-cost {
+  display: flex;
+  justify-content: space-between;
+  border-block: 1px solid #72857555;
+  padding: 16px 0;
+  font-size: 14px;
+  color: #d4bb86;
+}
+.stable-review .modal-actions {
+  display: flex;
+  gap: 12px;
+}
+.stable-review .button {
+  min-height: 44px;
+}
+.travel-camp {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid #9a895a44;
+  border-radius: 5px;
+  background: #1a281fe8;
+  padding: 19px 22px;
+  margin-top: 18px;
+}
+.travel-camp > .icon {
+  flex-shrink: 0;
+  color: #d8bc84;
+}
+.travel-camp > div {
+  flex: 1;
+}
+.travel-camp b {
+  font-family: var(--serif);
+  font-size: 16px;
+}
+.travel-camp p {
+  color: #a5b19a;
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 6px 0 0;
+}
+.travel-camp .button {
+  min-height: 44px;
+}
+.travel-action {
+  position: absolute;
+  right: 26px;
+  bottom: 124px;
+  width: 220px;
+  min-height: 56px;
+  border: 1px solid #a9956566;
+  border-radius: 5px;
+  background: #112019ed;
+  color: #d3c294;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+}
+.travel-action > span {
+  display: grid;
+  gap: 5px;
+  text-align: left;
+  flex: 1;
+  min-width: 0;
+}
+.travel-action b {
+  font-size: 12px;
+}
+.travel-action small {
+  font-size: 10px;
+  color: #aebd98;
+  line-height: 1.4;
+}
+.travel-action kbd {
+  font-size: 10px;
+}
+.travel-action[aria-pressed="true"] {
+  border-color: #d6bc82;
+}
+.travel-action:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+.travel-action .icon {
+  flex-shrink: 0;
+}
+.travel-channel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: #d8bd83;
+  border-radius: 3px;
+  pointer-events: none;
+}
+.game-tutorial {
+  pointer-events: none;
+}
+.stable-review p {
+  margin: 14px 0;
+}
+.stable-preview-copy p {
+  margin: 10px 0 14px;
+}
+.travel-guide p {
+  margin-top: 12px;
+}
+@media (max-width: 760px) {
+  .site-header nav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .travel-grid:has(.travel-card:nth-child(2):last-child) {
+    grid-template-columns: 1fr;
+  }
+}
+.trial-steed {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  padding: 20px;
+  margin-top: 20px;
+  background: #b9a86b0d;
+  border: 1px solid #a98d5b44;
+}
+.trial-steed > .icon {
+  color: #d8bc83;
+  flex-shrink: 0;
+}
+.trial-steed > div {
+  flex: 1;
+  min-width: 0;
+}
+.trial-steed b {
+  font-family: var(--serif);
+  font-size: 16px;
+}
+.trial-steed p {
+  font-size: 12px;
+  margin-top: 5px;
+}
+.trial-steed .button {
+  min-height: 44px;
+}
+@media (max-width: 760px) {
+  .trial-steed {
+    flex-wrap: wrap;
+    padding: 16px;
+  }
+  .trial-steed .button {
+    width: 100%;
+  }
+}
+@media (pointer: coarse) {
+  .travel-action {
+    bottom: 230px;
+  }
+  .game-tutorial {
+    bottom: 305px;
+  }
+}
+@media (max-width: 1100px) {
+  .travel-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .site-header nav {
+    gap: 1px;
+  }
+  .nav-link {
+    padding-inline: 9px;
+  }
+}
+@media (max-width: 760px) {
+  .stable-layout {
+    grid-template-columns: 1fr;
+  }
+  .stable-preview,
+  .riding-trainer {
+    padding: 22px;
+  }
+  .travel-grid {
+    grid-template-columns: 1fr;
+  }
+  .travel-card > .travel-art {
+    max-height: 235px;
+  }
+  .stable-catalog-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .travel-camp {
+    flex-wrap: wrap;
+    padding: 18px;
+  }
+  .travel-camp .button {
+    width: 100%;
+  }
+  .travel-action {
+    right: 16px;
+    bottom: 215px;
+    width: 190px;
+  }
+  .stable-review .modal-actions {
+    flex-wrap: wrap;
+  }
+  .stable-review .button {
+    flex: 1;
+    white-space: nowrap;
+  }
+}
+@media (pointer: coarse) {
+  .travel-action {
+    bottom: 230px;
+  }
+  .in-game #toast-root {
+    bottom: 370px;
+  }
+}
+@media (max-width: 760px) {
+  .in-game #toast-root {
+    bottom: 370px;
+  }
+}

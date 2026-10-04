@@ -1,0 +1,35 @@
+{
+  "layout": [
+    {
+      "width": 360,
+      "scroll": 360,
+      "cards": 5
+    },
+    {
+      "width": 390,
+      "scroll": 390,
+      "cards": 5
+    },
+    {
+      "width": 760,
+      "scroll": 760,
+      "cards": 5
+    },
+    {
+      "width": 800,
+      "scroll": 800,
+      "cards": 5
+    },
+    {
+      "width": 1024,
+      "scroll": 1024,
+      "cards": 5
+    },
+    {
+      "width": 1440,
+      "scroll": 1440,
+      "cards": 5
+    }
+  ],
+  "errors": []
+}

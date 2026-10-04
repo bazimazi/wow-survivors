@@ -1,0 +1,725 @@
+{
+  "layout": [
+    {
+      "state": "available",
+      "faction": "timbermaw",
+      "width": 360,
+      "scroll": 360,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "available",
+      "faction": "thorium",
+      "width": 360,
+      "scroll": 360,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "available",
+      "faction": "argent",
+      "width": 360,
+      "scroll": 360,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "available",
+      "faction": "timbermaw",
+      "width": 390,
+      "scroll": 390,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "available",
+      "faction": "thorium",
+      "width": 390,
+      "scroll": 390,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "available",
+      "faction": "argent",
+      "width": 390,
+      "scroll": 390,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "available",
+      "faction": "timbermaw",
+      "width": 760,
+      "scroll": 760,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "available",
+      "faction": "thorium",
+      "width": 760,
+      "scroll": 760,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "available",
+      "faction": "argent",
+      "width": 760,
+      "scroll": 760,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "available",
+      "faction": "timbermaw",
+      "width": 800,
+      "scroll": 800,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "available",
+      "faction": "thorium",
+      "width": 800,
+      "scroll": 800,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "available",
+      "faction": "argent",
+      "width": 800,
+      "scroll": 800,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "available",
+      "faction": "timbermaw",
+      "width": 1024,
+      "scroll": 1024,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "available",
+      "faction": "thorium",
+      "width": 1024,
+      "scroll": 1024,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "available",
+      "faction": "argent",
+      "width": 1024,
+      "scroll": 1024,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "available",
+      "faction": "timbermaw",
+      "width": 1440,
+      "scroll": 1440,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "available",
+      "faction": "thorium",
+      "width": 1440,
+      "scroll": 1440,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "available",
+      "faction": "argent",
+      "width": 1440,
+      "scroll": 1440,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "active",
+      "faction": "timbermaw",
+      "width": 360,
+      "scroll": 360,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "active",
+      "faction": "thorium",
+      "width": 360,
+      "scroll": 360,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "active",
+      "faction": "argent",
+      "width": 360,
+      "scroll": 360,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "active",
+      "faction": "timbermaw",
+      "width": 390,
+      "scroll": 390,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "active",
+      "faction": "thorium",
+      "width": 390,
+      "scroll": 390,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "active",
+      "faction": "argent",
+      "width": 390,
+      "scroll": 390,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "active",
+      "faction": "timbermaw",
+      "width": 760,
+      "scroll": 760,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "active",
+      "faction": "thorium",
+      "width": 760,
+      "scroll": 760,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "active",
+      "faction": "argent",
+      "width": 760,
+      "scroll": 760,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "active",
+      "faction": "timbermaw",
+      "width": 800,
+      "scroll": 800,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "active",
+      "faction": "thorium",
+      "width": 800,
+      "scroll": 800,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "active",
+      "faction": "argent",
+      "width": 800,
+      "scroll": 800,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "active",
+      "faction": "timbermaw",
+      "width": 1024,
+      "scroll": 1024,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "active",
+      "faction": "thorium",
+      "width": 1024,
+      "scroll": 1024,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "active",
+      "faction": "argent",
+      "width": 1024,
+      "scroll": 1024,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "active",
+      "faction": "timbermaw",
+      "width": 1440,
+      "scroll": 1440,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "active",
+      "faction": "thorium",
+      "width": 1440,
+      "scroll": 1440,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "active",
+      "faction": "argent",
+      "width": 1440,
+      "scroll": 1440,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "ready",
+      "faction": "timbermaw",
+      "width": 360,
+      "scroll": 360,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": "3"
+    },
+    {
+      "state": "ready",
+      "faction": "thorium",
+      "width": 360,
+      "scroll": 360,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": "3"
+    },
+    {
+      "state": "ready",
+      "faction": "argent",
+      "width": 360,
+      "scroll": 360,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": "3"
+    },
+    {
+      "state": "ready",
+      "faction": "timbermaw",
+      "width": 390,
+      "scroll": 390,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": "3"
+    },
+    {
+      "state": "ready",
+      "faction": "thorium",
+      "width": 390,
+      "scroll": 390,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": "3"
+    },
+    {
+      "state": "ready",
+      "faction": "argent",
+      "width": 390,
+      "scroll": 390,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": "3"
+    },
+    {
+      "state": "ready",
+      "faction": "timbermaw",
+      "width": 760,
+      "scroll": 760,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": "3"
+    },
+    {
+      "state": "ready",
+      "faction": "thorium",
+      "width": 760,
+      "scroll": 760,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": "3"
+    },
+    {
+      "state": "ready",
+      "faction": "argent",
+      "width": 760,
+      "scroll": 760,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": "3"
+    },
+    {
+      "state": "ready",
+      "faction": "timbermaw",
+      "width": 800,
+      "scroll": 800,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": "3"
+    },
+    {
+      "state": "ready",
+      "faction": "thorium",
+      "width": 800,
+      "scroll": 800,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": "3"
+    },
+    {
+      "state": "ready",
+      "faction": "argent",
+      "width": 800,
+      "scroll": 800,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": "3"
+    },
+    {
+      "state": "ready",
+      "faction": "timbermaw",
+      "width": 1024,
+      "scroll": 1024,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": "3"
+    },
+    {
+      "state": "ready",
+      "faction": "thorium",
+      "width": 1024,
+      "scroll": 1024,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": "3"
+    },
+    {
+      "state": "ready",
+      "faction": "argent",
+      "width": 1024,
+      "scroll": 1024,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": "3"
+    },
+    {
+      "state": "ready",
+      "faction": "timbermaw",
+      "width": 1440,
+      "scroll": 1440,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": "3"
+    },
+    {
+      "state": "ready",
+      "faction": "thorium",
+      "width": 1440,
+      "scroll": 1440,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": "3"
+    },
+    {
+      "state": "ready",
+      "faction": "argent",
+      "width": 1440,
+      "scroll": 1440,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": "3"
+    },
+    {
+      "state": "completed",
+      "faction": "timbermaw",
+      "width": 360,
+      "scroll": 360,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "completed",
+      "faction": "thorium",
+      "width": 360,
+      "scroll": 360,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "completed",
+      "faction": "argent",
+      "width": 360,
+      "scroll": 360,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "completed",
+      "faction": "timbermaw",
+      "width": 390,
+      "scroll": 390,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "completed",
+      "faction": "thorium",
+      "width": 390,
+      "scroll": 390,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "completed",
+      "faction": "argent",
+      "width": 390,
+      "scroll": 390,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "completed",
+      "faction": "timbermaw",
+      "width": 760,
+      "scroll": 760,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "completed",
+      "faction": "thorium",
+      "width": 760,
+      "scroll": 760,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "completed",
+      "faction": "argent",
+      "width": 760,
+      "scroll": 760,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "completed",
+      "faction": "timbermaw",
+      "width": 800,
+      "scroll": 800,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "completed",
+      "faction": "thorium",
+      "width": 800,
+      "scroll": 800,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "completed",
+      "faction": "argent",
+      "width": 800,
+      "scroll": 800,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "completed",
+      "faction": "timbermaw",
+      "width": 1024,
+      "scroll": 1024,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "completed",
+      "faction": "thorium",
+      "width": 1024,
+      "scroll": 1024,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "completed",
+      "faction": "argent",
+      "width": 1024,
+      "scroll": 1024,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "completed",
+      "faction": "timbermaw",
+      "width": 1440,
+      "scroll": 1440,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "completed",
+      "faction": "thorium",
+      "width": 1440,
+      "scroll": 1440,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    },
+    {
+      "state": "completed",
+      "faction": "argent",
+      "width": 1440,
+      "scroll": 1440,
+      "chapters": 4,
+      "offers": 4,
+      "nav": 8,
+      "readyBadge": null
+    }
+  ],
+  "errors": []
+}

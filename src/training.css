@@ -1,0 +1,217 @@
+.trade-training {
+  margin-top: auto;
+}
+.trainer-requirements {
+  color: #aab69d;
+  font-size: 10px;
+  line-height: 1.8;
+  margin: 13px 0 11px;
+}
+.trainer-button {
+  width: 100%;
+  min-height: 44px;
+  font-size: 11px;
+}
+.profession-card .profession-foot {
+  margin-top: 14px;
+}
+.secondary-training {
+  margin-top: 35px;
+}
+.secondary-training-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.secondary-training-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #3c4735;
+  border-radius: 5px;
+  padding: 22px;
+  background: #172019;
+}
+.secondary-training-card h3 {
+  margin: 0 0 5px;
+  font-size: 15px;
+}
+.secondary-training-card p {
+  color: #a6b49b;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.secondary-training-card .profession-skill {
+  margin-top: 16px;
+}
+.trade-specializations {
+  margin: 36px 0;
+}
+.specialization-group {
+  margin-top: 23px;
+}
+.specialization-group > h3 {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: #c9bc8e;
+  font-size: 15px;
+}
+.trade-specialization-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 15px;
+}
+.trade-specialization-grid.three-paths {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.trade-specialization-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #3a4834;
+  border-radius: 5px;
+  background: #18221a;
+  padding: 23px;
+  min-width: 0;
+}
+.trade-specialization-card.chosen {
+  border-color: #b5a572;
+  background: #252b1c;
+}
+.trade-specialization-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.trade-specialization-heading h4 {
+  margin: 0;
+  color: #d3d5bd;
+  font:
+    600 14px "Cinzel",
+    serif;
+  line-height: 1.8;
+}
+.specialization-selected {
+  margin-left: auto;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  color: #c6b17b;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.trade-specialization-card > p {
+  color: #a5b197;
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 15px 0;
+}
+.specialization-reward {
+  display: grid;
+  gap: 11px;
+  border-top: 1px solid #3c4935;
+  padding-top: 16px;
+  margin-top: auto;
+}
+.specialization-reward > small {
+  color: #8eaa94;
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+.specialization-reward > b {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #93b7da;
+  font-size: 12px;
+}
+.specialization-reward > span {
+  color: #a8b29d;
+  font-size: 10px;
+  line-height: 1.8;
+}
+.specialization-reward .gear-bonuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 10px;
+}
+.trade-specialization-card > button {
+  margin-top: 20px;
+  min-height: 44px;
+}
+.recipe-training {
+  display: grid;
+  gap: 8px;
+  color: #b2c29c;
+  font-size: 11px;
+  margin: 14px 0;
+}
+.specialization-review .specialization-reward {
+  margin: 20px 0;
+  padding: 18px;
+  border: 1px solid #48573d;
+  border-radius: 4px;
+  background: #1b281b;
+}
+.result-skill-caps {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: #c6b887;
+  font-size: 11px;
+  line-height: 1.8;
+  text-align: left;
+  padding: 14px;
+  background: #bbb27009;
+  border: 1px solid #80744350;
+  border-radius: 4px;
+}
+.result-skill-caps svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.craft-review #toast-root {
+  display: none;
+}
+@media (max-width: 480px) {
+  .profession-card.learned {
+    grid-column: 1 / -1;
+  }
+}
+.trade-progress-guide {
+  font-size: 12px;
+  color: #a9b99b;
+  line-height: 1.9;
+  padding: 17px 22px;
+  border-left: 2px solid #a3935c;
+  background: #242a1b;
+  margin: 20px 0 25px;
+}
+@media (max-width: 1050px) {
+  .trade-specialization-grid.three-paths {
+    grid-template-columns: 1fr;
+  }
+  .trade-specialization-card {
+    padding: 20px;
+  }
+}
+@media (max-width: 760px) {
+  .secondary-training-grid,
+  .trade-specialization-grid {
+    grid-template-columns: 1fr;
+  }
+  .trade-specializations .subtle-label {
+    display: none;
+  }
+  .trade-specialization-heading h4 {
+    font-size: 13px;
+  }
+  .specialization-selected {
+    font-size: 9px;
+  }
+  .trainer-button,
+  .trade-specialization-card > button {
+    min-height: 44px;
+  }
+}

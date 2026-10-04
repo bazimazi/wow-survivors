@@ -1,0 +1,463 @@
+.outpost-selector,
+.commission-grid,
+.quartermaster-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.outpost-selector {
+  margin-bottom: 24px;
+}
+.outpost-choice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+  padding: 19px;
+  border: 1px solid #344437;
+  background: #141f18;
+  color: #d5d8c9;
+  border-radius: 5px;
+  min-width: 0;
+}
+.outpost-choice.selected {
+  border-color: var(--faction-color);
+  background: #202c21;
+}
+.outpost-choice > span:nth-child(2) {
+  display: grid;
+  gap: 7px;
+  flex: 1;
+}
+.outpost-choice b {
+  font:
+    600 14px "Cinzel",
+    serif;
+}
+.outpost-choice small {
+  color: #a2ad9a;
+  font-size: 11px;
+}
+.faction-emblem {
+  color: var(--faction-color);
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  flex-shrink: 0;
+  border: 1px solid #7e8b6140;
+  background: #8999670c;
+  border-radius: 50%;
+}
+.faction-emblem.large {
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 13px;
+}
+.outpost-banner {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 35px;
+  padding: 32px;
+  background:
+    radial-gradient(ellipse at 90% 30%, #a9ab5d13, transparent 70%), #19251b;
+  border: 1px solid #43513a;
+  border-top: 2px solid var(--faction-color);
+  border-radius: 5px;
+}
+.outpost-banner h2 {
+  font-size: 28px;
+  margin: 15px 0;
+}
+.outpost-banner-copy p {
+  max-width: 660px;
+  color: #abb7a1;
+  line-height: 1.8;
+  margin-bottom: 24px;
+}
+.standing-panel {
+  text-align: center;
+  align-self: center;
+}
+.standing-panel > b {
+  display: block;
+  font:
+    600 22px "Cinzel",
+    serif;
+  color: var(--faction-color);
+  margin-bottom: 7px;
+}
+.standing-panel > span:not(.faction-emblem) {
+  font-size: 12px;
+  color: #bdc6b1;
+}
+.standing-panel .progress-track {
+  margin: 14px 0 9px;
+}
+.standing-panel .progress-track i {
+  background: var(--faction-color);
+}
+.standing-panel small {
+  font-size: 11px;
+  color: #95a18b;
+}
+.outpost-explanation {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #a5af9b;
+  margin: 17px 0 28px;
+  max-width: 900px;
+}
+.reputation-rules {
+  margin: -10px 0 28px;
+  max-width: 900px;
+  color: #a5af9b;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.reputation-rules summary {
+  cursor: pointer;
+  color: #c6b57c;
+  width: fit-content;
+  padding: 8px 0;
+}
+.reputation-rules p {
+  margin: 4px 0 0;
+}
+.active-commission {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 22px;
+  margin-bottom: 32px;
+  border: 1px solid #9a875555;
+  border-left: 3px solid #c1a769;
+  border-radius: 5px;
+  background: #242819;
+}
+.commission-status {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+}
+.commission-status > div {
+  display: grid;
+  gap: 6px;
+}
+.commission-status small {
+  font-size: 9px;
+  color: #c8b576;
+  letter-spacing: 1.2px;
+}
+.commission-status b {
+  font:
+    600 13px "Cinzel",
+    serif;
+  color: #d5d8c9;
+}
+.commission-status > div > span {
+  color: #a8b39c;
+  font-size: 11px;
+}
+.faction-small-icon {
+  color: var(--faction-color, #c8b576);
+  flex-shrink: 0;
+}
+.commission-controls {
+  display: grid;
+  gap: 9px;
+  justify-items: end;
+}
+.commission-controls .muted {
+  font-size: 11px;
+}
+.commission-card,
+.quartermaster-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid #334232;
+  border-radius: 5px;
+  background: #152018;
+  padding: 24px;
+}
+.commission-card.accepted {
+  border-color: #9e8c58;
+}
+.commission-card-heading,
+.quartermaster-item {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  color: #b8aa7c;
+}
+.commission-card h3,
+.quartermaster-card h3 {
+  margin: 0;
+  font-size: 14px;
+  color: #d9ddce;
+}
+.commission-card p,
+.quartermaster-card > p {
+  color: #9ca991;
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 17px 0;
+}
+.commission-goal {
+  font-size: 11px;
+  color: #c0c7b5;
+  margin-top: auto;
+}
+.commission-rewards {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #c4b17a;
+  font-size: 11px;
+  margin: 16px 0;
+}
+.commission-card > button {
+  width: 100%;
+  min-height: 44px;
+}
+.quartermaster-heading {
+  margin-top: 37px;
+}
+.quartermaster-item small {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: #9eaa90;
+  margin-bottom: 7px;
+}
+.quartermaster-item h3 {
+  line-height: 1.65;
+  color: #9bbce0;
+}
+.quartermaster-card .gear-bonuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-bottom: 19px;
+  font-size: 11px;
+}
+.offer-requirements {
+  display: grid;
+  gap: 9px;
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid #334232;
+  font-size: 11px;
+  color: #b1bba2;
+}
+.quartermaster-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 18px;
+}
+.quartermaster-footer > span {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: #cfb97d;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.quartermaster-footer button {
+  font-size: 11px;
+  padding: 10px 13px;
+  min-height: 44px;
+}
+.quartermaster-card > .text-button {
+  margin-top: 14px;
+  text-align: left;
+  min-height: 32px;
+}
+.quartermaster-card.owned {
+  border-color: #6a8154;
+}
+.camp-outpost {
+  border: 1px solid #3a4830;
+  background: #1b261a;
+  border-radius: 5px;
+  padding: 18px 21px;
+  margin: 0 0 30px;
+}
+.camp-outpost-heading {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+.camp-outpost-heading > div {
+  display: grid;
+  gap: 5px;
+  flex: 1;
+}
+.camp-outpost-heading small {
+  font-size: 8px;
+  color: #96a485;
+  letter-spacing: 1.4px;
+}
+.camp-outpost-heading b {
+  font:
+    600 13px "Cinzel",
+    serif;
+  color: var(--faction-color);
+}
+.camp-outpost-heading > div > span {
+  color: #a8b39c;
+  font-size: 10px;
+}
+.camp-outpost > p {
+  margin: 14px 0 0;
+  color: #a8b39c;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.camp-outpost .commission-status {
+  margin-top: 17px;
+  border-top: 1px solid #38472f;
+  padding-top: 16px;
+}
+.result-reputation {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 17px;
+  margin: 18px 0;
+  border: 1px solid #51604470;
+  border-radius: 4px;
+  color: var(--faction-color);
+  text-align: left;
+}
+.result-reputation > div {
+  display: grid;
+  gap: 7px;
+}
+.result-reputation b {
+  font-size: 13px;
+}
+.result-reputation span {
+  font-size: 11px;
+  color: #a8b39c;
+}
+.result-modal .commission-status {
+  padding: 0 16px 14px;
+}
+.pause-commission {
+  padding: 15px;
+  margin: 18px 0;
+  border: 1px solid #51604470;
+  border-radius: 4px;
+}
+.recipe-reputation {
+  padding: 12px 0;
+  display: grid;
+  gap: 8px;
+  font-size: 11px;
+  color: #b7c4a0;
+}
+.recipe-reputation .text-button {
+  justify-self: start;
+  font-size: 11px;
+}
+@media (max-width: 1050px) {
+  .outpost-choice {
+    padding: 15px 12px;
+    gap: 10px;
+  }
+  .outpost-choice b {
+    font-size: 12px;
+  }
+  .faction-emblem {
+    width: 42px;
+    height: 42px;
+  }
+  .quartermaster-card,
+  .commission-card {
+    padding: 19px;
+  }
+  .quartermaster-footer {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 760px) {
+  .site-header nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    height: auto;
+  }
+  .site-header nav .nav-link {
+    font-size: 11px;
+    gap: 6px;
+    padding: 10px 4px;
+    min-height: 44px;
+    justify-content: center;
+  }
+  .outpost-selector {
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+  .outpost-choice {
+    padding: 13px 16px;
+  }
+  .outpost-choice b {
+    font-size: 13px;
+  }
+  .outpost-banner {
+    grid-template-columns: 1fr;
+    padding: 24px;
+    gap: 25px;
+  }
+  .outpost-banner h2 {
+    font-size: 23px;
+  }
+  .standing-panel {
+    max-width: 320px;
+    width: 100%;
+    justify-self: center;
+  }
+  .standing-panel .large {
+    display: none;
+  }
+  .commission-grid,
+  .quartermaster-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .active-commission {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 17px;
+    padding: 18px;
+  }
+  .commission-controls {
+    justify-items: stretch;
+  }
+  .commission-controls .text-button {
+    justify-self: start;
+    min-height: 36px;
+  }
+  .quartermaster-heading .subtle-label {
+    display: none;
+  }
+  .camp-outpost {
+    padding: 16px;
+  }
+  .camp-outpost-heading {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .camp-outpost-heading > .text-button {
+    margin-left: 32px;
+    min-height: 35px;
+  }
+  .quartermaster-footer button {
+    max-width: 230px;
+  }
+}

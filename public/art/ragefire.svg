@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 800">
+<defs>
+ <linearGradient id="cave" x2="0" y2="1"><stop stop-color="#171626"/><stop offset=".7" stop-color="#623232"/><stop offset="1" stop-color="#201c28"/></linearGradient>
+ <linearGradient id="lava" x2="0" y2="1"><stop stop-color="#ffca68"/><stop offset=".4" stop-color="#e47934"/><stop offset="1" stop-color="#632329"/></linearGradient>
+ <radialGradient id="glow"><stop stop-color="#ea7d4480"/><stop offset="1" stop-color="#d9693200"/></radialGradient>
+</defs>
+<path fill="url(#cave)" d="M0 0H1400V800H0z"/>
+<ellipse fill="url(#glow)" cx="1000" cy="570" rx="480" ry="350"/>
+<path fill="#352938" d="M0 0H1400V280l-120-125-110 65-115-120-103 143-118-80-95 160-110-100-82 185-110-135-110 150-117-120-135 185-75-67z"/>
+<path fill="#251f30" d="M0 0h390l-73 310-83-142-70 250L0 250zm1100 0h300v570l-73-227-75 80-69-240-74 64z"/>
+<path fill="url(#lava)" d="M700 590l120-44 165 29 77-41 97 35 241-26v200l-188-39-114 52-147-76-190 51-144-92-147 53-158-22-113 73-90-55-219 92V655l177-52 117 33 132-41 128 42z"/>
+<g fill="none" stroke="#ffbc68" stroke-width="5" opacity=".45"><path d="M527 693l113-32 166 49 135-26 132 51 166-18"/><path d="M975 608l96 14 104-37 142 27"/></g>
+<path fill="#392d3c" stroke="#715046" stroke-width="6" d="M689 487l291-78 211 133-72 149-315 44-166-128z"/>
+<path fill="#534049" d="M714 491l262-62 183 119-61 102-275 46-147-100z"/>
+<path fill="#352b37" d="M953 439l25-39 28 51-14 181-43 2z"/>
+<path fill="#42303d" stroke="#865449" stroke-width="4" d="M1208 306l74 77-8 155-55 53-55-39 6-179z"/>
+<path fill="#a04532" d="M1194 376l39-29 24 49-19 36-42-8z"/>
+<path fill="#f1ae58" d="M1214 381l14-12 8 27-10 16-10-9z"/>
+<path fill="#312433" d="M748 212l48 60-3 244-59 60-51-61 21-242z"/>
+<path fill="#783332" d="M717 299h50v168l-24-28-23 27z"/>
+<path fill="#cb874f" opacity=".65" d="M738 324l-13 19 16 16 14-18zm-11 48h31v5h-31z"/>
+<g fill="#201c28"><path d="M0 727l128-93 152 78 110-50 119 57 184-42 82 123H0z"/><path d="M1154 737l70-60 69 32 107-100v191h-222z"/></g>
+</svg>

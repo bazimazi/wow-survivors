@@ -1,0 +1,314 @@
+.zone-strip {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.zone-mini.deadmines {
+  color: #d6ae7b;
+  background: linear-gradient(140deg, #473b31, #29373b);
+}
+.zone-mini.ragefire {
+  color: #edaa70;
+  background: linear-gradient(140deg, #65332a, #302438);
+}
+.zone-ragefire .world-image {
+  background-image: url("/art/ragefire.svg");
+  filter: none;
+}
+.zone-ragefire .world-image::after {
+  content: "";
+  position: absolute;
+  right: 5%;
+  bottom: 4%;
+  width: 38%;
+  max-width: 300px;
+  aspect-ratio: 1;
+  background: url("/art/ragefire-sprites.png") 0% 100% / 300% 300% no-repeat;
+  opacity: 0.8;
+}
+.zone-ragefire .world-overlay {
+  background:
+    linear-gradient(90deg, #281b24f0 5%, #241b2577 70%),
+    linear-gradient(0deg, #1d1722e8, transparent 80%);
+}
+.zone-ragefire .world-kicker {
+  color: #e0a16c;
+}
+.zone-ragefire .world-label {
+  color: #e1b888;
+}
+.zone-option:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+.zone-deadmines .world-image {
+  background-image: url("/art/deadmines.svg");
+  filter: none;
+}
+.zone-deadmines .world-overlay {
+  background:
+    linear-gradient(90deg, #182127f2 5%, #18212788 65%),
+    linear-gradient(0deg, #101a20e8, transparent 80%);
+}
+.dungeon-preview {
+  margin-top: 24px;
+  padding: 23px;
+  border: 1px solid #88714c70;
+  border-radius: 5px;
+  background: linear-gradient(130deg, #2e302333, #1b293133);
+}
+.dungeon-preview .section-heading {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.dungeon-route {
+  padding: 0;
+  margin: 22px 0;
+  list-style: none;
+  display: grid;
+  gap: 15px;
+}
+.dungeon-route li {
+  display: flex;
+  gap: 15px;
+  align-items: flex-start;
+}
+.dungeon-route li > span {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: 1px solid #b99a6260;
+  color: #d5bc85;
+  border-radius: 50%;
+  font-family: var(--serif);
+}
+.dungeon-route h3 {
+  font-family: var(--serif);
+  color: #e1d4b3;
+  margin: 0 0 4px;
+  font-weight: 500;
+}
+.dungeon-route b {
+  font-size: 12px;
+  color: #c9b18c;
+  font-weight: 500;
+}
+.dungeon-route p,
+.dungeon-note,
+.dungeon-route small {
+  color: #a4ad99;
+  font-size: 11px;
+  line-height: 1.7;
+  margin: 4px 0;
+}
+.dungeon-provisions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #8a794633;
+}
+.dungeon-provisions > span {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: #bda778;
+  font-size: 11px;
+}
+.dungeon-provisions small {
+  width: 100%;
+  color: #9dab96;
+  line-height: 1.7;
+}
+.dungeon-loot-guide {
+  margin: 22px 0;
+}
+.dungeon-loot-guide summary {
+  padding: 12px 0;
+  color: #c8b07c;
+  cursor: pointer;
+  font-size: 12px;
+  min-height: 44px;
+}
+.dungeon-loot-guide > div {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.dungeon-loot-guide h4 {
+  color: #d6bc8b;
+  font-size: 11px;
+  font-weight: 500;
+}
+.dungeon-loot-guide p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11px;
+  color: #8dbce0;
+}
+.dungeon-loot-guide small {
+  display: block;
+  width: 100%;
+  color: #9aaa96;
+  font-size: 10px;
+  line-height: 1.6;
+}
+.checkpoint-modal {
+  width: min(780px, calc(100vw - 40px));
+  max-width: 780px;
+}
+.checkpoint-reward {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 17px;
+  margin: 20px 0;
+  border: 1px solid #669dba66;
+  background: #17273180;
+  color: var(--reward-color);
+  border-radius: 4px;
+}
+.checkpoint-reward > div {
+  display: grid;
+  gap: 6px;
+}
+.checkpoint-reward small {
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: #acc3cc;
+}
+.checkpoint-reward b {
+  font-size: 14px;
+  font-weight: 500;
+}
+.checkpoint-reward span {
+  color: #aec0ac;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.checkpoint-rest {
+  color: #b7c1a6;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.checkpoint-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+.checkpoint-choice {
+  border: 1px solid #91a46d55;
+  padding: 16px;
+  background: #24332650;
+  color: #d6c79e;
+  text-align: left;
+  border-radius: 4px;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+.checkpoint-choice:hover {
+  border-color: #d1bc86;
+  background: #35473077;
+}
+.checkpoint-choice > span {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.checkpoint-choice b {
+  display: block;
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: 500;
+}
+.checkpoint-choice p {
+  color: #a8b69a;
+  font-size: 11px;
+  line-height: 1.7;
+  min-height: 55px;
+}
+.checkpoint-choice small {
+  color: #d2bc87;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+}
+.result-dungeon {
+  border: 1px solid #ae906355;
+  padding: 15px;
+  margin: 20px 0;
+  border-radius: 4px;
+}
+.result-dungeon > b,
+.result-dungeon > span {
+  display: block;
+  font-size: 12px;
+  color: #d4c298;
+  line-height: 1.7;
+}
+.result-dungeon > span {
+  font-size: 11px;
+  color: #a6b59a;
+}
+.result-dungeon ol {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+.result-dungeon li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #77826d;
+}
+.result-dungeon li.complete {
+  color: #bbc79c;
+}
+.has-checkpoint #toast-root {
+  display: none;
+}
+@media (max-width: 760px) {
+  .zone-strip {
+    grid-template-columns: 1fr;
+  }
+  .dungeon-preview {
+    padding: 18px;
+  }
+  .dungeon-provisions,
+  .dungeon-loot-guide > div {
+    grid-template-columns: 1fr;
+  }
+  .checkpoint-options {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .checkpoint-choice {
+    padding: 13px 15px;
+  }
+  .checkpoint-choice > span {
+    float: right;
+    gap: 12px;
+    margin: 0 0 0 12px;
+  }
+  .checkpoint-choice b {
+    font-size: 14px;
+  }
+  .checkpoint-choice p {
+    min-height: 0;
+    margin: 7px 0;
+  }
+  .checkpoint-modal {
+    padding: 23px 19px;
+  }
+  .checkpoint-rest {
+    font-size: 11px;
+  }
+}
