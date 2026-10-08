@@ -63,7 +63,7 @@ async function home(p: Page) {
   await p.getByRole("button", { name: "Return to camp", exact: true }).click();
 }
 
-test("Duskwood preview shows selected-hero entry requirements, six landmarks and thirteen equipment rewards", async ({
+test("Duskwood preview shows selected-hero entry requirements, six landmarks and twenty-eight local equipment rewards", async ({
   page,
 }) => {
   const s = ready();
@@ -83,7 +83,17 @@ test("Duskwood preview shows selected-hero entry requirements, six landmarks and
     "Watchkeeper’s Oath",
   );
   await page.getByText("Preview Duskwood equipment", { exact: true }).click();
-  await expect(page.locator(".dungeon-loot-guide section p")).toHaveCount(12);
+  const rewards = page.locator(".dungeon-loot-guide section p");
+  await expect(rewards).toHaveCount(28);
+  await expect(rewards.filter({ hasText: "Ravenhill Sabre" })).toContainText(
+    "Weapon · One-handed swords · One-handed · level 19 · warrior / rogue / hunter",
+  );
+  await expect(
+    rewards.filter({ hasText: "Nightwatch Wristwraps" }),
+  ).toContainText("cloth · Wrists · level 18");
+  await expect(rewards.filter({ hasText: "Ravenhill Band" })).toContainText(
+    "All classes · Ring · level 19",
+  );
   await page.locator('[data-action="hero"][data-id="warrior"]').click();
   await expect(
     page.getByRole("button", { name: "Begin Expedition" }),

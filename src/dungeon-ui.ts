@@ -12,6 +12,7 @@ import { zoneUnlocked } from "./progression";
 import type { SaveData, RunRecord } from "./progression";
 import type { GameEngine } from "./engine";
 import { icon } from "./icons";
+import { gearUseLabel } from "./equipment";
 
 const clock = (n: number) =>
   `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, "0")}`;
@@ -24,7 +25,7 @@ export function renderDungeonPreview(s: SaveData): string {
         `<section><h4>${stage.boss} · one reward</h4>${stage.loot
           .map((id) => {
             const g = GEAR_MAP[id];
-            return `<p>${icon(g.icon, 17)}<b>${g.name}</b><small>${g.armor || "All armor types"} · ${g.slot} · level ${g.level}${g.classes ? ` · ${g.classes.join(" / ")}` : ""}</small></p>`;
+            return `<p>${icon(g.icon, 17)}<b>${g.name}</b><small>${g.armor || (g.classes ? "Class restricted" : "All classes")} · ${gearUseLabel(g)} · level ${g.level}${g.classes ? ` · ${g.classes.join(" / ")}` : ""}</small></p>`;
           })
           .join("")}</section>`,
     )

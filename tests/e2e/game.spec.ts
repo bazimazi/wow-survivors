@@ -48,7 +48,7 @@ test("camp, nine heroes, talents, professions, crafting, equipment and save relo
   await page.reload();
   await expect(page.locator(".profession-card.learned")).toHaveCount(2);
   await page.getByRole("button", { name: "Armory", exact: true }).click();
-  await expect(page.locator(".loadout-slot")).toHaveCount(10);
+  await expect(page.locator(".loadout-slot")).toHaveCount(16);
   await expect(page.locator(".loadout-slot")).toContainText([
     "Apprentice’s Staff",
     "Linen Robe",

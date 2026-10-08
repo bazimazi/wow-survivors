@@ -1,0 +1,320 @@
+.modal.ring-review {
+  padding: 24px;
+}
+.ring-choices {
+  display: grid;
+  gap: 14px;
+  margin: 16px 0;
+}
+.ring-choice {
+  padding: 12px;
+  border: 1px solid #a59c6555;
+  border-radius: 4px;
+  background: #101b1280;
+}
+.ring-choice-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #d4c595;
+}
+.ring-choice-heading small {
+  color: #a6af97;
+}
+.ring-choice-heading h3 {
+  margin: 4px 0 0;
+}
+.ring-choice .gear-comparison {
+  margin: 12px 0;
+}
+.modal.ring-review button {
+  min-height: 44px;
+}
+
+.weapon-review .weapon-change {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  margin: 18px 0;
+  border: 1px solid #a59c6555;
+  border-radius: 4px;
+  background: #101b1280;
+}
+.weapon-review button {
+  min-height: 44px;
+}
+.weapon-review .modal-close {
+  min-width: 44px;
+}
+.gear-actions [data-action="review-ranged"] {
+  min-height: 44px;
+  min-width: 44px;
+}
+.weapon-review .save-actions {
+  flex-wrap: wrap;
+}
+.weapon-review .save-actions .button {
+  flex: 1 1 150px;
+}
+
+.dual-wield-panel {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 20px;
+  margin-bottom: 24px;
+  border: 1px solid #a59c6555;
+  border-radius: 4px;
+  background: #101b1280;
+}
+.dual-wield-panel > div {
+  flex: 1;
+  min-width: 0;
+}
+.dual-wield-panel h2 {
+  margin: 0 0 8px;
+}
+.dual-wield-panel p {
+  margin: 0 0 8px;
+  color: #a6af97;
+  line-height: 1.7;
+}
+.dual-wield-panel small {
+  color: #c8b77f;
+}
+.dual-wield-panel button {
+  min-height: 44px;
+  white-space: normal;
+}
+.hand-choices {
+  display: grid;
+  gap: 14px;
+}
+.hand-choice {
+  padding: 16px;
+  border: 1px solid #a59c6555;
+  border-radius: 4px;
+}
+.hand-choice h3 {
+  margin: 0 0 8px;
+}
+.hand-choice p {
+  color: #a6af97;
+  line-height: 1.6;
+}
+@media (min-width: 700px) {
+  .ranged-review .hand-choices {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ranged-review .hand-choice:only-child {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 600px) {
+  .dual-wield-panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+:is(.weapon-training-panel, .equipment-workshop) {
+  margin-bottom: 24px;
+  border: 1px solid #a59c6555;
+  border-radius: 4px;
+  background: #101b1280;
+}
+:is(.weapon-training-panel, .equipment-workshop) summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 12px 20px;
+  cursor: pointer;
+}
+:is(.weapon-training-panel, .equipment-workshop) summary span {
+  flex: 1;
+  min-width: 0;
+}
+:is(.weapon-training-panel, .equipment-workshop) summary::after {
+  content: "+";
+  font-size: 24px;
+}
+:is(.weapon-training-panel, .equipment-workshop)[open] summary::after {
+  content: "−";
+}
+:is(.weapon-training-panel, .equipment-workshop) summary small {
+  display: block;
+  margin-top: 5px;
+  color: #c8b77f;
+}
+.weapon-training-content {
+  padding: 0 20px 20px;
+}
+.weapon-training-content p {
+  color: #a6af97;
+  line-height: 1.7;
+}
+.weapon-training-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: 16px;
+}
+.weapon-training-grid article {
+  padding: 16px;
+  border: 1px solid #a59c6555;
+  border-radius: 4px;
+}
+.weapon-training-grid h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 0;
+}
+.weapon-training-grid small {
+  display: block;
+  color: #c8b77f;
+  margin-bottom: 12px;
+}
+.weapon-training-grid button,
+.gear-actions [data-action="review-weapon-training"] {
+  min-height: 44px;
+  min-width: 44px;
+  white-space: normal;
+}
+.training-restriction,
+.weapon-training-content .training-restriction {
+  color: #d4ad86;
+}
+
+.item-state {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #c8b77f;
+  overflow-wrap: anywhere;
+}
+.item-state.negative {
+  color: #e1a48d;
+}
+.workshop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.workshop-actions button,
+.equipment-workshop button,
+.affix-choices button,
+.gear-actions button[data-action="review-attunement"],
+.gear-actions button[data-action="review-repair"] {
+  min-height: 44px;
+  white-space: normal;
+}
+.weapon-practice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 12px;
+}
+.weapon-practice-grid div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #a59c6533;
+  font-size: 13px;
+}
+.weapon-practice-grid span {
+  white-space: nowrap;
+  color: #c8b77f;
+}
+.equipment-shoot {
+  position: absolute;
+  right: 24px;
+  bottom: 202px;
+  min-height: 48px;
+  min-width: 150px;
+  padding: 10px;
+  border: 1px solid #a59c6577;
+  border-radius: 4px;
+  background: #101b12e8;
+  color: #e4dfcb;
+  cursor: pointer;
+}
+.equipment-shoot span {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+.equipment-shoot small {
+  display: block;
+  margin-top: 4px;
+  color: #c8b77f;
+}
+.equipment-result {
+  color: #c8b77f;
+  font-size: 13px;
+}
+@media (max-width: 700px) {
+  .equipment-shoot {
+    right: 12px;
+    bottom: 235px;
+    min-width: 120px;
+  }
+}
+
+@media (pointer: coarse) {
+  .equipment-shoot {
+    right: 26px;
+    bottom: 310px;
+  }
+}
+@media (max-width: 760px) {
+  .equipment-shoot {
+    right: auto;
+    left: 16px;
+    bottom: 215px;
+    width: calc(50% - 24px);
+    min-width: 0;
+    min-height: 76px;
+  }
+  .game-shell:has(.equipment-shoot) .travel-action {
+    width: calc(50% - 24px);
+    min-height: 76px;
+    display: grid;
+    grid-template-columns: 20px 1fr auto;
+    gap: 6px;
+  }
+  .game-shell:has(.equipment-shoot) .travel-action > span {
+    display: contents;
+  }
+  .game-shell:has(.equipment-shoot) .travel-action .icon {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .game-shell:has(.equipment-shoot) .travel-action b {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .game-shell:has(.equipment-shoot) .travel-action kbd {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .game-shell:has(.equipment-shoot) .travel-action small {
+    grid-column: 1 / -1;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .game-shell:has(.equipment-shoot) .game-tutorial {
+    bottom: 325px;
+  }
+}
+@media (max-width: 760px) and (pointer: coarse) {
+  .equipment-shoot {
+    bottom: 230px;
+  }
+}

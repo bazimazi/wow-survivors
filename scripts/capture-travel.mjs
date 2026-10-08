@@ -1,9 +1,10 @@
-import { chromium } from "@playwright/test";
+import { openCaptureSession } from "./capture-session.mjs";
 import { mkdir } from "node:fs/promises";
 import assert from "node:assert/strict";
 
 await mkdir("output/screenshots", { recursive: true });
-const browser = await chromium.launch();
+const session = await openCaptureSession();
+const browser = session.browser;
 try {
   const page = await browser.newPage({
     viewport: { width: 1440, height: 1000 },
@@ -11,7 +12,7 @@ try {
   });
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("http://127.0.0.1:5176/");
+  await page.goto(session.url);
   await page.evaluate(async () => {
     const { freshSave, persist, trainRiding, purchaseTravel, selectTravel } =
       await import("/src/progression.ts");
@@ -29,7 +30,7 @@ try {
     selectTravel(s, "swift_horse");
     persist(s);
   });
-  await page.goto("http://127.0.0.1:5176/#stable");
+  await page.goto(`${session.url}#stable`);
   await page.reload();
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({
@@ -160,5 +161,5 @@ try {
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ layout, errors }, null, 2));
 } finally {
-  await browser.close();
+  await session.close();
 }

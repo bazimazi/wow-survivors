@@ -2,7 +2,6 @@ import {
   MATERIALS,
   PROFESSIONS,
   RECIPES,
-  SLOT_LABELS,
   RARITY_COLORS,
   STAT_LABELS,
   ZONES,
@@ -24,14 +23,42 @@ import { DUSKWOOD_GEAR } from "./duskwood";
 import { CAMPAIGN_GEAR, CAMPAIGN_SOURCES, CAMPAIGNS } from "./campaigns";
 import { FACTIONS } from "./factions";
 import { isWardrobeSlot } from "./wardrobe";
+import { ACCESSORY_GEAR, ACCESSORY_SOURCES } from "./accessories";
+import { NECKLACE_GEAR, NECKLACE_SOURCES } from "./necklaces";
+import { OFFHAND_GEAR, OFFHAND_SOURCES } from "./offhands";
+import {
+  DUAL_WIELD_GEAR,
+  DUAL_WIELD_SOURCES,
+  dualWieldClass,
+} from "./dual-wield";
+import { gearSlotLabel, gearUseLabel, gearFitsSlot } from "./equipment";
+import { RANGED_GEAR, RANGED_SOURCES } from "./ranged";
+import {
+  TRAINED_WEAPON_GEAR,
+  TRAINED_WEAPON_SOURCES,
+  advancedWeaponType,
+} from "./weapon-training";
+import { TRAINING_RANKS } from "./training";
 export const WARDROBE_CATALOG = [
   ...WARDROBE_GEAR,
+  ...ACCESSORY_GEAR,
+  ...NECKLACE_GEAR,
+  ...OFFHAND_GEAR,
+  ...DUAL_WIELD_GEAR,
+  ...RANGED_GEAR,
+  ...TRAINED_WEAPON_GEAR,
   ...DUSKWOOD_GEAR.filter((g) => isWardrobeSlot(g.slot)),
   ...CAMPAIGN_GEAR.filter((g) => isWardrobeSlot(g.slot)),
   ...SHADOWFANG_GEAR.filter((g) => isWardrobeSlot(g.slot)),
 ];
 export const WARDROBE_CATALOG_SOURCES = {
   ...WARDROBE_SOURCES,
+  ...ACCESSORY_SOURCES,
+  ...NECKLACE_SOURCES,
+  ...OFFHAND_SOURCES,
+  ...DUAL_WIELD_SOURCES,
+  ...RANGED_SOURCES,
+  ...TRAINED_WEAPON_SOURCES,
   ...CAMPAIGN_SOURCES,
   ...SHADOWFANG_SOURCES,
 };
@@ -55,7 +82,7 @@ function sourceText(s: SaveData, id: string): string {
     const recipe = RECIPES.find((r) => r.id === source.recipe)!;
     const profession = PROFESSIONS.find((p) => p.id === source.profession)!;
     const restriction = craftRestriction(s, recipe.id);
-    return `<b>${profession.name} · Skill ${recipe.skill}</b><span>${recipe.gold} G · ${Object.entries(
+    return `<b>${profession.name} · Skill ${recipe.skill}${recipe.trainingRank ? " · " + TRAINING_RANKS[recipe.trainingRank - 1].name : ""}</b><span>${recipe.gold} G · ${Object.entries(
       recipe.cost,
     )
       .map(
@@ -76,12 +103,16 @@ function sourceText(s: SaveData, id: string): string {
 export function renderWardrobe(s: SaveData, filters: WardrobeFilters): string {
   const items = WARDROBE_CATALOG.filter(
     (g) =>
-      (filters.slot === "all" || g.slot === filters.slot) &&
+      (filters.slot === "all" || gearFitsSlot(g, filters.slot)) &&
       (filters.source === "all" ||
         WARDROBE_CATALOG_SOURCES[g.id].type === filters.source) &&
-      (!filters.usable || canEquip(s.selectedClass, g.id)),
+      (!filters.usable ||
+        (canEquip(s.selectedClass, g.id) &&
+          (filters.slot !== "offhand" ||
+            g.slot !== "weapon" ||
+            dualWieldClass(s.selectedClass)))),
   );
-  return `<section class="wardrobe-section"><button class="wardrobe-toggle" data-action="toggle-wardrobe" aria-expanded="${filters.open}" aria-controls="wardrobe-catalog">${icon("book", 22)}<span><b>Plan your next discovery</b><small>Shoulders, cloaks, belts and leggings · ${WARDROBE_CATALOG.length} pieces</small></span>${icon(filters.open ? "close" : "arrow", 18)}</button><div id="wardrobe-catalog" ${filters.open ? "" : "hidden"}><p>Complete your outfit through exploration, crafting, dungeon guardians and faction campaigns. This guide shows the new equipment, including pieces you haven't found yet.</p><div class="wardrobe-toolbar"><label>Equipment slot<select id="wardrobe-slot"><option value="all">All four slots</option>${WARDROBE_SLOTS.map((slot) => `<option value="${slot}" ${filters.slot === slot ? "selected" : ""}>${SLOT_LABELS[slot]}</option>`).join("")}</select></label><label>Acquisition<select id="wardrobe-source">${[
+  return `<section class="wardrobe-section"><button class="wardrobe-toggle" data-action="toggle-wardrobe" aria-expanded="${filters.open}" aria-controls="wardrobe-catalog">${icon("book", 22)}<span><b>Plan your next discovery</b><small>Weapons, ranged equipment, off-hands, shoulders, cloaks, belts, leggings, wrists, rings and necklaces · ${WARDROBE_CATALOG.length} pieces</small></span>${icon(filters.open ? "close" : "arrow", 18)}</button><div id="wardrobe-catalog" ${filters.open ? "" : "hidden"}><p>Complete your outfit through exploration, crafting, dungeon guardians and faction campaigns. This guide shows the new equipment, including pieces you haven't found yet.</p><div class="wardrobe-toolbar"><label>Equipment slot<select id="wardrobe-slot"><option value="all">All equipment families</option>${WARDROBE_SLOTS.map((slot) => `<option value="${slot}" ${filters.slot === slot ? "selected" : ""}>${gearSlotLabel(slot)}</option>`).join("")}</select></label><label>Acquisition<select id="wardrobe-source">${[
     ["all", "All sources"],
     ["world", "Outdoor discoveries"],
     ["craft", "Crafted equipment"],
@@ -97,8 +128,14 @@ export function renderWardrobe(s: SaveData, filters: WardrobeFilters): string {
     )}</select></label><button data-action="wardrobe-usable" class="button quiet" aria-pressed="${filters.usable}">${filters.usable ? "Showing class-usable" : "Showing all classes"}</button><span aria-live="polite">${items.length} ${items.length === 1 ? "piece" : "pieces"}</span></div><div class="wardrobe-grid">${items
     .map((g) => {
       const owned = s.inventory.includes(g.id),
-        restriction = equipRestriction(s, g.id);
-      return `<article class="wardrobe-card" data-wardrobe-id="${g.id}" style="--rarity-color:${RARITY_COLORS[g.rarity]}"><div class="gear-card-head"><span class="gear-icon">${icon(g.icon, 27)}</span><div><span class="rarity-label">${g.rarity} · ${owned ? "Owned" : "Undiscovered"}</span><h3>${g.name}</h3><small>${SLOT_LABELS[g.slot]} · ${g.armor || "All classes"} · Level ${g.level}</small></div></div><div class="gear-bonuses">${Object.entries(
+        restriction = equipRestriction(
+          s,
+          g.id,
+          ["offhand", "ranged"].includes(filters.slot)
+            ? (filters.slot as "offhand" | "ranged")
+            : undefined,
+        );
+      return `<article class="wardrobe-card" data-wardrobe-id="${g.id}" style="--rarity-color:${RARITY_COLORS[g.rarity]}"><div class="gear-card-head"><span class="gear-icon">${icon(g.icon, 27)}</span><div><span class="rarity-label">${g.rarity} · ${owned ? "Owned" : "Undiscovered"}</span><h3>${g.name}</h3><small>${gearUseLabel(g, ["offhand", "ranged"].includes(filters.slot) ? (filters.slot as "offhand" | "ranged") : g.slot)} · ${g.armor || (g.classes ? g.classes.map((id) => id[0].toUpperCase() + id.slice(1)).join(" / ") : "All classes")} · Level ${g.level}</small></div></div><div class="gear-bonuses">${Object.entries(
         g.stats,
       )
         .map(
@@ -107,7 +144,7 @@ export function renderWardrobe(s: SaveData, filters: WardrobeFilters): string {
         )
         .join(
           "",
-        )}</div>${g.set ? `<span class="wardrobe-set">Six-piece crafted set · Bonuses at 2, 3 and 6 pieces</span>` : ""}<div class="wardrobe-source">${sourceText(s, g.id)}</div>${restriction ? `<p class="wardrobe-restriction">To wear: ${restriction}</p>` : ""}<div class="wardrobe-actions">${owned ? `<button class="button quiet" data-action="wardrobe-owned" data-id="${g.id}">Show in satchel</button>` : ""}${WARDROBE_CATALOG_SOURCES[g.id].type === "craft" ? `<button class="button quiet" data-action="wardrobe-craft" data-id="${g.id}">View crafting</button>` : ""}${WARDROBE_CATALOG_SOURCES[g.id].type === "campaign" ? `<button class="button quiet" data-action="nav" data-id="outposts" data-faction="${(WARDROBE_CATALOG_SOURCES[g.id] as Extract<WardrobeSource, { type: "campaign" }>).faction}">Visit envoy</button>` : ""}</div></article>`;
+        )}</div>${g.set ? `<span class="wardrobe-set">Six-piece crafted set · Bonuses at 2, 3 and 6 pieces</span>` : ""}<div class="wardrobe-source">${sourceText(s, g.id)}</div>${restriction ? `<p class="wardrobe-restriction">To wear: ${restriction}</p>` : ""}<div class="wardrobe-actions">${restriction?.startsWith("Train ") && advancedWeaponType(g.weaponType) && !s.heroes[s.selectedClass].weaponTraining.includes(g.weaponType) ? `<button class="button quiet" data-action="review-weapon-training" data-id="${g.weaponType}">View weapon training</button>` : ""}${owned ? `<button class="button quiet" data-action="wardrobe-owned" data-id="${g.id}">Show in satchel</button>` : ""}${WARDROBE_CATALOG_SOURCES[g.id].type === "craft" ? `<button class="button quiet" data-action="wardrobe-craft" data-id="${g.id}">View crafting</button>` : ""}${WARDROBE_CATALOG_SOURCES[g.id].type === "campaign" ? `<button class="button quiet" data-action="nav" data-id="outposts" data-faction="${(WARDROBE_CATALOG_SOURCES[g.id] as Extract<WardrobeSource, { type: "campaign" }>).faction}">Visit envoy</button>` : ""}</div></article>`;
     })
     .join(
       "",

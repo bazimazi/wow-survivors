@@ -1,12 +1,15 @@
-import { chromium } from "playwright";
+import { openCaptureSession } from "./capture-session.mjs";
 import fs from "node:fs/promises";
-const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } }),
-  errors = [];
-page.on("pageerror", (e) => errors.push(e.message));
-const base = "http://127.0.0.1:5176";
-await fs.mkdir("output/screenshots", { recursive: true });
+const session = await openCaptureSession({ headless: true });
+const browser = session.browser;
 try {
+  const page = await browser.newPage({
+      viewport: { width: 1440, height: 1000 },
+    }),
+    errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  const base = session.url;
+  await fs.mkdir("output/screenshots", { recursive: true });
   await page.goto(base);
   await page.evaluate(async () => {
     const { freshSave, persist, equip, craft, learnProfession } =
@@ -183,5 +186,5 @@ try {
     }),
   );
 } finally {
-  await browser.close();
+  await session.close();
 }

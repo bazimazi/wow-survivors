@@ -1,0 +1,59 @@
+.controller-input :is(button, a, select, input, summary):focus {
+  outline: 2px solid var(--gold-bright);
+  outline-offset: 3px;
+}
+.controller-input .setting-row input:focus + .toggle {
+  outline: 2px solid var(--gold-bright);
+  outline-offset: 3px;
+}
+.controller-hint {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  z-index: 110;
+  padding: 9px 18px;
+  border-top: 1px solid var(--border);
+  background: #101511f5;
+  color: var(--gold-bright);
+  font-size: 11px;
+  text-align: center;
+  pointer-events: none;
+}
+.controller-hint[hidden] {
+  display: none;
+}
+.controller-input {
+  scroll-padding-bottom: 65px;
+}
+.controller-input .site-footer {
+  padding-bottom: 55px;
+}
+.controller-input .modal-backdrop {
+  padding-bottom: 80px;
+}
+.controller-input .modal {
+  max-height: calc(100dvh - 110px);
+}
+.controller-status {
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: #263023;
+  border: 1px solid var(--border);
+  color: #c6d0b8;
+  font-size: 12px;
+}
+.controller-control-list kbd {
+  min-width: 150px;
+}
+@media (max-width: 600px) {
+  .controller-hint {
+    font-size: 10px;
+    line-height: 1.6;
+    padding: 7px 12px;
+  }
+  .controller-control-list kbd {
+    min-width: 118px;
+    font-size: 10px;
+  }
+}

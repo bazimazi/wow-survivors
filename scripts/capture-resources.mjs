@@ -1,13 +1,16 @@
-import { chromium } from "playwright";
+import { openCaptureSession } from "./capture-session.mjs";
 import fs from "node:fs/promises";
 
-const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-const errors = [];
-page.on("pageerror", (e) => errors.push(e.message));
-await fs.mkdir("output/screenshots", { recursive: true });
+const session = await openCaptureSession({ headless: true });
+const browser = session.browser;
 try {
-  await page.goto("http://127.0.0.1:5176");
+  const page = await browser.newPage({
+    viewport: { width: 1440, height: 1000 },
+  });
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await fs.mkdir("output/screenshots", { recursive: true });
+  await page.goto(session.url);
   // This browser context is isolated from the player's save.
   await page.evaluate(async () => {
     const { freshSave, persist } = await import("/src/progression.ts");
@@ -24,7 +27,7 @@ try {
       RESOURCE_IDS[f].forEach((id, i) => (s.materials[id] = (4 - i) * 12));
     persist(s);
   });
-  await page.goto("http://127.0.0.1:5176/#professions");
+  await page.goto(`${session.url}#professions`);
   await page.reload();
   await page.locator(".resource-store").waitFor();
   await page.evaluate(() => document.fonts.ready);
@@ -70,7 +73,7 @@ try {
     animations: "disabled",
   });
 
-  await page.goto("http://127.0.0.1:5176");
+  await page.goto(session.url);
   await page.evaluate(async () => {
     const { GameEngine } = await import("/src/engine.ts"),
       { GameRenderer } = await import("/src/renderer.ts");
@@ -124,5 +127,5 @@ try {
   if (errors.length) throw new Error(errors.join("\n"));
   console.log(JSON.stringify({ layout, errors, captures: 5 }));
 } finally {
-  await browser.close();
+  await session.close();
 }

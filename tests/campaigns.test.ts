@@ -104,9 +104,9 @@ function guardian(g: GameEngine) {
 test("three original campaigns have twelve ordered destinations and six exclusive universal rewards", () => {
   assert.equal(CAMPAIGN_FACTIONS.length, 3);
   assert.equal(CAMPAIGN_GEAR.length, 6);
-  assert.equal(GEAR.length, 189);
-  assert.equal(RECIPES.length, 75);
-  assert.equal(WARDROBE_CATALOG.length, 52);
+  assert.equal(GEAR.length, 353);
+  assert.equal(RECIPES.length, 127);
+  assert.equal(WARDROBE_CATALOG.length, 222);
   for (const f of CAMPAIGN_FACTIONS) {
     const cs = CAMPAIGNS[f].chapters;
     assert.equal(cs.length, 4);

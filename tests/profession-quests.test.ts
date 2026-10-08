@@ -123,8 +123,8 @@ test("twelve original chains contain 48 projects and twelve permanent level-20 e
   assert.equal(PROFESSION_TRADES.length, 12);
   assert.equal(PROFESSION_PROJECTS.length, 4);
   assert.equal(PROFESSION_MASTERY_GEAR.length, 12);
-  assert.equal(GEAR.length, 189);
-  assert.equal(new Set(GEAR.map((g) => g.id)).size, 189);
+  assert.equal(GEAR.length, 353);
+  assert.equal(new Set(GEAR.map((g) => g.id)).size, GEAR.length);
   for (const trade of PROFESSION_TRADES) {
     assert.equal(PROFESSION_QUESTS[trade].projects.length, 4);
     assert.equal(
@@ -320,7 +320,7 @@ test("equipment enchants count accepted grade-matched applications; same/failed 
   const s = prepared("enchanting");
   acceptProfessionQuest(s, "enchanting");
   const formulas = ENCHANTMENTS.filter((e) => tierForSkill(e.skill) === 1);
-  assert.equal(formulas.length, 2);
+  assert.equal(formulas.length, 5);
   assert.equal(applyEnchantment(s, "starter_mage", formulas[0].id), true);
   assert.equal(applyEnchantment(s, "starter_mage", formulas[0].id), false);
   assert.equal(s.professionQuests.enchanting.progress.crafts, 1);

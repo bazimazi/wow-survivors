@@ -1,6 +1,8 @@
+import { readBalanceBaseline } from "./balance-baselines.mjs";
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 const cloudAware = process.argv.includes("--cloud-aware");
+await fs.mkdir("output", { recursive: true });
 const profiles = cloudAware
   ? [
       ["duskwood-cloud-aware", ["--duskwood", "--entry", "--cloud-aware"]],
@@ -36,7 +38,7 @@ for (const [name, flags] of profiles) {
     wins = outcomes.filter((o) => o.victory);
   const baseline = name.startsWith("duskwood")
     ? null
-    : (await fs.readFile(`output/balance-0.15-${name}.jsonl`, "utf8"))
+    : (await readBalanceBaseline(`balance-0.15-${name}.jsonl`))
         .trim()
         .split(/\r?\n/)
         .map(JSON.parse);
@@ -67,7 +69,7 @@ for (const [name, flags] of profiles) {
 }
 if (cloudAware) {
   const earlier = JSON.parse(
-    await fs.readFile("output/duskwood-balance-0.16.json", "utf8"),
+    await readBalanceBaseline("duskwood-balance-0.16.json"),
   );
   reports.unshift(
     ...earlier.filter((r) => !reports.some((next) => next.name === r.name)),

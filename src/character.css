@@ -356,6 +356,10 @@
 .enchant-review #toast-root {
   display: none;
 }
+.enchantment-review .modal-close {
+  min-width: 44px;
+  min-height: 44px;
+}
 .enchantment-review .save-actions .button {
   min-height: 44px;
 }

@@ -95,8 +95,8 @@ test("24 named resources preserve all six legacy keys and every recipe/formula c
       "Smallfish",
     ],
   );
-  assert.equal(RECIPES.length, 75);
-  assert.equal(ENCHANTMENTS.length, 12);
+  assert.equal(RECIPES.length, 127);
+  assert.equal(ENCHANTMENTS.length, 24);
   for (const r of [...RECIPES, ...ENCHANTMENTS]) {
     const costs = "cost" in r ? r.cost : r.costs;
     assert.ok(Object.keys(costs).length);

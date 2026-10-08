@@ -1,5 +1,11 @@
 import type { Material, Stats } from "./content";
 import { wardrobeDungeonLoot } from "./wardrobe";
+import { accessoryDungeonLoot } from "./accessories";
+import { necklaceDungeonLoot } from "./necklaces";
+import { offhandDungeonLoot } from "./offhands";
+import { dualWieldDungeonLoot } from "./dual-wield";
+import { rangedDungeonLoot } from "./ranged";
+import { trainedWeaponDungeonLoot } from "./weapon-training";
 import { SHADOWFANG_STAGES } from "./shadowfang";
 
 export interface DungeonStage {
@@ -206,7 +212,15 @@ export const DUNGEONS: DungeonRoute[] = [
 ];
 for (const route of DUNGEONS)
   route.stages.forEach((stage, index) =>
-    stage.loot.push(...wardrobeDungeonLoot(route.id, index)),
+    stage.loot.push(
+      ...wardrobeDungeonLoot(route.id, index),
+      ...accessoryDungeonLoot(route.id, index),
+      ...necklaceDungeonLoot(route.id, index),
+      ...offhandDungeonLoot(route.id, index),
+      ...dualWieldDungeonLoot(route.id, index),
+      ...rangedDungeonLoot(route.id, index),
+      ...trainedWeaponDungeonLoot(route.id, index),
+    ),
   );
 export const dungeonRoute = (id: string) => DUNGEONS.find((d) => d.id === id);
 export const DUNGEON_MAX_GUARDIANS = Math.max(

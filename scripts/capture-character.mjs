@@ -1,16 +1,17 @@
-import { chromium } from "@playwright/test";
+import { openCaptureSession } from "./capture-session.mjs";
 import { mkdir } from "node:fs/promises";
 import assert from "node:assert/strict";
 
 await mkdir("output/screenshots", { recursive: true });
-const browser = await chromium.launch({ args: ["--disable-gpu"] });
+const session = await openCaptureSession({ args: ["--disable-gpu"] });
+const browser = session.browser;
 try {
   const page = await browser.newPage({
     viewport: { width: 1440, height: 1000 },
   });
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("http://127.0.0.1:5176/");
+  await page.goto(session.url);
   await page.evaluate(async () => {
     const { freshSave, persist, equip, applyEnchantment } =
       await import("/src/progression.ts");
@@ -32,7 +33,7 @@ try {
     s.settings.sound = false;
     persist(s);
   });
-  await page.goto("http://127.0.0.1:5176/#journal");
+  await page.goto(`${session.url}#journal`);
   await page.reload();
   await page.evaluate(() => document.fonts.ready);
   await page.locator(".class-trial").screenshot({
@@ -106,5 +107,5 @@ try {
     ),
   );
 } finally {
-  await browser.close();
+  await session.close();
 }

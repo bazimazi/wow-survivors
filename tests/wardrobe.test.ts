@@ -99,12 +99,12 @@ const run = (loot: string[], id = "wardrobe"): RunRecord => ({
 });
 
 test("the forty additions have exactly one valid source and twenty affordable original recipes", () => {
-  assert.equal(SLOTS.length, 10);
-  assert.equal(GEAR.length, 189);
-  assert.equal(RECIPES.length, 75);
+  assert.equal(SLOTS.length, 16);
+  assert.equal(GEAR.length, 353);
+  assert.equal(RECIPES.length, 127);
   assert.equal(WARDROBE_GEAR.length, 40);
   assert.equal(WARDROBE_RECIPES.length, 20);
-  assert.equal(Object.keys(WARDROBE_SOURCES).length, 44);
+  assert.equal(Object.keys(WARDROBE_SOURCES).length, 47);
   assert.equal(new Set(GEAR.map((g) => g.id)).size, GEAR.length);
   for (const g of WARDROBE_GEAR) {
     assert.ok(
@@ -151,7 +151,9 @@ test("old version-one saves keep all six slots and gain no free gear or stats", 
   assert.deepEqual(heroStats(loaded), stats);
   assert.deepEqual(loaded.inventory, s.inventory);
   assert.ok(
-    WARDROBE_SLOTS.every((slot) => !loaded.heroes.mage.equipment[slot]),
+    WARDROBE_SLOTS.filter((slot) => slot !== "weapon").every(
+      (slot) => !loaded.heroes.mage.equipment[slot],
+    ),
   );
   assert.equal(loaded.version, 1);
 });
@@ -176,7 +178,11 @@ test("new slots survive save import, while missing, misplaced, foreign and under
   s.inventory.push("shredder_drivebelt", "stonebound_spaulders");
   s.heroes.mage.level = 1;
   const h = validateSave(s).heroes.mage;
-  assert.ok(WARDROBE_SLOTS.every((slot) => !h.equipment[slot]));
+  assert.ok(
+    WARDROBE_SLOTS.filter((slot) => slot !== "weapon").every(
+      (slot) => !h.equipment[slot],
+    ),
+  );
 });
 test("four new pieces add their actual attributes and class/level gates block invalid equipment", () => {
   const s = prepared(),
@@ -367,10 +373,14 @@ test("new equipment disenchanting respects level grades and the existing formula
     assert.equal(sellGear(s, id, true), true);
     assert.equal(s.materials[dust], n + count);
   }
-  assert.equal(ENCHANTMENTS.length, 12);
+  assert.equal(ENCHANTMENTS.length, 24);
   assert.ok(
     ENCHANTMENTS.every(
       (e) =>
+        e.slot === "offhand" ||
+        e.slot === "back" ||
+        e.slot === "wrists" ||
+        e.slot === "weapon" ||
         !WARDROBE_SLOTS.includes(e.slot as (typeof WARDROBE_SLOTS)[number]),
     ),
   );

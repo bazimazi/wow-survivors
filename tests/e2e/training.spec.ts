@@ -257,7 +257,7 @@ test.describe("touch crafting paths", () => {
       .getByRole("button", { name: "Craft", exact: true })
       .tap();
     await page.locator("#recipe-filter").selectOption("all");
-    await expect(page.locator(".recipe-card")).toHaveCount(75);
+    await expect(page.locator(".recipe-card")).toHaveCount(127);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,

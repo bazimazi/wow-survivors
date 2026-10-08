@@ -1,11 +1,48 @@
 import { RESOURCE_TIERS } from "./resources";
 import { MATERIALS, SPELLS } from "./content";
-import type { Enemy, Vec, Hazard } from "./engine";
+import type {
+  Enemy,
+  Vec,
+  Hazard,
+  CombatAction,
+  EnemyAction,
+  DeathAction,
+} from "./engine";
 import type { Landmark } from "./expedition";
 import { GameEngine, WORLD_SIZE } from "./engine";
 import { drawDungeonFloor, drawSmite } from "./dungeon-renderer";
-import { DUSKWOOD_SPRITES } from "./duskwood";
-import { SHADOWFANG_SPRITES } from "./shadowfang";
+import { CREATURE_ART } from "./creature-animation";
+import {
+  ActorAnimator,
+  FrameCache,
+  QueuedFrameCache,
+  WALK_KEYS,
+} from "./animation";
+import type { ActorPose, AnimationRig } from "./animation";
+import {
+  createAnimationFrame,
+  heroCrop,
+  creatureCrop,
+  FRAME_CONTENT,
+  FRAME_PADDING,
+  FRAME_SIZE,
+} from "./animation-canvas";
+import type { SpriteCrop } from "./animation-canvas";
+import { CombatAnimator, combatKey, combatStyle } from "./combat-animation";
+import { CreatureCombatAnimator } from "./creature-combat";
+import { DeathAnimator, deathVisual } from "./death-animation";
+import type { DeathScene, DeathVisual } from "./death-animation";
+
+type DeathSnapshot =
+  | { kind: "enemy"; actor: Enemy }
+  | { kind: "player"; actor: GameEngine["player"]; bear: boolean };
+
+interface SpriteMotion {
+  pose: ActorPose;
+  rig: AnimationRig;
+  creature?: boolean;
+  priority?: boolean;
+}
 
 const hash = (x: number, y: number) => {
   let n =
@@ -21,6 +58,22 @@ export class GameRenderer {
   scale = 1;
   particles = true;
   shake = true;
+  animation = true;
+  private animator = new ActorAnimator();
+  private combatAnimator = new CombatAnimator();
+  private creatureCombatAnimator = new CreatureCombatAnimator();
+  private deathAnimator = new DeathAnimator<DeathSnapshot>();
+  private frameCache = new FrameCache<HTMLCanvasElement>(192, 2, (frame) => {
+    frame.width = frame.height = 0;
+  });
+  private creatureCache = new QueuedFrameCache<HTMLCanvasElement>(
+    128,
+    1,
+    (frame) => {
+      frame.width = frame.height = 0;
+    },
+  );
+  private reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   private worldAtlas = new Image();
   private heroAtlas = new Image();
   private companionAtlas = new Image();
@@ -28,6 +81,12 @@ export class GameRenderer {
   private ragefireAtlas = new Image();
   private shadowfangAtlas = new Image();
   private duskwoodAtlas = new Image();
+  private creatureAtlases = {
+    world: this.worldAtlas,
+    ragefire: this.ragefireAtlas,
+    shadowfang: this.shadowfangAtlas,
+    duskwood: this.duskwoodAtlas,
+  };
   private ground: CanvasPattern | null = null;
   constructor(
     public canvas: HTMLCanvasElement,
@@ -100,59 +159,265 @@ export class GameRenderer {
     y: number,
     size: number,
     mirror = false,
+    motion?: SpriteMotion,
   ): boolean {
     if (!atlas.complete || !atlas.naturalWidth) return false;
     const c = this.ctx,
-      cellWidth = atlas.naturalWidth / columns,
-      row = Math.floor(index / columns);
-    const worldRows = [0, 0.27, 0.486, 0.727, 1],
-      heroRows = [0, 0.336, 0.65, 1];
-    const rows =
-      atlas === this.duskwoodAtlas
-        ? [0, 385 / 1254, 771 / 1254, 1]
-        : atlas === this.shadowfangAtlas
-          ? [0, 395 / 1254, 820 / 1254, 1]
-          : atlas === this.ragefireAtlas
-            ? [0, 1 / 3, 2 / 3, 1]
-            : columns === 4
-              ? worldRows
-              : columns === 3
-                ? heroRows
-                : [0, 0.5, 1];
-    const sourceY = rows[row] * atlas.naturalHeight,
-      sourceHeight = (rows[row + 1] - rows[row]) * atlas.naturalHeight;
-    const column = index % columns,
-      edges =
-        atlas === this.duskwoodAtlas
-          ? [0, 440, 814, 1254]
+      cellWidth = atlas.naturalWidth / columns;
+    const creatureAtlas =
+      atlas === this.worldAtlas
+        ? "world"
+        : atlas === this.ragefireAtlas
+          ? "ragefire"
           : atlas === this.shadowfangAtlas
-            ? [0, 418, row === 2 ? 900 : row === 1 ? 880 : 836, 1254]
-            : null,
-      sourceX = edges
-        ? (edges[column] / 1254) * atlas.naturalWidth
-        : column * cellWidth,
-      sourceWidth = edges
-        ? ((edges[column + 1] - edges[column]) / 1254) * atlas.naturalWidth
-        : cellWidth,
-      drawWidth = edges ? (size * sourceWidth) / cellWidth : size,
-      drawHeight = edges ? (size * sourceHeight) / cellWidth : size;
+            ? "shadowfang"
+            : atlas === this.duskwoodAtlas
+              ? "duskwood"
+              : null;
+    const crop = creatureAtlas
+      ? creatureCrop(
+          creatureAtlas,
+          index,
+          atlas.naturalWidth,
+          atlas.naturalHeight,
+        )
+      : atlas === this.heroAtlas
+        ? heroCrop(index, atlas.naturalWidth, atlas.naturalHeight)
+        : {
+            x: (index % columns) * cellWidth,
+            y: (Math.floor(index / columns) * atlas.naturalHeight) / 2,
+            width: cellWidth,
+            height: atlas.naturalHeight / 2,
+          };
+    const measured =
+      creatureAtlas === "shadowfang" || creatureAtlas === "duskwood";
+    const drawWidth = measured ? (size * crop.width) / cellWidth : size,
+      drawHeight = measured ? (size * crop.height) / cellWidth : size;
     c.save();
     c.translate(Math.round(x), Math.round(y));
     if (mirror) c.scale(-1, 1);
     c.imageSmoothingEnabled = true;
-    c.drawImage(
+    this.drawCrop(
       atlas,
-      sourceX,
-      sourceY,
-      sourceWidth,
-      sourceHeight,
-      -drawWidth / 2,
-      -drawHeight * 0.95,
+      crop,
       drawWidth,
       drawHeight,
+      -drawHeight * 0.95,
+      motion,
     );
     c.restore();
     return true;
+  }
+  private get motionEnabled() {
+    return this.animation && !this.reducedMotion.matches;
+  }
+  private get suspended() {
+    const g = this.game;
+    return (
+      g.paused || g.choosing || !!g.shrineChoice || g.checkpoint || g.ended
+    );
+  }
+  onAction(action: CombatAction) {
+    if (!this.motionEnabled) {
+      this.combatAnimator.clear(action.actor);
+      return;
+    }
+    this.combatAnimator.trigger(
+      action.actor,
+      combatStyle(action),
+      action.time,
+      action.facing,
+      action.ability ? 1 : 0,
+    );
+  }
+  onEnemyAction(action: EnemyAction) {
+    if (!this.motionEnabled) this.creatureCombatAnimator.clear(action.actor);
+    else this.creatureCombatAnimator.trigger(action);
+  }
+  onDeath(action: DeathAction) {
+    if (![action.time, action.actor.x, action.actor.y].every(Number.isFinite))
+      return;
+    const g = this.game;
+    this.deathAnimator.advance(0, {
+      time: g.time,
+      stage: g.dungeonStageIndex,
+      enabled: this.motionEnabled,
+    });
+    if (action.kind === "enemy") {
+      this.creatureCombatAnimator.clear(action.actor);
+      const mirror = this.pose(
+        action.actor,
+        44,
+        action.actor.x > g.player.x,
+        true,
+      ).mirror;
+      this.deathAnimator.trigger(
+        action.actor,
+        {
+          kind: "enemy",
+          actor: {
+            ...action.actor,
+            dots: undefined,
+            flash: 0,
+            frozenUntil: 0,
+            guard: false,
+          },
+        },
+        { mirror, priority: action.actor.boss, enabled: this.motionEnabled },
+      );
+    } else {
+      this.combatAnimator.clear(action.actor);
+      this.deathAnimator.trigger(
+        action.actor,
+        { kind: "player", actor: { ...action.actor }, bear: action.bear },
+        {
+          mirror: Math.cos(action.actor.facing) < -0.2,
+          hero: true,
+          enabled: this.motionEnabled,
+        },
+      );
+    }
+  }
+  private deathRig(data: DeathSnapshot): AnimationRig {
+    return data.kind === "enemy"
+      ? CREATURE_ART[data.actor.type]?.rig || "heavy"
+      : data.bear
+        ? "quadruped"
+        : ["mage", "priest", "warlock", "druid"].includes(this.game.classDef.id)
+          ? "robe"
+          : "biped";
+  }
+  private death(entry: DeathScene<DeathSnapshot>) {
+    const { data } = entry,
+      c = this.ctx;
+    const visual = deathVisual(
+      entry.age,
+      this.deathRig(data),
+      entry.mirror,
+      data.kind === "player",
+    );
+    c.save();
+    c.globalAlpha *= visual.alpha;
+    const size =
+      data.kind === "enemy"
+        ? data.actor.boss
+          ? 2.1
+          : data.actor.elite
+            ? 1.5
+            : 1
+        : data.bear
+          ? 1.5
+          : 1;
+    this.shadow(data.actor.x, data.actor.y, 19 * size);
+    c.translate(data.actor.x, data.actor.y);
+    c.translate(0, visual.drop);
+    c.rotate(visual.rotation);
+    c.scale(visual.scaleX, visual.scaleY);
+    c.translate(-data.actor.x, -data.actor.y);
+    if (data.kind === "enemy") this.enemy(data.actor, visual);
+    else this.player(visual, data.actor, data.bear);
+    c.restore();
+  }
+  private creaturePose(e: Enemy, stride: number): ActorPose {
+    const frozen = e.frozenUntil > this.game.time;
+    const walk = this.pose(
+      e,
+      stride,
+      e.x > this.game.player.x,
+      frozen,
+      (e.id % 8) / 8,
+    );
+    const action = this.creatureCombatAnimator.sample(e, this.game.time, {
+      enabled: this.motionEnabled,
+      frozen: frozen || this.suspended,
+    });
+    return action
+      ? { ...walk, frame: action.frame, mirror: action.mirror }
+      : walk;
+  }
+  private characterPose(
+    actor: object & Vec,
+    stride = 44,
+    mirror = false,
+  ): ActorPose {
+    const walk = this.pose(actor, stride, mirror);
+    if (this.game.travelling) this.combatAnimator.clear(actor);
+    const action = this.combatAnimator.sample(actor, this.game.time, {
+      enabled: this.motionEnabled,
+      frozen: this.suspended,
+    });
+    return action
+      ? { ...walk, frame: action.frame, mirror: action.mirror }
+      : walk;
+  }
+  private pose(
+    actor: object & Vec,
+    stride = 44,
+    mirror = false,
+    frozen = false,
+    phaseOffset = 0,
+  ) {
+    const g = this.game;
+    return this.animator.sample(actor, actor, g.time, {
+      enabled: this.motionEnabled,
+      frozen: frozen || this.suspended,
+      stride,
+      mirror,
+      phaseOffset,
+    });
+  }
+  private drawCrop(
+    atlas: HTMLImageElement,
+    crop: SpriteCrop,
+    width: number,
+    height: number,
+    top: number,
+    motion?: SpriteMotion,
+  ) {
+    let frame: HTMLCanvasElement | null = null;
+    if (motion && motion.pose.frame >= 0) {
+      const key = `${atlas.src}:${crop.x}:${crop.y}:${crop.width}:${crop.height}:${motion.rig}:${motion.pose.frame}`,
+        create = () =>
+          createAnimationFrame(atlas, crop, motion.rig, motion.pose.frame);
+      frame = motion.creature
+        ? this.creatureCache.get(key, create, motion.priority)
+        : this.frameCache.get(key, create);
+    }
+    if (frame) {
+      this.ctx.drawImage(
+        frame,
+        -width / 2 - (width * FRAME_PADDING) / FRAME_CONTENT,
+        top - (height * FRAME_PADDING) / FRAME_CONTENT,
+        (width * FRAME_SIZE) / FRAME_CONTENT,
+        (height * FRAME_SIZE) / FRAME_CONTENT,
+      );
+    } else {
+      const cutout = crop.cutout;
+      if (cutout) {
+        this.ctx.save();
+        this.ctx.beginPath();
+        this.ctx.rect(-width / 2, top, width, height);
+        this.ctx.rect(
+          -width / 2 + cutout.x * width,
+          top + cutout.y * height,
+          cutout.width * width,
+          cutout.height * height,
+        );
+        this.ctx.clip("evenodd");
+      }
+      this.ctx.drawImage(
+        atlas,
+        crop.x,
+        crop.y,
+        crop.width,
+        crop.height,
+        -width / 2,
+        top,
+        width,
+        height,
+      );
+      if (cutout) this.ctx.restore();
+    }
   }
   resize() {
     this.width = this.canvas.clientWidth;
@@ -164,7 +429,22 @@ export class GameRenderer {
     this.ctx.imageSmoothingEnabled = false;
     this.game.setViewport(this.width, this.height);
   }
-  render() {
+  render(delta = 0) {
+    const state = this.game;
+    this.deathAnimator.advance(delta, {
+      time: state.time,
+      stage: state.dungeonStageIndex,
+      enabled: this.motionEnabled,
+      held:
+        state.paused ||
+        state.choosing ||
+        !!state.shrineChoice ||
+        document.hidden ||
+        !document.hasFocus(),
+    });
+    this.frameCache.beginFrame();
+    if (this.motionEnabled) this.creatureCache.beginFrame();
+    else this.creatureCache.cancelPending();
     const c = this.ctx,
       g = this.game,
       p = g.player;
@@ -364,12 +644,20 @@ export class GameRenderer {
       if (this.visible(l, 100))
         actors.push({ y: l.y, draw: () => this.landmark(l) });
     for (const e of g.enemies)
-      if (this.visible(e, 80))
+      if (!e.dead && this.visible(e, 80))
         actors.push({ y: e.y, draw: () => this.enemy(e) });
+    for (const entry of this.deathAnimator.enemies)
+      if (this.visible(entry.data.actor, 180))
+        actors.push({ y: entry.data.actor.y, draw: () => this.death(entry) });
     for (const pet of g.pets)
       actors.push({
         y: pet.y,
         draw: () => {
+          const pose = this.characterPose(
+            pet,
+            pet.spellId === "beast" ? 38 : 32,
+            pet.x > p.x,
+          );
           this.shadow(pet.x, pet.y, 15);
           if (
             this.sprite(
@@ -377,28 +665,46 @@ export class GameRenderer {
               pet.spellId === "beast" ? 0 : pet.spellId === "imp" ? 1 : 3,
               2,
               pet.x,
-              pet.y + Math.sin(g.time * 9) * 1.2,
+              pet.y,
               pet.spellId === "beast" ? 53 : 46,
-              pet.x > p.x,
+              pose.mirror,
+              {
+                pose,
+                rig:
+                  pet.spellId === "beast"
+                    ? "quadruped"
+                    : pet.spellId === "imp"
+                      ? "biped"
+                      : "totem",
+              },
             )
           )
             return;
           if (pet.spellId === "beast")
-            this.wolf(pet.x, pet.y, "#a2a598", 1, false);
+            this.wolf(pet.x, pet.y, "#a2a598", 1, false, pose);
           else {
             this.shadow(pet.x, pet.y, 13);
+            c.save();
+            c.translate(pet.x, pet.y);
+            if (pose.mirror) c.scale(-1, 1);
+            this.combatFallback(pose.frame);
             c.fillStyle = pet.spellId === "imp" ? "#8dba68" : "#ca9a61";
-            c.fillRect(pet.x - 7, pet.y - 17, 14, 23);
+            c.fillRect(-7, -17, 14, 23);
             c.fillStyle = "#d7e5ab";
-            c.fillRect(pet.x - 5, pet.y - 14, 3, 3);
-            c.fillRect(pet.x + 2, pet.y - 14, 3, 3);
+            c.fillRect(-5, -14, 3, 3);
+            c.fillRect(2, -14, 3, 3);
             c.fillStyle = "#e6bf6a";
-            c.fillRect(pet.x - 10, pet.y - 22, 4, 7);
-            c.fillRect(pet.x + 6, pet.y - 22, 4, 7);
+            c.fillRect(-10, -22, 4, 7);
+            c.fillRect(6, -22, 4, 7);
+            c.restore();
           }
         },
       });
-    actors.push({ y: p.y, draw: () => this.player() });
+    const defeated = this.deathAnimator.hero;
+    actors.push({
+      y: p.y,
+      draw: () => (defeated ? this.death(defeated) : this.player()),
+    });
     this.props(actors);
     actors.sort((a, b) => a.y - b.y);
     for (const actor of actors) actor.draw();
@@ -678,22 +984,34 @@ export class GameRenderer {
     c.ellipse(x, y + 5, radius, radius * 0.35, 0, 0, Math.PI * 2);
     c.fill();
   }
-  private player() {
+  private player(
+    death?: DeathVisual,
+    snapshot = this.game.player,
+    bear = false,
+  ) {
     const c = this.ctx,
-      p = this.game.player,
+      p = snapshot,
       g = this.game;
-    this.shadow(p.x, p.y, g.travel.active ? 30 : 19);
+    const pose =
+      death ||
+      this.characterPose(
+        p,
+        g.travel.active ? 76 : 44,
+        Math.cos(p.facing) < -0.2,
+      );
+    if (!death) this.shadow(p.x, p.y, g.travel.active ? 30 : 19);
     c.save();
     c.translate(Math.round(p.x), Math.round(p.y));
-    if (p.invulnerable > 0 && Math.floor(g.time * 12) % 2) c.globalAlpha = 0.6;
-    if (p.shield > 0 || p.invulnerable > 1) {
+    if (!death && p.invulnerable > 0 && Math.floor(g.time * 12) % 2)
+      c.globalAlpha = 0.6;
+    if (!death && (p.shield > 0 || p.invulnerable > 1)) {
       c.strokeStyle = "#e3d4a888";
       c.lineWidth = 2;
       c.beginPath();
       c.ellipse(0, -15, 29, 35, 0, 0, Math.PI * 2);
       c.stroke();
     }
-    if (g.travel.channel > 0) {
+    if (!death && g.travel.channel > 0) {
       c.strokeStyle = "#d8bd83aa";
       c.lineWidth = 2;
       c.beginPath();
@@ -701,6 +1019,7 @@ export class GameRenderer {
       c.stroke();
     }
     if (
+      !death &&
       g.travel.active &&
       g.travelOption &&
       this.travelAtlas.complete &&
@@ -708,7 +1027,8 @@ export class GameRenderer {
     ) {
       const t = g.travelOption,
         mirror = Math.cos(p.facing) < -0.2;
-      const bob = g.input.x || g.input.y ? Math.sin(g.time * 12) * 1.4 : 0;
+      const gait = WALK_KEYS[pose.frame];
+      const bob = gait ? -gait.bob * 1.2 : 0;
       if (t.rank === 2) {
         c.shadowColor = "#d7b67c66";
         c.shadowBlur = 8;
@@ -720,16 +1040,18 @@ export class GameRenderer {
       c.save();
       if (mirror) c.scale(-1, 1);
       c.imageSmoothingEnabled = true;
-      c.drawImage(
+      this.drawCrop(
         this.travelAtlas,
-        (t.sprite % 3) * cw,
-        Math.floor(t.sprite / 3) * ch,
-        cw,
-        ch,
-        -size / 2,
-        -height + 8 + bob,
+        {
+          x: (t.sprite % 3) * cw,
+          y: Math.floor(t.sprite / 3) * ch,
+          width: cw,
+          height: ch,
+        },
         size,
         height,
+        -height + 8,
+        { pose, rig: "quadruped" },
       );
       c.restore();
       c.shadowBlur = 0;
@@ -738,47 +1060,51 @@ export class GameRenderer {
         this.heroAtlas.complete &&
         this.heroAtlas.naturalWidth
       ) {
-        const col = g.classDef.portrait % 3,
-          row = Math.floor(g.classDef.portrait / 3);
-        const rows = [0, 0.336, 0.65, 1],
-          cw = this.heroAtlas.width / 3;
-        const ch = (rows[row + 1] - rows[row]) * this.heroAtlas.height;
+        const crop = heroCrop(
+          g.classDef.portrait,
+          this.heroAtlas.naturalWidth,
+          this.heroAtlas.naturalHeight,
+        );
         c.save();
         if (mirror) c.scale(-1, 1);
         c.imageSmoothingEnabled = true;
         // Crop the standing sprite to its upper body for a seated rider.
-        c.drawImage(
+        c.translate(-4.5, 0);
+        this.drawCrop(
           this.heroAtlas,
-          col * cw,
-          rows[row] * this.heroAtlas.height,
-          cw,
-          ch * 0.73,
-          -31,
-          -73 + bob,
+          {
+            ...crop,
+            height: crop.height * 0.73,
+            ...(crop.cutout
+              ? {
+                  cutout: {
+                    ...crop.cutout,
+                    y: crop.cutout.y / 0.73,
+                    height: crop.cutout.height / 0.73,
+                  },
+                }
+              : {}),
+          },
           53,
-          (ch / cw) * 53 * 0.73,
+          (crop.height / crop.width) * 53 * 0.73,
+          -73 + bob,
         );
         c.restore();
       }
       c.restore();
       return;
     }
-    if (g.classDef.id === "druid" && p.activeBuff > 0) {
+    if (death ? bear : g.classDef.id === "druid" && p.activeBuff > 0) {
       if (
-        this.sprite(
-          this.companionAtlas,
-          2,
-          2,
-          0,
-          0,
-          83,
-          Math.cos(p.facing) < -0.2,
-        )
+        this.sprite(this.companionAtlas, 2, 2, 0, 0, 83, pose.mirror, {
+          pose,
+          rig: "quadruped",
+        })
       ) {
         c.restore();
         return;
       }
-      this.wolf(0, 0, "#927b55", 1.5, false);
+      this.wolf(0, 0, "#927b55", 1.5, false, pose, !death);
       c.restore();
       return;
     }
@@ -788,15 +1114,25 @@ export class GameRenderer {
         g.classDef.portrait,
         3,
         0,
-        g.input.x || g.input.y ? Math.sin(g.time * 12) * 1.5 : 0,
+        0,
         70,
-        Math.cos(p.facing) < -0.2,
+        pose.mirror,
+        {
+          pose,
+          rig: ["mage", "priest", "warlock", "druid"].includes(g.classDef.id)
+            ? "robe"
+            : "biped",
+        },
       )
     ) {
       c.restore();
       return;
     }
-    const move = g.input.x || g.input.y ? Math.sin(g.time * 15) * 3 : 0;
+    if (pose.mirror) c.scale(-1, 1);
+    this.combatFallback(pose.frame);
+    const move = WALK_KEYS[pose.frame]?.left
+      ? WALK_KEYS[pose.frame].left * 3
+      : 0;
     const skin = ["shaman"].includes(g.classDef.id)
       ? "#91ab70"
       : g.classDef.id === "druid"
@@ -866,31 +1202,30 @@ export class GameRenderer {
     color: string,
     scale: number,
     flash: boolean,
+    pose: ActorPose,
+    shadow = true,
   ) {
     const c = this.ctx;
-    this.shadow(x, y, 17 * scale);
+    if (shadow) this.shadow(x, y, 17 * scale);
     if (
-      this.sprite(
-        this.worldAtlas,
-        8,
-        4,
-        x,
-        y + Math.sin(this.game.time * 10 + x) * 1.1,
-        51 * scale,
-        x > this.game.player.x,
-      )
+      this.sprite(this.worldAtlas, 8, 4, x, y, 51 * scale, pose.mirror, {
+        pose,
+        rig: "quadruped",
+      })
     )
       return;
     c.save();
     c.translate(Math.round(x), Math.round(y));
+    if (pose.mirror) c.scale(-1, 1);
     c.scale(scale, scale);
+    this.combatFallback(pose.frame);
     c.fillStyle = flash ? "#f1ecdc" : color;
     c.fillRect(-15, -16, 26, 13);
     c.fillRect(5, -24, 15, 16);
     c.fillRect(16, -16, 9, 5);
     c.fillRect(7, -30, 4, 8);
     c.fillRect(15, -28, 4, 7);
-    const step = Math.sin(this.game.time * 10 + x) * 2;
+    const step = (WALK_KEYS[pose.frame]?.left || 0) * 2;
     c.fillRect(-13, -4, 5, 8 + step);
     c.fillRect(5, -4, 5, 8 - step);
     c.fillRect(-24, -19, 12, 5);
@@ -898,7 +1233,13 @@ export class GameRenderer {
     c.fillRect(15, -20, 3, 3);
     c.restore();
   }
-  private enemy(e: Enemy) {
+  private combatFallback(frame: number) {
+    const key = combatKey(frame);
+    if (!key) return;
+    this.ctx.translate(key.lean * 1.5, -key.raise);
+    this.ctx.rotate(key.reach * 0.035);
+  }
+  private enemy(e: Enemy, death?: DeathVisual) {
     const c = this.ctx,
       scale = e.boss ? 2.1 : e.elite ? 1.5 : 1;
     const color =
@@ -912,82 +1253,28 @@ export class GameRenderer {
         ghoul: "#88a080",
         wraith: "#9a95b6",
       }[e.type] || "#b4a888";
-    const spriteIndex = {
-      wolf: 8,
-      kobold: 9,
-      gnoll: 10,
-      skeleton: 11,
-      ghoul: 12,
-      wraith: 13,
-      defias: 14,
-      blackguard: 14,
-      golem: 15,
-    }[e.type];
-    this.shadow(e.x, e.y, 15 * scale);
-    const ragefireIndex = {
-      trogg: 0,
-      earthborer: 1,
-      molten: 2,
-      cultist: 3,
-      voidwalker: 4,
-      oggleflint: 5,
-      taragaman: 6,
-      jergosh: 7,
-      bazzalan: 8,
-    }[e.type];
+    const art = CREATURE_ART[e.type];
+    const pose = death || this.creaturePose(e, (art?.stride || 44) * scale);
+    if (!death) this.shadow(e.x, e.y, 15 * scale);
+    const atlas = art && this.creatureAtlases[art.atlas];
     const renderedSprite =
-      DUSKWOOD_SPRITES[e.type] !== undefined
-        ? this.sprite(
-            this.duskwoodAtlas,
-            DUSKWOOD_SPRITES[e.type],
-            3,
-            e.x,
-            e.y +
-              (e.frozenUntil > this.game.time
-                ? 0
-                : Math.sin(this.game.time * 9 + e.id) * 1.2),
-            (e.boss ? 78 : 68) * scale,
-            e.x > this.game.player.x,
-          )
-        : SHADOWFANG_SPRITES[e.type] !== undefined
-          ? this.sprite(
-              this.shadowfangAtlas,
-              SHADOWFANG_SPRITES[e.type],
-              3,
-              e.x,
-              e.y +
-                (e.frozenUntil > this.game.time
-                  ? 0
-                  : Math.sin(this.game.time * 9 + e.id) * 1.2),
-              (e.type === "keep_worg" || e.type === "fenrus" ? 66 : 72) * scale,
-              e.x > this.game.player.x,
-            )
-          : ragefireIndex !== undefined
-            ? this.sprite(
-                this.ragefireAtlas,
-                ragefireIndex,
-                3,
-                e.x,
-                e.y +
-                  (e.frozenUntil > this.game.time
-                    ? 0
-                    : Math.sin(this.game.time * 9 + e.id) * 1.2),
-                (e.type === "earthborer" ? 56 : 65) * scale,
-                e.x > this.game.player.x,
-              )
-            : spriteIndex !== undefined &&
-              this.sprite(
-                this.worldAtlas,
-                spriteIndex,
-                4,
-                e.x,
-                e.y +
-                  (e.frozenUntil > this.game.time
-                    ? 0
-                    : Math.sin(this.game.time * 9 + e.id) * 1.2),
-                (e.type === "wolf" ? 51 : 59) * scale,
-                e.x > this.game.player.x,
-              );
+      art &&
+      atlas &&
+      this.sprite(
+        atlas,
+        art.index,
+        art.atlas === "world" ? 4 : 3,
+        e.x,
+        e.y,
+        art.size * scale,
+        pose.mirror,
+        {
+          pose,
+          rig: art.rig,
+          creature: true,
+          priority: e.boss && pose.frame >= 8,
+        },
+      );
     if (renderedSprite) {
       if (e.flash > 0) {
         c.globalAlpha = 0.3;
@@ -997,18 +1284,18 @@ export class GameRenderer {
         c.fill();
         c.globalAlpha = 1;
       }
-    } else if (e.type === "smite") drawSmite(c, e, this.game.time);
-    else if (e.type === "wolf") this.wolf(e.x, e.y, color, scale, e.flash > 0);
+    } else if (e.type === "smite") drawSmite(c, e, pose);
+    else if (e.type === "wolf")
+      this.wolf(e.x, e.y, color, scale, e.flash > 0, pose, !death);
     else {
-      this.shadow(e.x, e.y, 15 * scale);
+      if (!death) this.shadow(e.x, e.y, 15 * scale);
       c.save();
       c.translate(Math.round(e.x), Math.round(e.y));
+      if (pose.mirror) c.scale(-1, 1);
       c.scale(scale, scale);
+      this.combatFallback(pose.frame);
       c.fillStyle = e.flash > 0 ? "#f3ead5" : color;
-      const step =
-        e.frozenUntil > this.game.time
-          ? 0
-          : Math.sin(this.game.time * 9 + e.id) * 2;
+      const step = (WALK_KEYS[pose.frame]?.left || 0) * 2;
       c.fillRect(-9, -21, 18, 19);
       c.fillRect(-12, -20, 5, 13);
       c.fillRect(7, -20, 5, 13);
@@ -1059,6 +1346,7 @@ export class GameRenderer {
       }
       c.restore();
     }
+    if (death) return;
     if (e.frozenUntil > this.game.time) {
       c.strokeStyle = "#a4e6ef";
       c.lineWidth = 2;

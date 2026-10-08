@@ -1,11 +1,14 @@
-import { chromium } from "playwright";
+import { openCaptureSession } from "./capture-session.mjs";
 import fs from "node:fs/promises";
-const browser = await chromium.launch({ headless: true }),
-  page = await browser.newPage({ viewport: { width: 1440, height: 1000 } }),
-  base = "http://127.0.0.1:5176",
-  errors = [];
-page.on("pageerror", (e) => errors.push(e.message));
+const session = await openCaptureSession({ headless: true });
+const browser = session.browser;
 try {
+  const page = await browser.newPage({
+      viewport: { width: 1440, height: 1000 },
+    }),
+    base = session.url,
+    errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(base);
   await page.evaluate(async () => {
     const { freshSave, persist } = await import("/src/progression.ts");
@@ -198,5 +201,5 @@ try {
     }),
   );
 } finally {
-  await browser.close();
+  await session.close();
 }

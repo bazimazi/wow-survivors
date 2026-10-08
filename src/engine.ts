@@ -1,3 +1,6 @@
+import { weaponAccuracy } from "./item-progression";
+import type { EquipmentSnapshot, WeaponPractice } from "./item-progression";
+import type { WeaponType } from "./weapon-training";
 import {
   MATERIALS as RESOURCE_MAP,
   FAMILY_INFO,
@@ -13,6 +16,12 @@ import type { GatheringTrade, NodeFamily } from "./resources";
 import { rankForSkill, TRAINING_RANKS } from "./training";
 import { CLASS_MAP, GEAR, GEAR_MAP, MATERIALS, SPELLS } from "./content";
 import { WARDROBE_SOURCES } from "./wardrobe";
+import { ACCESSORY_SOURCES } from "./accessories";
+import { NECKLACE_SOURCES } from "./necklaces";
+import { OFFHAND_SOURCES } from "./offhands";
+import { DUAL_WIELD_SOURCES } from "./dual-wield";
+import { RANGED_SOURCES } from "./ranged";
+import { TRAINED_WEAPON_SOURCES } from "./weapon-training";
 import { validCampaignSnapshot, campaignRunCounts } from "./campaigns";
 import type { CampaignSnapshot } from "./campaigns";
 import { duskwoodRoster } from "./duskwood";
@@ -183,6 +192,33 @@ export type GameEvent = {
   amount?: number;
   victory?: boolean;
 };
+/** Accepted actions for optional presentation; references are never stored by the engine. */
+export interface CombatAction {
+  actor: Vec;
+  time: number;
+  facing: number;
+  spellId?: string;
+  spellKind?: SpellDef["kind"];
+  ability?: ClassId;
+}
+/** Accepted enemy actions for optional renderer observation. */
+export interface EnemyAction {
+  actor: Enemy;
+  time: number;
+  facing: number;
+  kind: "contact" | "projectile" | "telegraph";
+  warning: number;
+  zoneId: string;
+  pattern?: number;
+}
+export type DeathAction =
+  | { kind: "enemy"; actor: Enemy; time: number }
+  | {
+      kind: "player";
+      actor: GameEngine["player"];
+      time: number;
+      bear: boolean;
+    };
 export interface EngineConfig {
   classId: ClassId;
   zone: ZoneDef;
@@ -200,7 +236,12 @@ export interface EngineConfig {
   campaigns?: CampaignSnapshot[];
   travelId?: string;
   onEvent?: (event: GameEvent) => void;
+  onAction?: (action: CombatAction) => void;
+  onEnemyAction?: (action: EnemyAction) => void;
+  onDeath?: (action: DeathAction) => void;
   onConsume?: (type: "potions" | "bombs") => boolean;
+  equipment?: EquipmentSnapshot;
+  onAmmunition?: () => boolean;
 }
 
 export class Random {
@@ -346,6 +387,9 @@ export class GameEngine {
   private eliteCount = 0;
   private waveCount = 0;
   private grid = new SpatialGrid();
+  readonly equipment: EquipmentSnapshot;
+  weaponHits: Partial<Record<WeaponType, number>> = {};
+  shotReadyAt = 0;
   private config: EngineConfig;
   private runId: string;
 
@@ -355,6 +399,38 @@ export class GameEngine {
       professions: { ...config.professions },
       gatheringCaps: { ...config.gatheringCaps },
     };
+    const items = [...new Set(config.equipment?.items || [])].filter(
+      (id) =>
+        Object.hasOwn(GEAR_MAP, id) &&
+        (!GEAR_MAP[id].classes ||
+          GEAR_MAP[id].classes!.includes(config.classId)) &&
+        (config.characterLevel || 1) >= (GEAR_MAP[id].level || 1),
+    );
+    const practice = (value: WeaponPractice | undefined, ranged = false) => {
+      const gear = value && GEAR_MAP[value.item];
+      if (
+        !value ||
+        !items.includes(value.item) ||
+        gear?.weaponType !== value.type ||
+        (ranged && !gear.rangedType)
+      )
+        return undefined;
+      const cap = Math.min(300, Math.max(5, (config.characterLevel || 1) * 5));
+      return Object.freeze({
+        item: value.item,
+        type: value.type,
+        cap,
+        skill: Number.isFinite(value.skill)
+          ? Math.max(1, Math.min(cap, Math.floor(value.skill)))
+          : 1,
+      });
+    };
+    this.equipment = Object.freeze({
+      items: Object.freeze(items),
+      primary: practice(config.equipment?.primary),
+      secondary: practice(config.equipment?.secondary),
+      ranged: practice(config.equipment?.ranged, true),
+    });
     this.classDef = CLASS_MAP[config.classId];
     this.preparedSpells = Object.freeze(
       normalizeSpellbook(
@@ -538,6 +614,42 @@ export class GameEngine {
   }
   private emit(event: GameEvent) {
     this.config.onEvent?.(event);
+  }
+  private action(
+    actor: Vec,
+    target?: Vec,
+    spell?: SpellDef,
+    ability?: ClassId,
+  ) {
+    this.config.onAction?.({
+      actor,
+      time: this.time,
+      facing: target
+        ? Math.atan2(target.y - actor.y, target.x - actor.x)
+        : this.player.facing,
+      spellId: spell?.id,
+      spellKind: spell?.kind,
+      ability,
+    });
+  }
+  private enemyAction(
+    actor: Enemy,
+    kind: EnemyAction["kind"],
+    warning = 0,
+    pattern?: number,
+    facing?: number,
+  ) {
+    if (actor.dead) return;
+    this.config.onEnemyAction?.({
+      actor,
+      time: this.time,
+      facing:
+        facing ?? Math.atan2(this.player.y - actor.y, this.player.x - actor.x),
+      kind,
+      warning,
+      zoneId: this.zone.id,
+      pattern,
+    });
   }
   setViewport(width: number, height: number) {
     this.width = width;
@@ -736,7 +848,12 @@ export class GameEngine {
           }
         }
       }
-      if (length < e.radius + 14 && !p.invulnerable) this.hurtPlayer(e.damage);
+      if (
+        length < e.radius + 14 &&
+        !p.invulnerable &&
+        this.hurtPlayer(e.damage)
+      )
+        this.enemyAction(e, "contact");
       e.attackTimer -= dt;
       if (e.boss) {
         const phase = e.hp < e.maxHp * 0.5 ? 2 : 1;
@@ -760,7 +877,7 @@ export class GameEngine {
         length < 650
       ) {
         e.attackTimer = 5.5;
-        if (this.projectiles.length < 500)
+        if (this.projectiles.length < 500) {
           this.projectiles.push({
             x: e.x,
             y: e.y,
@@ -775,6 +892,8 @@ export class GameEngine {
             hit: new Set(),
             enemy: true,
           });
+          this.enemyAction(e, "projectile", 0, undefined, Math.atan2(dy, dx));
+        }
       }
       if (this.dungeonStage) {
         e.x = clamp(e.x, -bounds.x + e.radius, bounds.x - e.radius);
@@ -851,6 +970,7 @@ export class GameEngine {
         if (pet.spellId === "beast") {
           if (distanceSq(pet, target) < 100 ** 2) {
             this.damageEnemy(target, this.spellDamage(def, state.rank), def.id);
+            this.action(pet, target, def);
             this.addEffect({
               kind: "burst",
               x: target.x,
@@ -861,6 +981,7 @@ export class GameEngine {
             });
           }
         } else {
+          const before = this.projectiles.length;
           const count =
             1 + (this.config.spellBonuses?.[def.id]?.projectiles || 0);
           for (let i = 0; i < count; i++)
@@ -871,6 +992,7 @@ export class GameEngine {
               state.rank,
               (i - (count - 1) / 2) * 0.12,
             );
+          if (this.projectiles.length > before) this.action(pet, target, def);
         }
       }
     }
@@ -1111,6 +1233,7 @@ export class GameEngine {
       });
   }
   private castBossAttack(e: Enemy) {
+    const previousHazards = this.hazards.length;
     const phase = this.bossState.phase,
       alternate = this.bossState.attackIndex++ % 2;
     const p = this.player,
@@ -1124,6 +1247,14 @@ export class GameEngine {
       else if (this.zone.id === "shadowfang")
         this.castShadowfangAttack(e, phase, alternate, point, aim);
       else this.castDungeonAttack(e, phase, alternate, point, aim);
+      if (this.hazards.length > previousHazards)
+        this.enemyAction(
+          e,
+          "telegraph",
+          this.bossState.attackUntil - this.time,
+          alternate,
+          aim,
+        );
       return;
     } else if (this.zone.id === "duskwood") {
       if (!alternate) {
@@ -1283,6 +1414,8 @@ export class GameEngine {
     }
     this.bossState.attackUntil = this.time + warning;
     this.bossState.stillUntil = this.time + warning;
+    if (this.hazards.length > previousHazards)
+      this.enemyAction(e, "telegraph", warning, alternate, aim);
   }
 
   private castShadowfangAttack(
@@ -1783,21 +1916,31 @@ export class GameEngine {
       : "40 gold, 24 run XP, 5 materials, 25 health";
     if (isCache) {
       const armorRank = ["cloth", "leather", "mail", "plate"];
-      const pool = GEAR.filter(
-        (g) =>
-          (this.zone.id === "duskwood"
+      const pool = GEAR.filter((g) => {
+        const source =
+          WARDROBE_SOURCES[g.id] ||
+          ACCESSORY_SOURCES[g.id] ||
+          NECKLACE_SOURCES[g.id] ||
+          OFFHAND_SOURCES[g.id] ||
+          DUAL_WIELD_SOURCES[g.id] ||
+          RANGED_SOURCES[g.id] ||
+          TRAINED_WEAPON_SOURCES[g.id];
+        const local =
+          this.zone.id === "duskwood"
             ? g.dropZones?.includes("duskwood")
-            : WARDROBE_SOURCES[g.id]
-              ? WARDROBE_SOURCES[g.id].type === "world" &&
-                g.dropZones?.includes(this.zone.id)
-              : g.rarity === "uncommon") &&
+            : source
+              ? source.type === "world" && g.dropZones?.includes(this.zone.id)
+              : g.rarity === "uncommon";
+        return (
+          local &&
           !g.id.startsWith("starter_") &&
           (!g.classes || g.classes.includes(this.classDef.id)) &&
           (!g.armor ||
             armorRank.indexOf(g.armor) <=
               armorRank.indexOf(this.classDef.armor)) &&
-          (g.level || 1) <= (this.config.characterLevel || 1),
-      );
+          (g.level || 1) <= (this.config.characterLevel || 1)
+        );
+      });
       if (pool.length) {
         const item = this.rng.pick(pool);
         this.loot.push(item.id);
@@ -1860,6 +2003,7 @@ export class GameEngine {
         color: def.color,
         life: 0.38,
       });
+      this.action(this.player, undefined, def);
       this.emit({ type: "cast" });
       return true;
     }
@@ -1983,6 +2127,7 @@ export class GameEngine {
         next = this.nearest(previous, 240, hit);
       }
     }
+    this.action(this.player, target, def);
     this.emit({ type: "cast" });
     return true;
   }
@@ -2088,6 +2233,35 @@ export class GameEngine {
     canCrit = true,
   ) {
     if (e.dead || this.ended || this.checkpoint) return;
+    const weapon =
+      source === "equipment-strike"
+        ? this.equipment.primary
+        : source === "equipment-shot"
+          ? this.shootingWeapon
+          : ["shot", "multishot"].includes(source)
+            ? this.shootingWeapon
+            : canCrit &&
+                (SPELLS[source]?.kind === "melee" ||
+                  ["flurry", "whirlwind"].includes(source))
+              ? this.equipment.primary
+              : undefined;
+    if (weapon) {
+      const accuracy = weaponAccuracy(
+        weapon,
+        this.weaponHits[weapon.type] || 0,
+      );
+      if (accuracy < 1 && this.rng.next() >= accuracy) {
+        if (this.texts.length < 90)
+          this.texts.push({
+            x: e.x,
+            y: e.y - e.radius,
+            value: "Miss",
+            color: "#b5b1a4",
+            life: 0.6,
+          });
+        return;
+      }
+    }
     const bonus = this.config.spellBonuses?.[source] || {};
     const critical =
         canCrit &&
@@ -2095,6 +2269,16 @@ export class GameEngine {
           Math.min(0.8, (this.stats.crit + (bonus.crit || 0)) / 100),
       damage = amount * (critical ? 1.8 : 1);
     const dealt = Math.min(e.hp, damage);
+    if (weapon && dealt > 0) {
+      this.weaponHits[weapon.type] = (this.weaponHits[weapon.type] || 0) + 1;
+      if (
+        weapon === this.equipment.primary &&
+        this.equipment.secondary &&
+        this.equipment.secondary.type !== weapon.type
+      )
+        this.weaponHits[this.equipment.secondary.type] =
+          (this.weaponHits[this.equipment.secondary.type] || 0) + 1;
+    }
     this.totalDamage += dealt;
     this.damageBySpell[source] = (this.damageBySpell[source] || 0) + dealt;
     if (bonus.leech)
@@ -2117,6 +2301,7 @@ export class GameEngine {
     if (e.hp <= 0) {
       e.dead = true;
       delete e.dots;
+      this.config.onDeath?.({ kind: "enemy", actor: e, time: this.time });
       this.kills++;
       if (e.elite && !e.boss) this.trialElites++;
       if (e.boss) this.trialBosses++;
@@ -2275,7 +2460,7 @@ export class GameEngine {
   }
   private hurtPlayer(damage: number) {
     const p = this.player;
-    if (p.invulnerable || this.ended || this.checkpoint) return;
+    if (p.invulnerable || this.ended || this.checkpoint) return false;
     this.stopTravel();
     this.travel.lock = TRAVEL_RULES.damageLock;
     const armor =
@@ -2293,6 +2478,7 @@ export class GameEngine {
     if (this.classDef.resource === "Rage")
       p.resource = Math.min(100, p.resource + 15);
     this.emit({ type: "hit", amount: taken });
+    return true;
   }
   private addEffect(effect: Omit<Effect, "maxLife">) {
     if (this.effects.length < 100)
@@ -2519,6 +2705,7 @@ export class GameEngine {
       color: this.classDef.color,
       life: 0.7,
     });
+    this.action(p, undefined, undefined, id);
     this.emit({ type: "active", message: this.classDef.active });
     return true;
   }
@@ -2537,6 +2724,96 @@ export class GameEngine {
     this.stopTravel();
     this.player.dashTimer = 0.22;
     this.player.invulnerable = 0.3;
+    return true;
+  }
+  get shootingWeapon(): WeaponPractice | undefined {
+    const weapon = this.equipment.ranged || this.equipment.primary;
+    return weapon && GEAR_MAP[weapon.item]?.rangedType ? weapon : undefined;
+  }
+  shootEquipment(): boolean {
+    const weapon = this.shootingWeapon;
+    if (
+      !weapon ||
+      this.paused ||
+      this.choosing ||
+      this.shrineChoice ||
+      this.checkpoint ||
+      this.ended ||
+      this.time < this.shotReadyAt
+    )
+      return false;
+    const target = this.nearest(this.player, 650);
+    if (!target) return false;
+    if (
+      ["bow", "gun", "crossbow"].includes(
+        GEAR_MAP[weapon.item].rangedType || "",
+      ) &&
+      !this.config.onAmmunition?.()
+    )
+      return false;
+    this.shotReadyAt = this.time + 2.5;
+    this.stopTravel();
+    this.damageEnemy(
+      target,
+      20 * (1 + this.stats.power / 100),
+      "equipment-shot",
+    );
+    this.addEffect({
+      kind: "line",
+      x: this.player.x,
+      y: this.player.y,
+      end: { x: target.x, y: target.y },
+      color: "#d9d2ae",
+      radius: 3,
+      life: 0.18,
+    });
+    this.config.onAction?.({
+      actor: this.player,
+      time: this.time,
+      facing: Math.atan2(target.y - this.player.y, target.x - this.player.x),
+      spellKind: "projectile",
+    });
+    this.emit({ type: "cast", message: "Equipment shot" });
+    return true;
+  }
+  attackEquipment(): boolean {
+    if (this.shootingWeapon) return this.shootEquipment();
+    const weapon = this.equipment.primary;
+    if (
+      !weapon ||
+      this.paused ||
+      this.choosing ||
+      this.shrineChoice ||
+      this.checkpoint ||
+      this.ended ||
+      this.time < this.shotReadyAt
+    )
+      return false;
+    const target = this.nearest(this.player, 150);
+    if (!target) return false;
+    this.shotReadyAt = this.time + 2.5;
+    this.stopTravel();
+    this.damageEnemy(
+      target,
+      20 * (1 + this.stats.power / 100),
+      "equipment-strike",
+    );
+    this.addEffect({
+      kind: "line",
+      x: this.player.x,
+      y: this.player.y,
+      end: { x: target.x, y: target.y },
+      color: "#e0c9a0",
+      radius: 12,
+      life: 0.18,
+    });
+    this.config.onAction?.({
+      actor: this.player,
+      time: this.time,
+      facing: Math.atan2(target.y - this.player.y, target.x - this.player.x),
+      spellKind: "melee",
+    });
+    this.emit({ type: "cast", message: "Equipment strike" });
     return true;
   }
   private recordProfessionUse(field: "healing" | "bombs" | "meals") {
@@ -2734,6 +3011,13 @@ export class GameEngine {
     )
       return;
     this.ended = true;
+    if (!victory && this.player.hp <= 0)
+      this.config.onDeath?.({
+        kind: "player",
+        actor: this.player,
+        time: this.time,
+        bear: this.classDef.id === "druid" && this.player.activeBuff > 0,
+      });
     this.healingEffects = {};
     for (const e of this.enemies) delete e.dots;
     this.shrineChoice = null;
@@ -2755,6 +3039,15 @@ export class GameEngine {
       ),
       materials: { ...this.materials },
       loot: [...this.loot],
+      ...(this.config.equipment
+        ? {
+            equipmentProof: {
+              items: [...this.equipment.items],
+              weaponHits: { ...this.weaponHits },
+              defeated: this.ended && this.player.hp <= 0,
+            },
+          }
+        : {}),
       encounters: this.completedEncounters,
       ...(this.campaignSnapshots.length
         ? {

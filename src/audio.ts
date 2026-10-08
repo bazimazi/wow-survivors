@@ -6,7 +6,8 @@ export class Sound {
     if (!this.enabled) return;
     try {
       this.context ??= new AudioContext();
-      if (this.context.state === "suspended") void this.context.resume();
+      if (this.context.state === "suspended")
+        void this.context.resume().catch(() => {});
     } catch {
       /* Audio is optional. */
     }

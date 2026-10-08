@@ -1,16 +1,17 @@
-import { chromium } from "@playwright/test";
+import { openCaptureSession } from "./capture-session.mjs";
 import { mkdir } from "node:fs/promises";
 import assert from "node:assert/strict";
 
 await mkdir("output/screenshots", { recursive: true });
-const browser = await chromium.launch({ args: ["--disable-gpu"] });
+const session = await openCaptureSession({ args: ["--disable-gpu"] });
+const browser = session.browser;
 try {
   const page = await browser.newPage({
     viewport: { width: 1440, height: 1000 },
   });
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("http://127.0.0.1:5176/");
+  await page.goto(session.url);
   // This fixture is confined to this script's browser context.
   await page.evaluate(async () => {
     const { freshSave, persist } = await import("/src/progression.ts");
@@ -28,7 +29,7 @@ try {
     save.totals.kills = 120;
     persist(save);
   });
-  await page.goto("http://127.0.0.1:5176/#outposts");
+  await page.goto(`${session.url}#outposts`);
   await page.reload();
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({
@@ -86,5 +87,5 @@ try {
     ),
   );
 } finally {
-  await browser.close();
+  await session.close();
 }

@@ -1,5 +1,7 @@
+import { readBalanceBaseline } from "./balance-baselines.mjs";
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
+await fs.mkdir("output", { recursive: true });
 const profiles = [
   ["starter", []],
   ["core-heroic", ["--advanced"]],
@@ -30,7 +32,7 @@ for (const [name, flags] of profiles) {
   await fs.writeFile(`output/balance-0.15-${name}.jsonl`, output);
   const baseline = !name.startsWith("exalted-")
     ? JSON.parse(
-        `[${(await fs.readFile(`output/balance-0.14-${name}.jsonl`, "utf8")).trim().split(/\r?\n/).join(",")}]`,
+        `[${(await readBalanceBaseline(`balance-0.14-${name}.jsonl`)).trim().split(/\r?\n/).join(",")}]`,
       )
     : null;
   const report = {

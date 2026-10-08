@@ -96,7 +96,7 @@ function engine(s = freshSave(), chapter = 0) {
 test("every class has a distinct trial and eligible exclusive relic with no normal drop source", () => {
   assert.equal(Object.keys(CLASS_TRIALS).length, 9);
   assert.equal(new Set(Object.values(CLASS_TRIALS).map((t) => t.name)).size, 9);
-  assert.equal(GEAR.length, 189);
+  assert.equal(GEAR.length, 353);
   for (const c of CLASSES) {
     const s = freshSave(),
       id = trialRelicId(c.id);
@@ -309,8 +309,8 @@ test("rank selections and real elite/boss kills record mastery and evolution wit
   assert.equal(g.ended, true);
 });
 test("enchantment formulas cover valid supported slots with finite costs and bonuses", () => {
-  assert.equal(ENCHANTMENTS.length, 12);
-  assert.equal(new Set(ENCHANTMENTS.map((e) => e.id)).size, 12);
+  assert.equal(ENCHANTMENTS.length, 24);
+  assert.equal(new Set(ENCHANTMENTS.map((e) => e.id)).size, 24);
   assert.deepEqual(
     [...new Set(ENCHANTMENTS.map((e) => e.skill))],
     [1, 50, 125, 225],

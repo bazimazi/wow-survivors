@@ -73,7 +73,7 @@ test("advanced specialization, recipe milestones, crafted set equipment and set-
       .getByRole("button", { name: "Craft", exact: true })
       .click();
   await page.getByRole("button", { name: "Armory", exact: true }).click();
-  await expect(page.locator(".loadout-slot")).toHaveCount(10);
+  await expect(page.locator(".loadout-slot")).toHaveCount(16);
   for (const name of [
     "Spellwoven Gloves",
     "Spellwoven Crown",
@@ -130,7 +130,7 @@ test("expanded equipment and recipe catalog remain usable on a narrow screen", a
   ).toBe(true);
   await page.getByRole("button", { name: "Professions", exact: true }).click();
   await page.locator("#recipe-filter").selectOption("all");
-  await expect(page.locator(".recipe-card")).toHaveCount(75);
+  await expect(page.locator(".recipe-card")).toHaveCount(127);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

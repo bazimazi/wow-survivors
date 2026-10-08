@@ -119,9 +119,76 @@ export const ENCHANTMENTS: Enchantment[] = [
     costs: { dust: 8, herbs: 4 },
     stats: { speed: 7, regen: 0.3 },
   },
+  {
+    id: "wrists_vigor",
+    name: "Wristward Vigor",
+    slot: "wrists",
+    skill: 1,
+    gold: 12,
+    costs: { dust: 3, herbs: 1 },
+    stats: { health: 10 },
+  },
+  {
+    id: "wrists_guard",
+    name: "Wristguard",
+    slot: "wrists",
+    skill: 50,
+    gold: 25,
+    costs: { dust: 4, ore: 2 },
+    stats: { armor: 3 },
+  },
+  {
+    id: "wrists_focus",
+    name: "Spellthread Focus",
+    slot: "wrists",
+    skill: 125,
+    gold: 50,
+    costs: { dust: 6, herbs: 3 },
+    stats: { power: 4, haste: 2 },
+  },
+  {
+    id: "wrists_recovery",
+    name: "Evergreen Recovery",
+    slot: "wrists",
+    skill: 225,
+    gold: 95,
+    costs: { dust: 8, herbs: 4 },
+    stats: { health: 24, regen: 0.4 },
+  },
 ];
+for (const [slot, names, bonuses, material] of [
+  [
+    "back",
+    ["Trailward", "Stonefold", "Windthread", "Evergreen Mantle"],
+    [
+      { health: 8 },
+      { armor: 2 },
+      { crit: 2, speed: 2 },
+      { regen: 0.3, magnet: 10 },
+    ],
+    "cloth",
+  ],
+  [
+    "offhand",
+    ["Companion Ward", "Steadfast Grip", "Focused Grip", "Quickened Guard"],
+    [{ health: 8 }, { armor: 2 }, { power: 4 }, { haste: 4, health: 12 }],
+    "ore",
+  ],
+] as const) {
+  for (let tier = 0; tier < 4; tier++)
+    ENCHANTMENTS.push({
+      id: `${slot}_ward_${tier + 1}`,
+      name: names[tier],
+      slot,
+      skill: [1, 50, 125, 225][tier],
+      gold: [15, 25, 45, 80][tier],
+      costs: { dust: [2, 3, 5, 8][tier], [material]: [1, 2, 3, 4][tier] },
+      stats: bonuses[tier],
+    });
+}
 for (const formula of ENCHANTMENTS)
   formula.costs = gradedCosts(formula.costs, formula.skill);
 export const ENCHANTMENT_MAP = Object.fromEntries(
   ENCHANTMENTS.map((e) => [e.id, e]),
 );
+export const ENCHANTABLE_SLOTS = new Set(ENCHANTMENTS.map((e) => e.slot));

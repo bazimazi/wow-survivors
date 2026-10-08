@@ -315,8 +315,8 @@ test.describe("touch character progression", () => {
     });
     await page.getByRole("button", { name: "Armory", exact: true }).tap();
     await page.locator("#enchant-target").selectOption("spellweave_hands");
-    await page.getByText("Browse all 12 formulas", { exact: true }).tap();
-    await expect(page.locator(".enchantment-catalog p")).toHaveCount(12);
+    await page.getByText("Browse all 24 formulas", { exact: true }).tap();
+    await expect(page.locator(".enchantment-catalog p")).toHaveCount(24);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,

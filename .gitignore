@@ -4,3 +4,6 @@ test-results/
 playwright-report/
 .DS_Store
 *.log
+
+# Regeneratable diagnostics, captures and downloaded research sources
+output/

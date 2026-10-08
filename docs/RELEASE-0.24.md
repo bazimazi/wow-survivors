@@ -1,0 +1,53 @@
+# v0.24 — Bracers and paired rings
+
+## Design recorded before implementation
+
+Continue the remaining equipment roadmap with a wrist position and two ring positions, bringing each hero from ten to thirteen sockets. Existing equipment, attributes, source IDs and version-1 saves remain compatible; new positions begin empty. Keep shared item ownership: one ring definition can be worn once per hero, and different heroes may share it. No personal item instances are introduced.
+
+Add 24 original items: a cloth bracer and universal ring for each of four outdoor regions, eight crafted bracers (four armor families at Expert/Artisan grades), and eight universal guardian rings across the three dungeon routes. Bracers stay outside the existing six-piece sets. Crafted rings/Jewelcrafting, neck/off-hand positions, affixes, soulbinding and durability remain separate phases. Existing enchantment formulas keep their supported slots.
+
+Both ring positions accept the same category. Equipping fills an empty position automatically. When both are occupied, show each current ring and its exact stat comparison, then let the player select which to replace or cancel. No silent replacement occurs without a target. Explicitly moving a worn ring clears its prior position before calculating/applying stats. Invalid targets fail without mutation. Imports check ownership, slot/class/level eligibility and remove duplicate same-hero rings in canonical slot order. Selling/disenchanting remains blocked while any hero wears an item, and duplicate expedition loot keeps the existing refund rule.
+
+Extend camp sockets, Armory slot filters, empty-position browsing and the acquisition guide. Both ring positions filter the same items; the guide lists a single Rings category alongside Wrists and the four existing families. Record exact zone/guardian/crafting sources and grade/rank/level gates. New line icons follow the current SVG system. Check all nine classes, six viewport widths, keyboard/touch/controller-compatible DOM actions and 44px controls.
+
+Verify migration/import repair, pair uniqueness and moving/replacement comparisons, rejected transactions, class/level/grade/training gates, every new recipe and actual outdoor/guardian rewards, shared sale protection, duplicate settlement, combined filters and saved UI replacement/cancellation. Compare older ten-slot stats and real combat with added legal accessories. Run relevant progression/balance diagnostics and full unit/build/browser/format checks, inspect captures and preserve historical artifacts.
+
+## Research
+
+Blizzard's [original manual](https://assets.blz-contentstack.com/v3/assets/blt3452e3b114fab0cd/blt2e9295db02a222fc/6025bcbb6968b53d529edb2a/media_manual_classic_enUS.pdf), printed pages 58–59, names wrist armor, one armor item per body position, and two ring positions. It describes rings as monster drops/quest rewards and discusses level/class equipment restrictions on the following pages. These relationships inform this phase. The items, compact progression gates, values, crafting costs and shared-ownership rule are original survival-game designs.
+
+## Implemented behavior
+
+`src/accessories.ts` defines all 24 items and their acquisition sources. The catalog now contains **213 items and 83 recipes**. Four regions each add cloth wrist armor and a universal ring; level gates are 2/3 in Elwynn, 5/6 in Westfall, 10/11 in Tirisfal and 18/19 in Duskwood. Caches enforce the selected character's level and local source; elite chests can retain a higher-level local discovery for later. Crafted bracers and guardian rings stay outside world reward pools. A reward-pool regression caught and corrected cross-region accessory leakage in guarded caches.
+
+Eight crafted bracers cover cloth/Tailoring, leather/Leatherworking, mail/Blacksmithing and plate/Blacksmithing. Expert recipes require skill 125, training rank 3 and grade-3 supplies, cost 65 G and produce level-10 equipment. Artisan recipes require skill 225, training rank 4 and grade-4 supplies, cost 110 G and produce level-18 equipment. Existing crafting eligibility, skill practice, profession projects, armor access and duplicate conversion apply. These alternatives do not add set pieces or enchanting formulas.
+
+Eight rare universal rings join existing guardian pools: Foundry Signet from Sneed and Corsair's Band from VanCleef; Stoneheart Ring from Oggleflint, Emberheart Band from Jergosh and Shadowcleft Signet from Bazzalan; Silvermoon Signet from Silverlaine, Oathkeeper's Band from Springvale and Mooncurse Ring from Arugal. The first two routes require equipment level 10, Shadowfang rings level 15. Dungeon guardian loot now contains 53 items across all three routes. Secured rewards enter shared inventory at once-only expedition settlement and remain unequipped until a camp action.
+
+Duskwood's camp equipment preview reads the canonical local drop pool, including the new level-18 wristwraps and level-19 ring alongside its twelve rare discoveries and the separately described epic guardian trophy. All expedition previews use readable equipment labels; rings appear as a shared Ring category rather than an internal position ID.
+
+`src/equipment.ts` provides the compatible ring category and default target selection. The progression transaction and comparison use the same candidate equipment calculation, including clearing a ring's prior position. Invalid slots, ownership, class and level fail without mutations. Full ring positions require an explicit replacement. Version-1 import walks canonical equipment positions, rejects invalid placements and repairs repeated ring IDs; different heroes can still share equipment. Existing stats are unchanged when the three new sockets are empty.
+
+The Armory shows all thirteen positions and a **76-item guide across six families**. Empty Ring II browses the same twelve rings as Ring I; bag position filters use the compatible category. A full pair opens a review with both current item names and exact changes to the selected build, keyboard focus containment, two replacement actions and cancellation. Crafting links reach the real filtered profession recipes, displaying exact material names, costs and Expert/Artisan training requirements. Camp sockets and review controls have 44px targets. Original bracer/ring SVG icons follow the existing interface art.
+
+## Prepared-build diagnostics
+
+`node scripts/check-accessory-balance.mjs` runs every class with three seeds using production combat and real craft/equip actions. Ring ownership is seeded from named world/guardian sources. This compares prepared builds; it does not measure acquisition time, random-drop fairness or human win rates. No spells or encounter values were retuned.
+
+| Profile                          | Victories | First upgrade | Successful finish | Timeouts |
+| -------------------------------- | --------- | ------------- | ----------------- | -------- |
+| Level-21 ten-slot Tirisfal       | 21/27     | 6–26 s        | 483–518 s         | 0        |
+| Level-21 thirteen-slot Tirisfal  | 24/27     | 5–29 s        | 481–501 s         | 0        |
+| Level-10 thirteen-slot Deadmines | 27/27     | 5–13 s        | 324–371 s         | 0        |
+
+The nine-class ten-slot report is identical to the saved v0.13 report, including equipment, camp stats, first upgrades and full combat outcomes. New profiles verify thirteen eligible equipped positions per seed. Heroic accessories improve this particular automated movement policy, but the warrior's later first upgrades demonstrate that added armor/regen need not accelerate every opening. Evidence: `output/accessory-balance-0.24.json` and `output/balance-0.24-{ten-slot-heroic,thirteen-slot-heroic,thirteen-slot-deadmines-entry}.jsonl`. Ingredient costs, alternatives and reward pacing still need human playtesting.
+
+## Verification
+
+Implementation is complete. The complete browser regression passes **176/176 cases** in **8.6 minutes**, including all seven new accessory flows and the previous gameplay/presentation suite. Repository formatting and `git diff --check` pass. Logs: `output/browser-0.24.log` and `output/format-0.24.log`; see [validation](VALIDATION.md). Final class-restriction wording in expedition previews was checked again in six affected browser cases (**15.6 seconds**) and the unit/build checks. The final preview/catalog log is `output/accessory-previews-browser-0.24.log`.
+
+All **362 unit checks** pass, including thirteen new accessory checks. They cover catalog/source uniqueness, unchanged legacy stats, canonical imports, paired eligibility and uniqueness, automatic targets, explicit moving/replacement comparisons across all nine classes, rejected transaction atomicity, every real recipe, grade/training gates, shared sale protection and duplicate settlement. Actual elite/cache combat reaches all eight region-specific outdoor additions without cross-region leakage; novice caches respect level gates. Actual guardian combat reaches every new ring through its recorded room. A real spell-damage comparison demonstrates the equipped bonus and restoration of the old build after removal. Strict TypeScript and the production build pass; logs are `output/tests-0.24.log` and `output/build-0.24.log`.
+
+The **seven new browser cases** and **seven existing wardrobe cases** all pass. They cover old loadouts, both ring browsers, source/armor filters, reviewed cancellation and keyboard replacement, malformed imports through the real file import UI, shared ownership across hero switches, exact Expert/Artisan crafting and source links, and rings earned through actual cache/guardian combat followed by once-only settlement, camp equip and reload. Layout checks cover **nine classes × six widths = 54 combinations**, with no horizontal overflow and 44px camp sockets. Ring review checks measure every action at 44px or taller and within desktop/phone viewports. Log: `output/accessory-browser-0.24.log`; layout report: `output/accessory-layout-0.24.json`. Reproduce with `npx playwright test tests/e2e/accessories.spec.ts tests/e2e/wardrobe.spec.ts`.
+
+All six desktop/phone captures were visually inspected: `output/screenshots/accessory-{camp,armory}-{1440,390}-0.24.png` and `output/screenshots/ring-review-{1440,390}-0.24.png`. Camp/catalog captures scroll to the equipment under review, while ring captures wait for entry animation and transient equip notifications to finish. The browser checks regenerated 89 historical tracked artifacts, which were restored; current-release evidence is retained. Old saves start with empty additional positions; save schema/key and automatic first-free-port startup remain compatible.

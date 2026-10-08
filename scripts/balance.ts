@@ -1,3 +1,8 @@
+import {
+  equipmentSnapshot,
+  itemCondition,
+  weaponSkillCap,
+} from "../src/item-progression";
 import { CLASSES, GEAR_SETS, MATERIALS, ZONES } from "../src/content";
 import { distanceSq, GameEngine } from "../src/engine";
 import { telegraphContains } from "../src/expedition";
@@ -7,15 +12,29 @@ import {
   heroSpellBonuses,
   learnTalent,
   equip,
+  trainDualWield,
+  trainWeaponType,
   craft,
   learnProfession,
+  forgetProfession,
+  applyEnchantment,
   trainClassTechnique,
   prepareClassSpell,
   buyOffer,
+  settleRun,
+  attuneEquipment,
 } from "../src/progression";
 import { CAMPAIGN_FACTIONS, campaignCloakId } from "../src/campaigns";
 import type { FactionId } from "../src/factions";
 import { CLASS_TECHNIQUES, lockedClassSpell } from "../src/spellbook";
+import { dualWieldClass } from "../src/dual-wield";
+import { rangedClass, RANGED_CLASSES } from "../src/ranged";
+import {
+  advancedWeaponType,
+  WEAPON_TRAINING,
+  trainedWeaponRanged,
+  trainedWeaponOneHanded,
+} from "../src/weapon-training";
 
 // A simple, repeatable player policy: collect XP, keep personal space,
 // use the class ability when surrounded, and spend the starter healing supplies.
@@ -27,7 +46,26 @@ const duskwood = process.argv.includes("--duskwood");
 const cloudAware = process.argv.includes("--cloud-aware");
 const entryLevel = duskwood ? 20 : shadowfang ? 15 : 10;
 const spellbook = process.argv.includes("--spellbook");
-const wardrobe = process.argv.includes("--wardrobe");
+const weaponTypeArg = process.argv
+  .find((arg) => arg.startsWith("--weapon-type="))
+  ?.slice(14);
+if (weaponTypeArg !== undefined && !advancedWeaponType(weaponTypeArg))
+  throw Error("Unknown weapon type profile");
+const weaponType = advancedWeaponType(weaponTypeArg)
+  ? weaponTypeArg
+  : undefined;
+const equipmentProgression = process.argv.includes("--equipment-progression");
+const practiced = process.argv.includes("--practiced");
+const attuned = process.argv.includes("--attuned");
+const ranged =
+  process.argv.includes("--ranged") || !!weaponType || equipmentProgression;
+const dualWield = process.argv.includes("--dual-wield") || ranged;
+const offhands = process.argv.includes("--offhands") || dualWield;
+const necklaces = process.argv.includes("--necklaces") || offhands;
+const wristEnchant = process.argv.includes("--wrist-enchant");
+const accessories =
+  process.argv.includes("--accessories") || necklaces || wristEnchant;
+const wardrobe = process.argv.includes("--wardrobe") || accessories;
 const campaign = process.argv
   .find((arg) => arg.startsWith("--campaign="))
   ?.slice(11) as FactionId | undefined;
@@ -124,6 +162,171 @@ for (const c of CLASSES) {
       if (Object.keys(save.heroes[c.id].equipment).length !== 10)
         throw Error("Incomplete loadout");
     }
+    if (accessories) {
+      const set = GEAR_SETS.find((s) => s.armor === c.armor)!;
+      const heroLevel = save.heroes[c.id].level;
+      save.professions[set.profession] = heroLevel >= 18 ? 225 : 125;
+      save.training[set.profession] = heroLevel >= 18 ? 4 : 3;
+      const wrists = `${heroLevel >= 18 ? "artisan" : "expert"}_${c.armor}_bracers`;
+      if (!craft(save, `craft_${wrists}`) || !equip(save, wrists))
+        throw Error(wrists);
+      // Prepared source-specific ownership fixtures; this does not measure acquisition time.
+      for (const id of heroLevel >= 15
+        ? ["tirisfal_ring", "mooncurse_ring"]
+        : ["foundry_signet", "corsair_band"]) {
+        save.inventory.push(id);
+        if (!equip(save, id)) throw Error(id);
+      }
+      if (Object.keys(save.heroes[c.id].equipment).length !== 13)
+        throw Error("Incomplete accessory loadout");
+    }
+    if (necklaces) {
+      const id =
+        save.heroes[c.id].level >= 15 ? "moonlit_pendant" : "ironclad_pendant";
+      // Prepared guardian ownership; equip still enforces level/class/slot rules.
+      save.inventory.push(id);
+      if (
+        !equip(save, id) ||
+        Object.keys(save.heroes[c.id].equipment).length !== 14
+      )
+        throw Error("Incomplete necklace loadout");
+    }
+    if (wristEnchant) {
+      const set = GEAR_SETS.find((s) => s.armor === c.armor)!;
+      // The cape remains owned after unlearning its trade, freeing a primary slot.
+      if (
+        set.profession !== "tailoring" &&
+        !forgetProfession(save, "tailoring")
+      )
+        throw Error("Could not free a profession slot");
+      if (!learnProfession(save, "enchanting"))
+        throw Error("Could not learn Enchanting");
+      const artisan = save.heroes[c.id].level >= 18;
+      save.professions.enchanting = artisan ? 225 : 125;
+      save.training.enchanting = artisan ? 4 : 3;
+      if (
+        !applyEnchantment(
+          save,
+          save.heroes[c.id].equipment.wrists!,
+          artisan ? "wrists_recovery" : "wrists_focus",
+        )
+      )
+        throw Error("Could not enchant bracers");
+    }
+    if (offhands && !["rogue", "hunter"].includes(c.id)) {
+      const shield = ["warrior", "paladin", "shaman"].includes(c.id);
+      const artisan = save.heroes[c.id].level >= 18;
+      const weapon = `${artisan ? "duskwood" : "westfall"}_${shield ? "mace" : "spellblade"}`;
+      const held = `${artisan ? "artisan" : "expert"}_${shield ? "shield" : "focus"}`;
+      if (!shield && !save.professions.enchanting) {
+        if (
+          save.professions.tailoring &&
+          c.armor !== "cloth" &&
+          !forgetProfession(save, "tailoring")
+        )
+          throw Error("Could not free a profession slot");
+        if (!learnProfession(save, "enchanting"))
+          throw Error("Could not learn Enchanting");
+      }
+      const trade = shield ? "blacksmithing" : "enchanting";
+      save.professions[trade] = artisan ? 225 : 125;
+      save.training[trade] = artisan ? 4 : 3;
+      // Prepared ownership from a named local discovery; acquisition time is not measured.
+      save.inventory.push(weapon);
+      if (
+        !craft(save, `craft_${held}`) ||
+        !equip(save, weapon) ||
+        !equip(save, held) ||
+        Object.keys(save.heroes[c.id].equipment).length !== 15
+      )
+        throw Error("Invalid off-hand loadout");
+    }
+    if (dualWield && dualWieldClass(c.id)) {
+      const artisan = save.heroes[c.id].level >= 18;
+      if (!save.professions.blacksmithing) {
+        const finishedTrade = save.professions.tailoring
+          ? "tailoring"
+          : "leatherworking";
+        if (
+          !forgetProfession(save, finishedTrade) ||
+          !learnProfession(save, "blacksmithing")
+        )
+          throw Error(
+            "Could not prepare blade crafting within two primary professions",
+          );
+      }
+      save.professions.blacksmithing = artisan ? 225 : 125;
+      save.training.blacksmithing = artisan ? 4 : 3;
+      const weapon = `${artisan ? "duskwood" : "westfall"}_duelist_blade`;
+      const secondary = `${artisan ? "artisan" : "expert"}_duelist_blade`;
+      // Named local ownership fixture; training, crafting and both placements are real transactions.
+      save.inventory.push(weapon);
+      if (
+        !trainDualWield(save) ||
+        !craft(save, `craft_${secondary}`) ||
+        !equip(save, weapon) ||
+        !equip(save, secondary, "offhand") ||
+        Object.keys(save.heroes[c.id].equipment).length !== 15
+      )
+        throw Error("Invalid dual-wield loadout");
+    }
+    if (ranged && rangedClass(c.id)) {
+      const wand = RANGED_CLASSES.wand.includes(c.id),
+        profession = wand ? "enchanting" : "engineering";
+      if (!save.professions[profession]) {
+        const finishedTrade = Object.keys(save.professions).find(
+          (p) => p !== profession,
+        ) as keyof typeof save.professions;
+        if (
+          !forgetProfession(save, finishedTrade) ||
+          !learnProfession(save, profession)
+        )
+          throw Error(
+            "Could not prepare ranged crafting within two primary professions",
+          );
+      }
+      const artisan = save.heroes[c.id].level >= 18,
+        id = `${artisan ? "artisan" : "expert"}_${wand ? "wand" : "thrown"}`;
+      save.professions[profession] = artisan ? 225 : 125;
+      save.training[profession] = artisan ? 4 : 3;
+      if (
+        !craft(save, `craft_${id}`) ||
+        !equip(save, id) ||
+        Object.keys(save.heroes[c.id].equipment).length !== 16
+      )
+        throw Error("Invalid ranged loadout");
+    }
+    if (weaponType && WEAPON_TRAINING[weaponType].classes.includes(c.id)) {
+      const profession = trainedWeaponRanged(weaponType)
+        ? "engineering"
+        : "blacksmithing";
+      if (!save.professions[profession]) {
+        const finishedTrade = Object.keys(save.professions).find(
+          (p) => p !== profession,
+        ) as keyof typeof save.professions;
+        if (
+          !forgetProfession(save, finishedTrade) ||
+          !learnProfession(save, profession)
+        )
+          throw Error(
+            "Could not prepare weapon crafting within two primary professions",
+          );
+      }
+      const artisan = save.heroes[c.id].level >= 18,
+        tier = artisan ? "artisan" : "expert";
+      save.professions[profession] = artisan ? 225 : 125;
+      save.training[profession] = artisan ? 4 : 3;
+      const id = `${tier}_${weaponType}`;
+      if (!trainWeaponType(save, weaponType) || !craft(save, `craft_${id}`))
+        throw Error("Invalid weapon training or craft");
+      if (trainedWeaponOneHanded(weaponType) && dualWieldClass(c.id)) {
+        const primary = `${artisan ? "duskwood" : "westfall"}_${weaponType}`;
+        save.inventory.push(primary);
+        if (!equip(save, primary) || !equip(save, id, "offhand"))
+          throw Error("Invalid trained weapon pair");
+      } else if (!equip(save, id))
+        throw Error("Invalid trained primary weapon");
+    }
     if (spellbook) {
       const replace = c.spells
         .filter((id) => !lockedClassSpell(c.id, id, c.spells))
@@ -147,6 +350,30 @@ for (const c of CLASSES) {
       )
         throw Error("Invalid campaign reward profile");
     }
+    if (equipmentProgression) {
+      save.ammunition = 9999;
+      if (practiced)
+        for (const type of Object.keys(save.heroes[c.id].weaponSkills))
+          save.heroes[c.id].weaponSkills[
+            type as keyof (typeof save.heroes)[typeof c.id]["weaponSkills"]
+          ] = weaponSkillCap(save.heroes[c.id].level);
+      if (attuned) {
+        if (!save.professions.enchanting) {
+          const trade = Object.keys(
+            save.professions,
+          )[0] as keyof typeof save.professions;
+          forgetProfession(save, trade);
+          learnProfession(save, "enchanting");
+        }
+        save.professions.enchanting = 225;
+        save.training.enchanting = 4;
+        const item =
+          save.heroes[c.id].equipment.ranged ||
+          save.heroes[c.id].equipment.weapon!;
+        if (!attuneEquipment(save, item, "force"))
+          throw Error("Invalid personal attunement");
+      }
+    }
     const stats = heroStats(save, c.id),
       zone = dungeon
         ? ZONES.find(
@@ -166,6 +393,13 @@ for (const c of CLASSES) {
       zone,
       stats,
       spellBonuses: heroSpellBonuses(save, c.id),
+      ...(equipmentProgression
+        ? {
+            equipment: equipmentSnapshot(save),
+            onAmmunition: () =>
+              save.ammunition > 0 ? (--save.ammunition, true) : false,
+          }
+        : {}),
       ...(spellbook
         ? {
             characterLevel: save.heroes[c.id].level,
@@ -298,14 +532,40 @@ for (const c of CLASSES) {
         if (g.player.hp < g.player.maxHp - 44) g.usePotion();
         if (threatened) g.dash();
       }
+      if (equipmentProgression && i % 165 === 0) g.attackEquipment();
       g.update(1 / 60);
     }
     firstLevels.push(firstLevel);
+    if (
+      equipmentProgression &&
+      g.ended &&
+      !settleRun(save, g.result(), g.professionGains)
+    )
+      throw Error("Equipment settlement failed");
     outcomes.push({
+      ...(equipmentProgression
+        ? {
+            practiced,
+            attuned,
+            ammunitionUsed: 9999 - save.ammunition,
+            weaponHits: g.weaponHits,
+            weaponSkills: save.heroes[c.id].weaponSkills,
+            conditions: equipmentSnapshot(save).items.map((id) => ({
+              id,
+              condition: itemCondition(save, id),
+            })),
+          }
+        : {}),
+      ...(weaponType
+        ? { weaponTraining: save.heroes[c.id].weaponTraining }
+        : {}),
+      ...(ranged ? { ranged: !!save.heroes[c.id].equipment.ranged } : {}),
+      ...(dualWield ? { dualWield: save.heroes[c.id].dualWield } : {}),
       seed,
       ...(wardrobe
         ? { equipment: save.heroes[c.id].equipment, campStats: stats }
         : {}),
+      ...(wristEnchant ? { enchantments: save.enchantments } : {}),
       ...(spellbook
         ? {
             healing: Math.round(g.totalHealing),
@@ -363,10 +623,13 @@ for (const c of CLASSES) {
       class: c.name,
       ...(spellbook ? { spellbook: "trainer techniques prepared" } : {}),
       ...(campaign ? { campaign } : {}),
+      ...(weaponType ? { weaponType } : {}),
+      ...(ranged ? { ranged: rangedClass(c.id) } : {}),
+      ...(dualWield ? { dualWield: dualWieldClass(c.id) } : {}),
       profile: dungeon
-        ? `level-${entry ? entryLevel : 21} / ${entry ? entryLevel : 21}-point hybrid / ${wardrobe ? "ten" : "six"} equipped slots / ${shadowfang ? "Shadowfang Keep" : process.argv.includes("--ragefire") ? "Ragefire Chasm" : "Deadmines"}`
+        ? `level-${entry ? entryLevel : 21} / ${entry ? entryLevel : 21}-point hybrid / ${weaponType === "polearm" && WEAPON_TRAINING.polearm.classes.includes(c.id) ? (rangedClass(c.id) ? "fifteen" : "fourteen") : ranged && rangedClass(c.id) ? "sixteen" : (dualWield && dualWieldClass(c.id)) || (offhands && !["rogue", "hunter"].includes(c.id)) ? "fifteen" : necklaces ? "fourteen" : accessories ? "thirteen" : wardrobe ? "ten" : "six"} equipped slots / ${shadowfang ? "Shadowfang Keep" : process.argv.includes("--ragefire") ? "Ragefire Chasm" : "Deadmines"}`
         : advanced
-          ? `level-21 / 21-point hybrid / ${wardrobe ? "ten" : campaign ? "seven" : "six"} equipped slots / Tirisfal`
+          ? `level-21 / 21-point hybrid / ${weaponType === "polearm" && WEAPON_TRAINING.polearm.classes.includes(c.id) ? (rangedClass(c.id) ? "fifteen" : "fourteen") : ranged && rangedClass(c.id) ? "sixteen" : (dualWield && dualWieldClass(c.id)) || (offhands && !["rogue", "hunter"].includes(c.id)) ? "fifteen" : necklaces ? "fourteen" : accessories ? "thirteen" : wardrobe ? "ten" : campaign ? "seven" : "six"} equipped slots / Tirisfal`
           : "starter / Elwynn",
       firstLevelSeconds: firstLevels.map((n) => Math.round(n)),
       outcomes,

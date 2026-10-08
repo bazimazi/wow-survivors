@@ -53,14 +53,14 @@ async function returnHome(p: Page) {
   await p.getByRole("button", { name: "Return to camp", exact: true }).click();
 }
 
-test("legacy loadouts retain gear, expose ten slots and link empty cloak equipment to its guide", async ({
+test("legacy loadouts retain gear, expose sixteen slots and link empty cloak equipment to its guide", async ({
   page,
 }) => {
   const s = ready(),
     before = structuredClone(s.heroes.mage.equipment);
   await seed(page, s);
   await page.goto("/#armory");
-  await expect(page.locator(".loadout-slot")).toHaveCount(10);
+  await expect(page.locator(".loadout-slot")).toHaveCount(16);
   await expect(page.locator("#wardrobe-catalog")).toBeHidden();
   await page.getByRole("button", { name: "Browse cloak", exact: true }).click();
   await expect(page.locator("#bag-slot")).toHaveValue("back");
@@ -73,9 +73,9 @@ test("legacy loadouts retain gear, expose ten slots and link empty cloak equipme
   await page.reload();
   expect((await saved(page)).heroes.mage.equipment).toEqual(before);
   await page.getByRole("button", { name: "Expedition", exact: true }).click();
-  await expect(page.locator(".equipment-socket")).toHaveCount(10);
+  await expect(page.locator(".equipment-socket")).toHaveCount(16);
 });
-test("guide filters fifty-two pieces by source and armor and shows exact resource and expedition gates", async ({
+test("guide filters the current catalog by source and armor and shows exact resource and expedition gates", async ({
   page,
 }) => {
   const s = freshSave();
@@ -84,9 +84,9 @@ test("guide filters fifty-two pieces by source and armor and shows exact resourc
   await page.goto("/#armory");
   await open(page);
   await page.getByRole("button", { name: "Showing class-usable" }).click();
-  await expect(page.locator(".wardrobe-card")).toHaveCount(52);
+  await expect(page.locator(".wardrobe-card")).toHaveCount(222);
   await page.locator("#wardrobe-source").selectOption("craft");
-  await expect(page.locator(".wardrobe-card")).toHaveCount(20);
+  await expect(page.locator(".wardrobe-card")).toHaveCount(72);
   await expect(discovery(page, "spellweave_shoulders")).toContainText(
     "Skill 125",
   );
@@ -100,13 +100,13 @@ test("guide filters fifty-two pieces by source and armor and shows exact resourc
     "Requires level 10",
   );
   await page.locator("#wardrobe-source").selectOption("dungeon");
-  await expect(page.locator(".wardrobe-card")).toHaveCount(13);
+  await expect(page.locator(".wardrobe-card")).toHaveCount(64);
   await expect(discovery(page, "smite_deckgreaves")).toContainText("Mr. Smite");
   await expect(discovery(page, "smite_deckgreaves")).toContainText(
     "Class restricted",
   );
   await page.getByRole("button", { name: "Showing all classes" }).click();
-  await expect(page.locator(".wardrobe-card")).toHaveCount(5);
+  await expect(page.locator(".wardrobe-card")).toHaveCount(27);
   await page.locator("#wardrobe-slot").selectOption("waist");
   await expect(page.locator(".wardrobe-empty")).toBeVisible();
   await page.locator("#hero-switch").selectOption("warrior");
@@ -221,7 +221,7 @@ test("owned guide links, combined satchel filters, shared sale protection and ne
     "trailwatch_cloak",
   );
 });
-test("the new catalog and ten-slot camp fit six widths with accessible control targets", async ({
+test("the new catalog and sixteen-slot camp fit six widths with accessible control targets", async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -235,7 +235,7 @@ test("the new catalog and ten-slot camp fit six widths with accessible control t
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBe(width);
-    await expect(page.locator(".wardrobe-card")).toHaveCount(52);
+    await expect(page.locator(".wardrobe-card")).toHaveCount(222);
     for (const el of await page
       .locator(
         ".wardrobe-section button, .wardrobe-section select, #bag-slot, .browse-slot",
@@ -243,7 +243,7 @@ test("the new catalog and ten-slot camp fit six widths with accessible control t
       .all())
       expect((await el.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     await page.getByRole("button", { name: "Expedition", exact: true }).click();
-    await expect(page.locator(".equipment-socket")).toHaveCount(10);
+    await expect(page.locator(".equipment-socket")).toHaveCount(16);
     for (const el of await page.locator(".equipment-socket").all()) {
       const box = await el.boundingBox();
       expect(box!.width).toBeGreaterThanOrEqual(44);

@@ -1,5 +1,8 @@
 import type { Enemy, GameEngine } from "./engine";
 import { drawShadowfangFloor } from "./shadowfang-renderer";
+import { WALK_KEYS } from "./animation";
+import type { ActorPose } from "./animation";
+import { combatKey } from "./combat-animation";
 
 export function drawDungeonFloor(
   c: CanvasRenderingContext2D,
@@ -250,11 +253,21 @@ function drawRagefireFloor(
   c.strokeRect(-b.x, -b.y, b.x * 2, b.y * 2);
 }
 
-export function drawSmite(c: CanvasRenderingContext2D, e: Enemy, time: number) {
+export function drawSmite(
+  c: CanvasRenderingContext2D,
+  e: Enemy,
+  pose: ActorPose,
+) {
   c.save();
   c.translate(e.x, e.y);
+  if (pose.mirror) c.scale(-1, 1);
   c.scale(2.1, 2.1);
-  const step = e.frozenUntil > time ? 0 : Math.sin(time * 7) * 2;
+  const action = combatKey(pose.frame);
+  if (action) {
+    c.translate(action.lean * 1.5, -action.raise);
+    c.rotate(action.reach * 0.035);
+  }
+  const step = (WALK_KEYS[pose.frame]?.left || 0) * 2;
   c.fillStyle = "#312925";
   c.fillRect(-11, -5, 8, 13 + step);
   c.fillRect(4, -5, 8, 13 - step);

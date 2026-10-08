@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { freshSave, SAVE_KEY } from "../../src/progression";
 import type { SaveData } from "../../src/progression";
+import { GEAR_MAP } from "../../src/content";
 import { dungeonRoute } from "../../src/dungeon";
 
 function prepared() {
@@ -156,7 +157,7 @@ test("Ragefire preview uses an independent unlock, hero gate, continent and four
   );
   await page.getByText("Preview dungeon equipment", { exact: true }).click();
   await expect(page.locator(".dungeon-loot-guide section")).toHaveCount(4);
-  await expect(page.locator(".dungeon-loot-guide section p")).toHaveCount(15);
+  await expect(page.locator(".dungeon-loot-guide section p")).toHaveCount(31);
   await page.locator('[data-action="hero"][data-id="warrior"]').click();
   await expect(
     page.getByRole("button", { name: "Begin Dungeon" }),
@@ -172,6 +173,7 @@ test("four real guardian returns settle one victory, correct Journal credit and 
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   const trialSave = prepared();
+  trialSave.inventory.push("elwynn_spellblade");
   trialSave.heroes.mage.classTrial = {
     chapter: 2,
     active: true,
@@ -231,10 +233,26 @@ test("four real guardian returns settle one victory, correct Journal credit and 
     inventory.includes(id),
   );
   expect(reward).toBeTruthy();
+  if (GEAR_MAP[reward!].slot === "offhand") {
+    await expect(
+      page.locator(`.gear-card[data-gear-id="${reward}"]`).getByRole("button", {
+        name: "Equip a one-handed weapon",
+        exact: true,
+      }),
+    ).toBeDisabled();
+    await page
+      .locator('.gear-card[data-gear-id="elwynn_spellblade"]')
+      .getByRole("button", { name: "Equip item", exact: true })
+      .click();
+  }
   await page
     .locator(`.gear-card[data-gear-id="${reward}"]`)
     .getByRole("button", { name: "Equip item" })
     .click();
+  if (GEAR_MAP[reward!].rangedType)
+    await page
+      .locator('[data-action="equip-ranged-position"][data-slot="ranged"]')
+      .click();
   await page.reload();
   s = await saved(page);
   expect(s.claimedQuests).toContain("ragefire-clear");

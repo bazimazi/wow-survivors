@@ -1,3 +1,9 @@
+import { ACCESSORY_GEAR } from "../src/accessories";
+import { NECKLACE_GEAR } from "../src/necklaces";
+import { OFFHAND_GEAR } from "../src/offhands";
+import { RANGED_GEAR } from "../src/ranged";
+import { TRAINED_WEAPON_GEAR } from "../src/weapon-training";
+import { DUAL_WIELD_GEAR } from "../src/dual-wield";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { GameEngine } from "../src/engine";
@@ -136,12 +142,12 @@ test("the seven destinations retain their original order and thirteen equipment 
       "duskwood",
     ],
   );
-  assert.equal(GEAR.length, 189);
-  assert.equal(RECIPES.length, 75);
+  assert.equal(GEAR.length, 353);
+  assert.equal(RECIPES.length, 127);
   assert.equal(DUSKWOOD_GEAR.length, 13);
   assert.equal(Object.keys(DUSKWOOD_SPRITES).length, 9);
-  assert.equal(new Set(GEAR.map((g) => g.id)).size, 189);
-  assert.equal(WARDROBE_CATALOG.length, 52);
+  assert.equal(new Set(GEAR.map((g) => g.id)).size, GEAR.length);
+  assert.equal(WARDROBE_CATALOG.length, 222);
   for (const g of DUSKWOOD_GEAR) {
     assert.equal(g.level, 20);
     if (["shoulders", "back", "waist", "legs"].includes(g.slot))
@@ -251,11 +257,11 @@ test("frontier herb nodes enforce skill and training caps before actual gatherin
     assert.equal((g.materials.sungrass || 0) > 0, skill === 225);
   }
 });
-test("every class receives only eligible level twenty local gear from real cache completions", () => {
+test("every class receives only eligible local gear from real cache completions", () => {
   const seen = new Set<string>();
   for (const c of CLASSES)
     for (let seed = 1; seed <= 80; seed++) {
-      const g = make(c.id, seed);
+      const g = make(c.id, seed * 7919);
       const l = g.landmarks.find((l) => l.kind === "cache")!;
       g.player.x = l.x;
       g.player.y = l.y;
@@ -274,10 +280,20 @@ test("every class receives only eligible level twenty local gear from real cache
       assert.equal(g.loot.length, 1);
       const id = g.loot[0];
       assert.ok(canEquip(c.id, id));
-      assert.ok(DUSKWOOD_GEAR.some((x) => x.id === id && x.dropZones));
+      assert.ok(
+        [
+          ...DUSKWOOD_GEAR,
+          ...ACCESSORY_GEAR,
+          ...NECKLACE_GEAR,
+          ...OFFHAND_GEAR,
+          ...DUAL_WIELD_GEAR,
+          ...RANGED_GEAR,
+          ...TRAINED_WEAPON_GEAR,
+        ].some((x) => x.id === id && x.dropZones?.includes("duskwood")),
+      );
       seen.add(id);
     }
-  assert.equal(seen.size, 12);
+  assert.equal(seen.size, 28);
 });
 test("elite loot is local and class eligible and never awards the exclusive boss trophy", () => {
   const seen = new Set<string>();
@@ -288,10 +304,20 @@ test("elite loot is local and class eligible and never awards the exclusive boss
       g.useBomb();
       const id = g.pickups.find((p) => p.kind === "chest")!.loot!;
       assert.ok(canEquip(c.id, id));
-      assert.ok(DUSKWOOD_GEAR.some((x) => x.id === id && x.dropZones));
+      assert.ok(
+        [
+          ...DUSKWOOD_GEAR,
+          ...ACCESSORY_GEAR,
+          ...NECKLACE_GEAR,
+          ...OFFHAND_GEAR,
+          ...DUAL_WIELD_GEAR,
+          ...RANGED_GEAR,
+          ...TRAINED_WEAPON_GEAR,
+        ].some((x) => x.id === id && x.dropZones?.includes("duskwood")),
+      );
       seen.add(id);
     }
-  assert.equal(seen.size, 12);
+  assert.equal(seen.size, 28);
 });
 test("cleaver fans capture direction and increase from three to five lanes below half health", () => {
   for (const phase of [1, 2]) {

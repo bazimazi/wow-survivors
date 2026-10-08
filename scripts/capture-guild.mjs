@@ -1,12 +1,15 @@
-import { chromium } from "playwright";
+import { openCaptureSession } from "./capture-session.mjs";
 import fs from "node:fs/promises";
-const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } }),
-  errors = [];
-page.on("pageerror", (e) => errors.push(e.message));
-await fs.mkdir("output/screenshots", { recursive: true });
+const session = await openCaptureSession({ headless: true });
+const browser = session.browser;
 try {
-  await page.goto("http://127.0.0.1:5176");
+  const page = await browser.newPage({
+      viewport: { width: 1440, height: 1000 },
+    }),
+    errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await fs.mkdir("output/screenshots", { recursive: true });
+  await page.goto(session.url);
   await page.evaluate(async () => {
     const { freshSave, persist } = await import("/src/progression.ts");
     const s = freshSave();
@@ -48,7 +51,7 @@ try {
     for (const id of Object.keys(s.materials)) s.materials[id] = 24;
     persist(s);
   });
-  await page.goto("http://127.0.0.1:5176/#professions");
+  await page.goto(`${session.url}#professions`);
   await page.reload();
   await page.evaluate(() => document.fonts.ready);
   const layout = [];
@@ -122,5 +125,5 @@ try {
   );
   console.log(JSON.stringify({ layout, errors }));
 } finally {
-  await browser.close();
+  await session.close();
 }

@@ -195,12 +195,27 @@ test("partial and full settlement keep secured loot, isolate Journal credit and 
   assert.ok(loaded.claimedQuests.includes("shadowfang-clear"));
   assert.equal(settleRun(loaded, record()), false);
 });
-test("sixteen rare rewards cover every slot, remain guardian-only and extend the guide by five exact sources", () => {
-  assert.equal(GEAR.length, 189);
-  assert.equal(RECIPES.length, 75);
+test("sixteen original rare rewards cover all ten original slots, remain guardian-only and extend the guide by five exact sources", () => {
+  assert.equal(GEAR.length, 353);
+  assert.equal(RECIPES.length, 127);
   assert.equal(SHADOWFANG_GEAR.length, 16);
-  assert.equal(WARDROBE_CATALOG.length, 52);
-  assert.deepEqual(new Set(SHADOWFANG_GEAR.map((g) => g.slot)), new Set(SLOTS));
+  assert.equal(WARDROBE_CATALOG.length, 222);
+  assert.deepEqual(
+    new Set(SHADOWFANG_GEAR.map((g) => g.slot)),
+    new Set(
+      SLOTS.filter(
+        (slot) =>
+          ![
+            "wrists",
+            "finger1",
+            "finger2",
+            "neck",
+            "offhand",
+            "ranged",
+          ].includes(slot),
+      ),
+    ),
+  );
   assert.equal(Object.keys(SHADOWFANG_SPRITES).length, 9);
   for (const g of SHADOWFANG_GEAR) {
     const source = SHADOWFANG_SOURCES[g.id];
@@ -213,10 +228,10 @@ test("sixteen rare rewards cover every slot, remain guardian-only and extend the
     assert.ok(!RECIPES.some((r) => r.output === g.id));
   }
 });
-test("every class has eligible loot in every room and real kills cover all sixteen trophies", () => {
+test("every class has eligible loot in every room and real kills cover all twenty-seven trophies", () => {
   const seen = new Set<string>();
   for (const c of CLASSES)
-    for (let seed = 1; seed <= 20; seed++) {
+    for (let seed = 1; seed <= 80; seed++) {
       const g = make(c.id, seed * 7919);
       for (let stage = 0; stage < 4; stage++) {
         defeat(g);
@@ -227,7 +242,10 @@ test("every class has eligible loot in every room and real kills cover all sixte
         if (stage < 3) assert.ok(g.continueDungeon("edge"));
       }
     }
-  assert.equal(seen.size, 16);
+  assert.deepEqual(
+    seen,
+    new Set(SHADOWFANG_STAGES.flatMap((stage) => stage.loot)),
+  );
 });
 test("level-fifteen equipment waits in the shared satchel until eligible and survives save migration", () => {
   const s = freshSave();

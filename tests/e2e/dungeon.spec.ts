@@ -216,16 +216,14 @@ test("all three guardians lead to a dungeon victory, journal claim and persisten
   await q.getByRole("button", { name: /Claim/ }).click();
   expect((await saved(page)).claimedQuests).toContain("deadmines-clear");
   await page.getByRole("button", { name: "Armory", exact: true }).click();
-  const dungeonWeapon = page.locator(".gear-card").filter({
-    has: page.getByRole("heading", {
-      name: "Tidecaller's Staff",
-      exact: true,
-    }),
-  });
-  await dungeonWeapon.getByRole("button", { name: "Equip item" }).click();
+  // The expanded pool can award different eligible gear; exercise the actual secured item.
+  const itemId = result.history[0].loot[0];
+  expect(result.inventory).toContain(itemId);
+  const dungeonItem = page.locator(`[data-gear-id="${itemId}"]`);
+  await dungeonItem.getByRole("button", { name: "Equip item" }).click();
   await page.reload();
-  expect((await saved(page)).heroes.mage.equipment.weapon).toBe(
-    "rigging_staff",
+  expect(Object.values((await saved(page)).heroes.mage.equipment)).toContain(
+    itemId,
   );
   expect((await saved(page)).totals.dungeonBosses).toBe(3);
   expect(errors).toEqual([]);

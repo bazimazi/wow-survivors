@@ -5,14 +5,16 @@ export default defineConfig({
   workers: 1,
   timeout: 60_000,
   use: {
-    baseURL: "http://127.0.0.1:5176",
     browserName: "chromium",
     viewport: { width: 1440, height: 1000 },
   },
   webServer: {
-    command: "npm run dev -- --port 5176 --strictPort",
-    url: "http://127.0.0.1:5176",
-    reuseExistingServer: true,
+    command: "node scripts/local-server.mjs --test",
+    wait: {
+      stdout:
+        /WOW_SURVIVORS_URL=(?<playwright_test_base_url>http:\/\/127\.0\.0\.1:\d+\/)/,
+    },
+    stdout: "pipe",
     timeout: 30_000,
   },
   reporter: "list",

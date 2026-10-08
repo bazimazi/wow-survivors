@@ -1,4 +1,16 @@
 import {
+  normalizeItemStates,
+  normalizeWeaponSkills,
+  itemCondition,
+  itemOwner,
+  itemAffixStats,
+  settleEquipment,
+  affixQuote,
+  attuneItem,
+} from "./item-progression";
+import type { ItemState, EquipmentProof } from "./item-progression";
+import type { WeaponType } from "./weapon-training";
+import {
   materialFor,
   tierForLevel,
   RESOURCE_TIERS,
@@ -17,7 +29,27 @@ import {
   RECIPES,
   SPELLS,
   ZONES,
+  SLOTS,
 } from "./content";
+import {
+  gearFitsSlot,
+  isRingSlot,
+  RING_SLOTS,
+  hasOneHandedWeapon,
+  displacedOffhand,
+  offhandMultiplier,
+  rangedMultiplier,
+} from "./equipment";
+import {
+  ADVANCED_WEAPON_TYPES,
+  WEAPON_TRAINING,
+  WEAPON_TYPE_LABELS,
+  advancedWeaponType,
+  normalizeWeaponTraining,
+  weaponTrainingAllows,
+} from "./weapon-training";
+import type { AdvancedWeaponType } from "./weapon-training";
+import { dualWieldClass, DUAL_WIELD_RULES } from "./dual-wield";
 import type {
   ClassId,
   Material,
@@ -50,6 +82,7 @@ import type {
   ClassTrialProgress,
   TrialMetric,
 } from "./class-trials";
+import { weaponFormulaFits } from "./ranged";
 import { ENCHANTMENT_MAP } from "./enchanting";
 import { freshTravel, RIDING_RANKS, TRAVEL_MAP, TRAVEL_RULES } from "./travel";
 import type { TravelProgress, TravelOption } from "./travel";
@@ -105,6 +138,9 @@ export interface HeroProgress {
   classTrial: ClassTrialProgress;
   travel: TravelProgress;
   spellbook: SpellbookProgress;
+  dualWield: boolean;
+  weaponTraining: AdvancedWeaponType[];
+  weaponSkills: Partial<Record<WeaponType, number>>;
 }
 export interface SaveData {
   version: 1;
@@ -114,6 +150,8 @@ export interface SaveData {
   heroes: Record<ClassId, HeroProgress>;
   inventory: string[];
   enchantments: Record<string, string>;
+  itemStates: Record<string, ItemState>;
+  ammunition: number;
   mounts: string[];
   materials: Record<Material, number>;
   professions: Partial<Record<ProfessionId, number>>;
@@ -141,7 +179,14 @@ export interface SaveData {
   };
   claimedQuests: string[];
   history: RunRecord[];
-  settings: { sound: boolean; particles: boolean; screenShake: boolean };
+  settings: {
+    sound: boolean;
+    particles: boolean;
+    screenShake: boolean;
+    animation: boolean;
+    music: boolean;
+    musicVolume: number;
+  };
 }
 export interface RunRecord {
   id: string;
@@ -161,6 +206,7 @@ export interface RunRecord {
   classProof?: ClassProof;
   professionProof?: ProfessionProof[];
   campaignProof?: CampaignProof[];
+  equipmentProof?: EquipmentProof;
 }
 export const SAVE_KEY = "wow-survivors-save-v1";
 
@@ -260,6 +306,16 @@ export function freshSave(): SaveData {
         classTrial: freshTrial(),
         travel: freshTravel(),
         spellbook: freshSpellbook(c.spells),
+        dualWield: false,
+        weaponTraining: [] as AdvancedWeaponType[],
+        weaponSkills: Object.fromEntries(
+          GEAR.filter(
+            (g) =>
+              g.weaponType &&
+              !advancedWeaponType(g.weaponType) &&
+              (!g.classes || g.classes.includes(c.id)),
+          ).map((g) => [g.weaponType!, 5]),
+        ),
       },
     ]),
   ) as Record<ClassId, HeroProgress>;
@@ -286,6 +342,8 @@ export function freshSave(): SaveData {
       fish: 2,
     },
     enchantments: {},
+    itemStates: {},
+    ammunition: 0,
     mounts: [],
     professions: {},
     supplies: { potions: 3, bombs: 1, food: 0 },
@@ -316,7 +374,14 @@ export function freshSave(): SaveData {
     },
     claimedQuests: [],
     history: [],
-    settings: { sound: true, particles: true, screenShake: true },
+    settings: {
+      sound: true,
+      particles: true,
+      screenShake: true,
+      animation: true,
+      music: false,
+      musicVolume: 50,
+    },
   };
 }
 const finite = (x: unknown, fallback = 0, max = 1_000_000) =>
@@ -351,10 +416,26 @@ export function validateSave(raw: unknown): SaveData {
         ),
       ]
     : s.inventory;
+  s.itemStates = normalizeItemStates(s, data.itemStates);
+  s.ammunition = finite(data.ammunition, 0, 9999);
   const savedHeroes = obj(data.heroes);
   for (const c of CLASSES) {
     const h = obj(savedHeroes[c.id]);
     s.heroes[c.id].level = Math.max(1, finite(h.level, 1, 60));
+    s.heroes[c.id].dualWield =
+      h.dualWield === true &&
+      dualWieldClass(c.id) &&
+      s.heroes[c.id].level >= DUAL_WIELD_RULES.level;
+    s.heroes[c.id].weaponTraining = normalizeWeaponTraining(
+      c.id,
+      s.heroes[c.id].level,
+      h.weaponTraining,
+    );
+    s.heroes[c.id].weaponSkills = normalizeWeaponSkills(
+      s,
+      c.id,
+      h.weaponSkills,
+    );
     s.heroes[c.id].spellbook = normalizeSpellbook(
       c.id,
       s.heroes[c.id].level,
@@ -393,12 +474,21 @@ export function validateSave(raw: unknown): SaveData {
               (s.heroes[c.id].talents[n.id] || 0) + 1;
       }
     s.heroes[c.id].equipment = {};
-    for (const [slot, id] of Object.entries(obj(h.equipment))) {
+    for (const slot of SLOTS) {
+      const id = obj(h.equipment)[slot];
       if (
         typeof id === "string" &&
         s.inventory.includes(id) &&
-        GEAR_MAP[id]?.slot === slot &&
+        gearFitsSlot(GEAR_MAP[id], slot) &&
+        !Object.values(s.heroes[c.id].equipment).includes(id) &&
         canEquip(c.id, id) &&
+        (!itemOwner(s, id) || itemOwner(s, id) === c.id) &&
+        weaponTrainingAllows(c.id, s.heroes[c.id], GEAR_MAP[id]) &&
+        (slot !== "offhand" ||
+          offhandMultiplier(c.id, {
+            ...s.heroes[c.id],
+            equipment: { ...s.heroes[c.id].equipment, offhand: id },
+          }) > 0) &&
         s.heroes[c.id].level >= (GEAR_MAP[id].level || 1)
       )
         s.heroes[c.id].equipment[slot as Slot] = id;
@@ -438,7 +528,7 @@ export function validateSave(raw: unknown): SaveData {
       s.inventory.includes(itemId) &&
       typeof enchantId === "string" &&
       Object.hasOwn(ENCHANTMENT_MAP, enchantId) &&
-      ENCHANTMENT_MAP[enchantId].slot === GEAR_MAP[itemId].slot
+      weaponFormulaFits(GEAR_MAP[itemId], ENCHANTMENT_MAP[enchantId].slot)
     )
       s.enchantments[itemId] = enchantId;
   }
@@ -556,9 +646,16 @@ export function validateSave(raw: unknown): SaveData {
         ),
       ]
     : [];
-  for (const k of ["sound", "particles", "screenShake"] as const)
+  for (const k of [
+    "sound",
+    "particles",
+    "screenShake",
+    "animation",
+    "music",
+  ] as const)
     if (typeof obj(data.settings)[k] === "boolean")
       s.settings[k] = obj(data.settings)[k] as boolean;
+  s.settings.musicVolume = finite(obj(data.settings).musicVolume, 50, 100);
   s.history = Array.isArray(data.history)
     ? data.history.slice(0, 20).flatMap((r) => {
         const h = obj(r);
@@ -703,10 +800,111 @@ export function canEquip(classId: ClassId, gearId: string): boolean {
     armors.indexOf(gear.armor) <= armors.indexOf(CLASS_MAP[classId].armor)
   );
 }
-export function equip(s: SaveData, gearId: string): boolean {
-  if (!s.inventory.includes(gearId) || equipRestriction(s, gearId))
+export function equipmentTarget(
+  s: SaveData,
+  gearId: string,
+  requested?: Slot,
+): Slot | null {
+  if (!Object.hasOwn(GEAR_MAP, gearId)) return null;
+  const gear = GEAR_MAP[gearId],
+    equipment = s.heroes[s.selectedClass].equipment;
+  if (requested !== undefined)
+    return gearFitsSlot(gear, requested) ? requested : null;
+  if (!isRingSlot(gear.slot)) return gear.slot;
+  return (
+    RING_SLOTS.find((slot) => equipment[slot] === gearId) ||
+    RING_SLOTS.find((slot) => !equipment[slot]) ||
+    null
+  );
+}
+function equippedCandidate(
+  equipment: HeroProgress["equipment"],
+  gearId: string,
+  target: Slot,
+) {
+  const next = { ...equipment };
+  for (const slot of SLOTS)
+    if (slot !== target && next[slot] === gearId) delete next[slot];
+  next[target] = gearId;
+  if (displacedOffhand(equipment, GEAR_MAP[gearId], target))
+    delete next.offhand;
+  return next;
+}
+export function equip(s: SaveData, gearId: string, requested?: Slot): boolean {
+  if (!s.inventory.includes(gearId) || equipRestriction(s, gearId, requested))
     return false;
-  s.heroes[s.selectedClass].equipment[GEAR_MAP[gearId].slot] = gearId;
+  const target = equipmentTarget(s, gearId, requested);
+  if (!target) return false;
+  const hero = s.heroes[s.selectedClass];
+  hero.equipment = equippedCandidate(hero.equipment, gearId, target);
+  return true;
+}
+export function dualWieldRestriction(s: SaveData): string | null {
+  const h = s.heroes[s.selectedClass];
+  if (!dualWieldClass(s.selectedClass)) return "Warrior, Rogue or Hunter only";
+  if (h.dualWield === true) return "Already trained";
+  if (h.level < DUAL_WIELD_RULES.level)
+    return `Requires character level ${DUAL_WIELD_RULES.level}`;
+  return s.gold < DUAL_WIELD_RULES.gold
+    ? `Requires ${DUAL_WIELD_RULES.gold} G`
+    : null;
+}
+export function trainDualWield(s: SaveData): boolean {
+  if (dualWieldRestriction(s)) return false;
+  s.gold -= DUAL_WIELD_RULES.gold;
+  s.heroes[s.selectedClass].dualWield = true;
+  return true;
+}
+export function weaponTrainingRestriction(
+  s: SaveData,
+  type: string,
+): string | null {
+  if (!advancedWeaponType(type)) return "Unknown weapon training";
+  const rule = WEAPON_TRAINING[type],
+    hero = s.heroes[s.selectedClass];
+  if (!rule.classes.includes(s.selectedClass)) return "Class restricted";
+  if (hero.weaponTraining.includes(type)) return "Already trained";
+  if (hero.level < rule.level) return `Requires character level ${rule.level}`;
+  return s.gold < rule.gold ? `Requires ${rule.gold} G` : null;
+}
+export function trainWeaponType(s: SaveData, type: string): boolean {
+  if (!advancedWeaponType(type) || weaponTrainingRestriction(s, type))
+    return false;
+  s.gold -= WEAPON_TRAINING[type].gold;
+  const h = s.heroes[s.selectedClass];
+  h.weaponTraining = ADVANCED_WEAPON_TYPES.filter(
+    (id) => id === type || h.weaponTraining.includes(id),
+  );
+  h.weaponSkills[type] = 1;
+  return true;
+}
+export function swapWeaponHands(s: SaveData): boolean {
+  const hero = s.heroes[s.selectedClass],
+    e = hero.equipment;
+  if (
+    !e.weapon ||
+    !e.offhand ||
+    !s.inventory.includes(e.weapon) ||
+    !s.inventory.includes(e.offhand) ||
+    (itemOwner(s, e.weapon) && itemOwner(s, e.weapon) !== s.selectedClass) ||
+    (itemOwner(s, e.offhand) && itemOwner(s, e.offhand) !== s.selectedClass) ||
+    offhandMultiplier(s.selectedClass, hero) !== DUAL_WIELD_RULES.factor
+  )
+    return false;
+  const next = { ...e, weapon: e.offhand, offhand: e.weapon };
+  if (
+    offhandMultiplier(s.selectedClass, { ...hero, equipment: next }) !==
+    DUAL_WIELD_RULES.factor
+  )
+    return false;
+  hero.equipment = next;
+  return true;
+}
+export function unequip(s: SaveData, slot: Slot): boolean {
+  const hero = s.heroes[s.selectedClass];
+  if (!SLOTS.includes(slot) || !hero.equipment[slot]) return false;
+  delete hero.equipment[slot];
+  if (slot === "weapon") delete hero.equipment.offhand;
   return true;
 }
 export function sellGear(s: SaveData, id: string, disenchant = false): boolean {
@@ -724,6 +922,7 @@ export function sellGear(s: SaveData, id: string, disenchant = false): boolean {
   if (disenchant && !s.professions.enchanting) return false;
   s.inventory = s.inventory.filter((x) => x !== id);
   delete s.enchantments[id];
+  delete s.itemStates[id];
   if (disenchant) {
     const dust = disenchantMaterial(id);
     s.materials[dust] += GEAR_MAP[id].rarity === "epic" ? 4 : 2;
@@ -764,15 +963,42 @@ export function heroStats(s: SaveData, classId = s.selectedClass): Stats {
   for (const t of c.trees)
     for (const n of t.nodes)
       if (!n.spellIds) stats[n.stat] += n.value * (h.talents[n.id] || 0);
-  for (const id of Object.values(h.equipment)) {
+  const validNewWeapon = (itemId: string, position: string) => {
+    const item = GEAR_MAP[itemId];
+    return (
+      !advancedWeaponType(item?.weaponType) ||
+      (s.inventory.includes(itemId) &&
+        gearFitsSlot(item, position) &&
+        h.level >= (item.level || 1) &&
+        weaponTrainingAllows(classId, h, item))
+    );
+  };
+  for (const [slot, id] of Object.entries(h.equipment)) {
+    const factor =
+      slot === "offhand"
+        ? offhandMultiplier(classId, h)
+        : slot === "ranged"
+          ? rangedMultiplier(classId, h)
+          : 1;
     const gear = GEAR_MAP[id];
+    if (
+      !factor ||
+      !itemCondition(s, id) ||
+      (itemOwner(s, id) && itemOwner(s, id) !== classId) ||
+      !validNewWeapon(id, slot) ||
+      (slot === "offhand" &&
+        !validNewWeapon(h.equipment.weapon || "", "weapon"))
+    )
+      continue;
     if (gear)
       for (const [stat, value] of Object.entries(gear.stats))
-        stats[stat as keyof Stats] += value!;
+        stats[stat as keyof Stats] += value! * factor;
+    for (const [stat, value] of Object.entries(itemAffixStats(s, id)))
+      stats[stat as keyof Stats] += value! * factor;
     const enchantment = itemEnchantment(s, id);
     if (enchantment)
       for (const [stat, value] of Object.entries(enchantment.stats))
-        stats[stat as keyof Stats] += value!;
+        stats[stat as keyof Stats] += value! * factor;
   }
   for (const set of equippedSets(s, classId))
     for (const bonus of set.definition.bonuses)
@@ -876,22 +1102,57 @@ export function heroSpellBonuses(
   }
   return result;
 }
-export function equipRestriction(s: SaveData, id: string): string | null {
+export function equipRestriction(
+  s: SaveData,
+  id: string,
+  requested?: Slot,
+): string | null {
   if (!canEquip(s.selectedClass, id)) return "Class restricted";
-  const level = GEAR_MAP[id].level || 1;
-  return s.heroes[s.selectedClass].level < level
-    ? `Requires level ${level}`
+  if (itemOwner(s, id) && itemOwner(s, id) !== s.selectedClass)
+    return `Soulbound to ${CLASS_MAP[itemOwner(s, id)!].name}`;
+  const gear = GEAR_MAP[id],
+    hero = s.heroes[s.selectedClass];
+  if (hero.level < (gear.level || 1)) return `Requires level ${gear.level}`;
+  const target = requested || gear.slot;
+  if (!gearFitsSlot(gear, target)) return "Incompatible equipment position";
+  if (!weaponTrainingAllows(s.selectedClass, hero, gear))
+    return `Train ${WEAPON_TYPE_LABELS[gear.weaponType!]} first`;
+  if (target !== "offhand") return null;
+  if (gear.slot === "weapon") {
+    if (!dualWieldClass(s.selectedClass))
+      return "Warrior, Rogue or Hunter only";
+    if (hero.dualWield !== true || hero.level < DUAL_WIELD_RULES.level)
+      return "Train Dual Wield first";
+    if (hero.equipment.weapon === id) return "Use a distinct secondary weapon";
+  }
+  if (!hasOneHandedWeapon(hero.equipment)) return "Equip a one-handed weapon";
+  return !s.inventory.includes(hero.equipment.weapon || "") ||
+    offhandMultiplier(s.selectedClass, {
+      ...hero,
+      equipment: { ...hero.equipment, offhand: id },
+    }) === 0
+    ? "Equip an eligible one-handed weapon"
     : null;
 }
 export function equippedSets(s: SaveData, classId = s.selectedClass) {
-  const equipped = Object.values(s.heroes[classId].equipment);
+  const equipped = Object.values(s.heroes[classId].equipment).filter(
+    (id) =>
+      itemCondition(s, id) > 0 &&
+      (!itemOwner(s, id) || itemOwner(s, id) === classId),
+  );
   return GEAR_SETS.map((definition) => ({
     definition,
     pieces: equipped.filter((id) => GEAR_MAP[id]?.set === definition.id).length,
   })).filter((set) => set.pieces > 0);
 }
-export function gearComparison(s: SaveData, id: string): Partial<Stats> {
-  if (equipRestriction(s, id)) return {};
+export function gearComparison(
+  s: SaveData,
+  id: string,
+  requested?: Slot,
+): Partial<Stats> {
+  if (equipRestriction(s, id, requested)) return {};
+  const target = equipmentTarget(s, id, requested);
+  if (!target) return {};
   const hero = s.heroes[s.selectedClass],
     current = heroStats(s);
   const candidate: SaveData = {
@@ -900,7 +1161,7 @@ export function gearComparison(s: SaveData, id: string): Partial<Stats> {
       ...s.heroes,
       [s.selectedClass]: {
         ...hero,
-        equipment: { ...hero.equipment, [GEAR_MAP[id].slot]: id },
+        equipment: equippedCandidate(hero.equipment, id, target),
       },
     },
   };
@@ -909,6 +1170,26 @@ export function gearComparison(s: SaveData, id: string): Partial<Stats> {
   for (const k of Object.keys(current) as (keyof Stats)[])
     if (Math.abs(next[k] - current[k]) > 0.0001)
       delta[k] = next[k] - current[k];
+  return delta;
+}
+export function weaponSwapComparison(s: SaveData): Partial<Stats> {
+  const candidate = {
+    ...s,
+    heroes: {
+      ...s.heroes,
+      [s.selectedClass]: {
+        ...s.heroes[s.selectedClass],
+        equipment: { ...s.heroes[s.selectedClass].equipment },
+      },
+    },
+  };
+  if (!swapWeaponHands(candidate)) return {};
+  const before = heroStats(s),
+    after = heroStats(candidate),
+    delta: Partial<Stats> = {};
+  for (const key of Object.keys(before) as (keyof Stats)[])
+    if (Math.abs(after[key] - before[key]) > 0.0001)
+      delta[key] = after[key] - before[key];
   return delta;
 }
 export function professionTitle(skill: number) {
@@ -1065,6 +1346,7 @@ export function settleRun(
     run.dungeonBosses !== dungeonRoute(run.zoneId)!.stages.length
   )
     return false;
+  settleEquipment(s, run);
   s.history.unshift(run);
   advanceClassTrial(s, run);
   s.history = s.history.slice(0, 20);
@@ -1467,7 +1749,7 @@ export function itemEnchantment(s: SaveData, itemId: string) {
   return id &&
     Object.hasOwn(ENCHANTMENT_MAP, id) &&
     s.inventory.includes(itemId) &&
-    GEAR_MAP[itemId]?.slot === ENCHANTMENT_MAP[id].slot
+    weaponFormulaFits(GEAR_MAP[itemId], ENCHANTMENT_MAP[id].slot)
     ? ENCHANTMENT_MAP[id]
     : null;
 }
@@ -1483,7 +1765,7 @@ export function enchantmentRestriction(
   if (!s.professions.enchanting) return "Learn Enchanting in Professions";
   const restriction = equipRestriction(s, itemId);
   if (restriction) return restriction;
-  if (gear.slot !== e.slot) return `Requires a ${e.slot} item`;
+  if (!weaponFormulaFits(gear, e.slot)) return `Requires a ${e.slot} item`;
   if (s.enchantments[itemId] === formulaId) return "Already applied";
   if (s.professions.enchanting < e.skill)
     return `Requires Enchanting ${e.skill}`;
@@ -1505,6 +1787,21 @@ export function enchantmentSkillGain(s: SaveData, formulaId: string): number {
         Math.max(0, trainingInfo(s, "enchanting").cap - skill),
       )
     : 0;
+}
+export function attuneEquipment(
+  s: SaveData,
+  id: string,
+  affix: string,
+): boolean {
+  const quote = affixQuote(s, id, affix);
+  if (!attuneItem(s, id, affix)) return false;
+  grantProfessionSkill(
+    s,
+    "enchanting",
+    recipeSkillGain({ skill: quote.skill }, s.professions.enchanting || 0),
+  );
+  recordProfessionCraft(s, "enchanting", quote.skill);
+  return true;
 }
 export function applyEnchantment(
   s: SaveData,
@@ -1530,7 +1827,7 @@ export function enchantmentComparison(
   const old = itemEnchantment(s, itemId),
     next = ENCHANTMENT_MAP[formulaId],
     delta: Partial<Stats> = {};
-  if (!next || next.slot !== GEAR_MAP[itemId]?.slot) return delta;
+  if (!next || !weaponFormulaFits(GEAR_MAP[itemId], next.slot)) return delta;
   for (const key of Object.keys(heroStats(s)) as (keyof Stats)[]) {
     const value = (next.stats[key] || 0) - (old?.stats[key] || 0);
     if (value) delta[key] = value;

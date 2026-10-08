@@ -1,3 +1,27 @@
+import {
+  renderItemState,
+  renderEquipmentWorkshop,
+  renderRepairReview,
+  renderAttunementReview,
+  renderEquipmentResult,
+} from "./item-progression-ui";
+import {
+  equipmentSnapshot,
+  repairItems,
+  repairQuote,
+  buyAmmunition,
+  protectedItem,
+} from "./item-progression";
+import {
+  renderWeaponTraining,
+  renderWeaponTrainingReview,
+} from "./weapon-training-ui";
+import {
+  advancedWeaponType,
+  WEAPON_TRAINING,
+  WEAPON_TYPE_LABELS,
+} from "./weapon-training";
+import { attuneEquipment, trainWeaponType } from "./progression";
 import "./resources.css";
 import "./profession-quests.css";
 import {
@@ -39,10 +63,49 @@ import "./stable.css";
 import "./spellbook.css";
 import "./wardrobe.css";
 import "./duskwood.css";
+import "./controller.css";
+import "./music.css";
+import { musicScene } from "./music";
+import { MusicPlayer } from "./music-player";
+import { ControllerInput, CONTROLLER_BINDINGS } from "./controller";
+import {
+  captureControllerFocus,
+  confirmControllerFocus,
+  cycleControllerFocus,
+  ensureControllerFocus,
+  moveControllerFocus,
+  renderControllerHelp,
+  scrollControllerMenu,
+  updateControllerHints,
+} from "./controller-ui";
 import { duskwoodOptionText, renderDuskwoodPreview } from "./duskwood-ui";
-import { renderWardrobe } from "./wardrobe-ui";
+import { renderWardrobe, WARDROBE_CATALOG_SOURCES } from "./wardrobe-ui";
 import type { WardrobeFilters } from "./wardrobe-ui";
-import { isWardrobeSlot, WARDROBE_SOURCES } from "./wardrobe";
+import { isWardrobeSlot } from "./wardrobe";
+import {
+  gearFitsSlot,
+  gearUseLabel,
+  displacedOffhand,
+  hasOneHandedWeapon,
+  offhandMultiplier,
+  isRingSlot,
+  RING_SLOTS,
+} from "./equipment";
+import {
+  renderRingReview,
+  renderWeaponReview,
+  renderDualWieldPanel,
+  renderDualWieldTrainingReview,
+  renderWeaponHandReview,
+  renderHandSwapReview,
+  renderRangedReview,
+} from "./equipment-ui";
+import {
+  secondaryWeapon,
+  dualWieldClass,
+  DUAL_WIELD_RULES,
+} from "./dual-wield";
+import "./equipment.css";
 import {
   renderSpellbook,
   renderSpellbookCamp,
@@ -127,12 +190,17 @@ import {
   craft,
   characterXpRequired,
   equip,
+  unequip,
+  trainDualWield,
+  dualWieldRestriction,
+  swapWeaponHands,
   forgetProfession,
   heroStats,
   heroSpellBonuses,
   equipRestriction,
   equippedSets,
   gearComparison,
+  equipmentTarget,
   recipeSkill,
   learnProfession,
   learnTalent,
@@ -233,7 +301,14 @@ let modalKind = "",
   lastFocus: HTMLElement | null = null;
 const sound = new Sound();
 sound.enabled = save.settings.sound;
+const music = new MusicPlayer();
+music.configure(save.settings.music, save.settings.musicVolume);
 const keys = new Set<string>();
+const controller = new ControllerInput();
+let controllerMode = false;
+let controllerMovement = { x: 0, y: 0 };
+let touchMovement = { x: 0, y: 0 };
+let controllerStatus = "Connect a controller and press a button to detect it.";
 const escapeHtml = (s: string) =>
   s.replace(
     /[&<>"']/g,
@@ -306,12 +381,15 @@ function header() {
   return `<header class="site-header"><a class="brand" href="#" data-action="nav" data-id="camp" aria-label="Wow Survivors home">${logo}<div><span class="brand-top">WOW</span><span class="brand-bottom">SURVIVORS</span></div></a><nav aria-label="Main navigation">${nav.map(([id, i, label]) => `<button class="nav-link ${page === id ? "active" : ""}" data-action="nav" data-id="${id}">${icon(i, 17)}<span>${label}</span>${id === "professions" && guildReady ? `<b class="nav-count" aria-hidden="true">${guildReady}</b>` : id === "journal" && ready ? `<b class="nav-count" aria-hidden="true">${ready}</b>` : id === "outposts" && outpostReady ? `<b class="nav-count" aria-hidden="true">${outpostReady}</b>` : ""}</button>`).join("")}</nav><div class="header-tools"><div class="gold-balance" title="Gold">${icon("coin", 18)}<span>${save.gold.toLocaleString()}</span><small>G</small></div>${button("settings", icon("gear", 20), "icon-button", 'aria-label="Settings" title="Settings"')}</div></header>`;
 }
 function footer() {
-  return `<footer class="site-footer"><span><i class="status-dot"></i> A world of adventure. One survivor.</span><span>WOW SURVIVORS <i>·</i> <span class="muted">EARLY ACCESS 0.16</span></span>${button("controls", `${icon("info", 14)} How to play`, "text-button")}</footer>`;
+  return `<footer class="site-footer"><span><i class="status-dot"></i> A world of adventure. One survivor.</span><span>WOW SURVIVORS <i>·</i> <span class="muted">EARLY ACCESS 0.30</span></span>${button("controls", `${icon("info", 14)} How to play`, "text-button")}</footer>`;
 }
 function render() {
   if (game) return;
+  const restoreFocus = controllerMode ? captureControllerFocus(app) : null;
   document.body.classList.remove("in-game");
   app.innerHTML = `${header()}<main class="main-content">${{ camp: renderCamp, talents: renderTalents, armory: renderArmory, professions: renderProfessions, journal: renderJournal, outposts: renderOutpostsPage, stable: renderStablePage, spellbook: renderSpellbookPage }[page]()}</main>${footer()}`;
+  restoreFocus?.();
+  refreshControllerHints();
 }
 function renderCamp() {
   const c = CLASS_MAP[save.selectedClass],
@@ -331,7 +409,7 @@ function renderCamp() {
   <aside class="hero-sheet" style="--class-color:${c.color}"><div class="sheet-label"><span>YOUR ADVENTURER</span><span>${icon("spark", 14)} LV. ${h.level}</span></div><div class="hero-art">${portrait(c.portrait)}<div class="hero-art-gradient"></div><div class="hero-art-name"><span>${c.race} · ${c.faction}</span><h2>${c.name}</h2><p>${c.subtitle}</p></div><div class="hero-art-emblem">${icon(c.id, 24)}</div></div><div class="sheet-body"><p class="hero-description">${c.description}</p><div class="hero-stats"><div>${icon("heart", 17)}<b>${Math.round(stats.health)}</b><span>Health</span></div><div>${icon("sword", 17)}<b>+${Math.round(stats.power)}%</b><span>Damage</span></div><div>${icon("target", 17)}<b>${Math.round(stats.crit)}%</b><span>Critical</span></div></div><div class="sheet-divider"></div><div class="sheet-section-label">STARTING ABILITIES</div><div class="starting-ability"><span class="ability-icon">${icon(SPELLS[c.spells[0]].icon, 23)}</span><div><b>${SPELLS[c.spells[0]].name}</b><small>Automatic attack</small></div><span class="micro-tag">RANK 1</span></div><div class="starting-ability"><span class="ability-icon active-skill">${icon(c.id, 22)}</span><div><b>${c.active}</b><small>${c.activeCooldown}s cooldown</small></div><kbd>SPACE</kbd></div><div class="passive-note">${icon("spark", 15)}<div><b>${c.passive}</b><p>${c.passiveDescription}</p></div></div><div class="sheet-divider"></div><div class="equipment-heading"><span class="sheet-section-label">EQUIPMENT</span>${button("nav", "Manage", "text-button", 'data-id="armory"')}</div><div class="equipment-row">${SLOTS.map(
     (slot) => {
       const gear = GEAR_MAP[h.equipment[slot] || ""];
-      return `<button class="equipment-socket ${gear ? "filled" : ""}" data-action="browse-slot" data-id="${slot}" title="${gear ? gear.name : `Empty ${SLOT_LABELS[slot].toLowerCase()} slot`}" aria-label="${gear ? gear.name : `Empty ${SLOT_LABELS[slot].toLowerCase()} slot`}">${icon(gear?.icon || SLOT_ICONS[slot], 24)}<small>${SLOT_LABELS[slot]}</small></button>`;
+      return `<button class="equipment-socket ${gear ? "filled" : ""}" data-action="browse-slot" data-id="${slot}" title="${gear ? `${gear.name} · ${gearUseLabel(gear, slot)}` : slot === "offhand" && !hasOneHandedWeapon(h.equipment) ? "Off-hand requires a one-handed weapon" : `Empty ${SLOT_LABELS[slot].toLowerCase()} slot`}" aria-label="${gear ? gear.name : `Empty ${SLOT_LABELS[slot].toLowerCase()} slot`}">${icon(gear?.icon || SLOT_ICONS[slot], 24)}<small>${SLOT_LABELS[slot]}</small></button>`;
     },
   ).join(
     "",
@@ -437,16 +515,16 @@ function renderArmory() {
   const activeSets = equippedSets(save);
   const items = save.inventory
     .filter((id) => bagFilter === "all" || canEquip(c.id, id))
-    .filter((id) => bagSlot === "all" || GEAR_MAP[id].slot === bagSlot)
+    .filter((id) => bagSlot === "all" || gearFitsSlot(GEAR_MAP[id], bagSlot))
     .sort(
       (a, b) =>
         ["epic", "rare", "uncommon", "common"].indexOf(GEAR_MAP[a].rarity) -
         ["epic", "rare", "uncommon", "common"].indexOf(GEAR_MAP[b].rarity),
     );
-  return `${pageTitle("EQUIPMENT & INVENTORY", "Ready for the road.", "Equip your discoveries. Every attribute matters when the horde arrives.")}<div class="armory-layout"><aside class="loadout-panel"><h2>Current loadout</h2><p class="muted">${c.name} · ${c.armor.charAt(0).toUpperCase() + c.armor.slice(1)} armor and lighter</p>${SLOTS.map(
+  return `${pageTitle("EQUIPMENT & INVENTORY", "Ready for the road.", "Equip your discoveries. Every attribute matters when the horde arrives.")}${renderWeaponTraining(save)}${renderEquipmentWorkshop(save)}${renderDualWieldPanel(save)}<div class="armory-layout"><aside class="loadout-panel"><h2>Current loadout</h2><p class="muted">${c.name} · ${c.armor.charAt(0).toUpperCase() + c.armor.slice(1)} armor and lighter</p>${SLOTS.map(
     (slot) => {
       const g = GEAR_MAP[h.equipment[slot] || ""];
-      return `<div class="loadout-slot"><span class="gear-icon" style="color:${g ? RARITY_COLORS[g.rarity] : "#716f60"}">${icon(g?.icon || SLOT_ICONS[slot], 26)}</span><div><small>${SLOT_LABELS[slot].toUpperCase()}</small><b style="color:${g ? RARITY_COLORS[g.rarity] : "#918f82"}">${g?.name || "Empty slot"}</b>${g ? renderItemEnchantment(save, g.id) : ""}</div>${g ? button("unequip", icon("close", 15), "icon-button", `data-id="${slot}" aria-label="Unequip ${g.name}"`) : button("browse-slot", "Browse", "button quiet browse-slot", `data-id="${slot}" aria-label="Browse ${SLOT_LABELS[slot].toLowerCase()}"`)}</div>`;
+      return `<div class="loadout-slot"><span class="gear-icon" style="color:${g ? RARITY_COLORS[g.rarity] : "#716f60"}">${icon(g?.icon || SLOT_ICONS[slot], 26)}</span><div><small>${(g ? gearUseLabel(g, slot) : SLOT_LABELS[slot]).toUpperCase()}</small><b style="color:${g ? RARITY_COLORS[g.rarity] : "#918f82"}">${g?.name || "Empty slot"}</b>${g ? renderItemEnchantment(save, g.id) + renderItemState(save, g.id) : ""}</div>${g ? button("unequip", icon("close", 15), "icon-button", `data-id="${slot}" aria-label="Unequip ${g.name}"`) : button("browse-slot", "Browse", "button quiet browse-slot", `data-id="${slot}" aria-label="Browse ${SLOT_LABELS[slot].toLowerCase()}"`)}</div>`;
     },
   ).join(
     "",
@@ -459,12 +537,26 @@ function renderArmory() {
     )
     .join(
       "",
-    )}</div><div class="equipped-set-bonuses">${activeSets.map((s) => renderGearSet(s.definition.id)).join("")}</div><div class="passive-note">${icon("info", 17)}<p>Armor reduces incoming damage. Lighter armor is usable; weapons remain class restricted.</p></div></aside><section class="bag-panel"><div class="section-heading"><h2>Your satchel <span class="muted">${items.length}</span></h2><div class="segmented"><button data-action="bag-filter" data-id="usable" class="${bagFilter === "usable" ? "active" : ""}">Usable</button><button data-action="bag-filter" data-id="all" class="${bagFilter === "all" ? "active" : ""}">All items</button></div></div><div class="bag-slot-toolbar"><label for="bag-slot">Equipment slot</label><select id="bag-slot"><option value="all">All slots</option>${SLOTS.map((slot) => `<option value="${slot}" ${bagSlot === slot ? "selected" : ""}>${SLOT_LABELS[slot]}</option>`).join("")}</select></div>${!items.length ? `<p class="bag-empty">No owned items match these filters. Explore the acquisition guide below or choose another slot.</p>` : ""}<div class="gear-grid">${items
+    )}</div><div class="equipped-set-bonuses">${activeSets.map((s) => renderGearSet(s.definition.id)).join("")}</div><div class="passive-note">${icon("info", 17)}<p>Armor reduces incoming damage. Lighter armor is usable; weapons remain class restricted. Off-hands require a one-handed weapon. Equipping a two-handed primary removes this hero’s off-hand. Ranged equipment works independently of both hands.</p></div></aside><section class="bag-panel"><div class="section-heading"><h2>Your satchel <span class="muted">${items.length}</span></h2><div class="segmented"><button data-action="bag-filter" data-id="usable" class="${bagFilter === "usable" ? "active" : ""}">Usable</button><button data-action="bag-filter" data-id="all" class="${bagFilter === "all" ? "active" : ""}">All items</button></div></div><div class="bag-slot-toolbar"><label for="bag-slot">Equipment slot</label><select id="bag-slot"><option value="all">All slots</option>${SLOTS.map((slot) => `<option value="${slot}" ${bagSlot === slot ? "selected" : ""}>${SLOT_LABELS[slot]}</option>`).join("")}</select></div>${!items.length ? `<p class="bag-empty">No owned items match these filters. Explore the acquisition guide below or choose another slot.</p>` : ""}<div class="gear-grid">${items
     .map((id) => {
       const g = GEAR_MAP[id],
         equipped = Object.values(h.equipment).includes(id),
-        restriction = equipRestriction(save, id),
-        comparison = equipped ? {} : gearComparison(save, id),
+        restriction = equipRestriction(
+          save,
+          id,
+          ["offhand", "ranged"].includes(bagSlot)
+            ? (bagSlot as "offhand" | "ranged")
+            : undefined,
+        ),
+        comparison = equipped
+          ? {}
+          : gearComparison(
+              save,
+              id,
+              ["offhand", "ranged"].includes(bagSlot)
+                ? (bagSlot as "offhand" | "ranged")
+                : undefined,
+            ),
         inUse = Object.values(save.heroes).some((h) =>
           Object.values(h.equipment).includes(id),
         ),
@@ -472,7 +564,7 @@ function renderArmory() {
           id.startsWith("starter_") ||
           isMasteryGear(id) ||
           ["cloth", "leather", "mail", "plate"].includes(id);
-      return `<article class="gear-card" data-gear-id="${id}" style="--rarity-color:${RARITY_COLORS[g.rarity]}"><div class="gear-card-head"><span class="gear-icon">${icon(g.icon, 29)}</span><div><span class="rarity-label">${g.rarity}</span><h3>${g.name}</h3><small>${SLOT_LABELS[g.slot]}${g.armor ? ` · ${g.armor}` : ""}${g.level ? ` · Level ${g.level}` : ""}</small></div></div><p class="gear-flavor">${g.description}</p><div class="gear-bonuses">${Object.entries(
+      return `<article class="gear-card" data-gear-id="${id}" style="--rarity-color:${RARITY_COLORS[g.rarity]}"><div class="gear-card-head"><span class="gear-icon">${icon(g.icon, 29)}</span><div><span class="rarity-label">${g.rarity}</span><h3>${g.name}</h3><small>${gearUseLabel(g, h.equipment.ranged === id || bagSlot === "ranged" ? "ranged" : h.equipment.offhand === id || bagSlot === "offhand" ? "offhand" : g.slot)}${g.armor ? ` · ${g.armor}` : ""}${g.level ? ` · Level ${g.level}` : ""}</small></div></div><p class="gear-flavor">${g.description}</p><div class="gear-bonuses">${Object.entries(
         g.stats,
       )
         .map(
@@ -481,7 +573,7 @@ function renderArmory() {
         )
         .join(
           "",
-        )}</div>${renderItemEnchantment(save, id)}${g.set ? renderGearSet(g.set) : ""}${
+        )}</div>${renderItemEnchantment(save, id)}${renderItemState(save, id)}${g.set ? renderGearSet(g.set) : ""}${
         Object.keys(comparison).length
           ? `<div class="gear-comparison"><small>IF EQUIPPED · INCLUDES SET BONUSES</small>${Object.entries(
               comparison,
@@ -492,7 +584,7 @@ function renderArmory() {
               )
               .join("")}</div>`
           : ""
-      }<div class="gear-actions">${button("equip", equipped ? `${icon("check", 14)} Equipped` : restriction || "Equip item", "button quiet", `data-id="${id}" ${equipped || !!restriction ? "disabled" : ""}`)}${!starter && !inUse ? button("sell", `${icon("coin", 14)} ${g.value}`, "text-button", `data-id="${id}" title="Sell item"`) : ""}${save.professions.enchanting && !starter && !inUse ? button("disenchant", icon("spark", 17), "icon-button", `data-id="${id}" title="Disenchant into ${disenchantText(id)}" aria-label="Disenchant ${g.name}"`) : ""}</div></article>`;
+      }<div class="gear-actions">${!protectedItem(id) ? button("review-attunement", "Attune item", "button quiet", `data-id="${id}"`) : ""}${repairQuote(save, [id]).ids.length ? button("review-repair", "Repair item", "button quiet", `data-id="${id}"`) : ""}${restriction?.startsWith("Train ") && advancedWeaponType(g.weaponType) && !h.weaponTraining.includes(g.weaponType) ? button("review-weapon-training", "View weapon training", "button quiet", `data-id="${g.weaponType}"`) : ""}${button("equip", equipped ? `${icon("check", 14)} Equipped` : restriction || "Equip item", "button quiet", `data-id="${id}" ${equipped || !!restriction ? "disabled" : ""}`)}${g.slot === "weapon" && g.rangedType ? button("review-ranged", "Place ranged weapon", "button quiet", `data-id="${id}" ${equipRestriction(save, id, "ranged") ? "disabled" : ""}`) : ""}${!starter && !inUse ? button("sell", `${icon("coin", 14)} ${g.value}`, "text-button", `data-id="${id}" title="Sell item"`) : ""}${save.professions.enchanting && !starter && !inUse ? button("disenchant", icon("spark", 17), "icon-button", `data-id="${id}" title="Disenchant into ${disenchantText(id)}" aria-label="Disenchant ${g.name}"`) : ""}</div></article>`;
     })
     .join(
       "",
@@ -589,6 +681,7 @@ function renderJournal() {
 }
 
 function showModal(html: string, kind: string, css = "") {
+  resetMovement();
   lastFocus = document.activeElement as HTMLElement;
   modalKind = kind;
   modalRoot.innerHTML = `<div class="modal-backdrop"><section class="modal ${css}" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">${html}</section></div>`;
@@ -596,7 +689,13 @@ function showModal(html: string, kind: string, css = "") {
   document.body.classList.toggle("craft-review", kind === "specialization");
   document.body.classList.toggle("enchant-review", kind === "enchantment");
   document.body.classList.toggle("has-checkpoint", kind === "checkpoint");
+  refreshControllerHints();
+  if (controllerMode) ensureControllerFocus(modalRoot);
   requestAnimationFrame(() => {
+    if (controllerMode) {
+      ensureControllerFocus(modalRoot);
+      return;
+    }
     const el = modalRoot.querySelector<HTMLElement>(
       "button:not([disabled]),input,select,.modal",
     );
@@ -604,6 +703,7 @@ function showModal(html: string, kind: string, css = "") {
   });
 }
 function closeModal() {
+  resetMovement();
   modalRoot.innerHTML = "";
   modalKind = "";
   document.body.classList.remove(
@@ -613,6 +713,7 @@ function closeModal() {
     "enchant-review",
   );
   lastFocus?.focus();
+  refreshControllerHints();
 }
 const modalClose = () =>
   button(
@@ -640,7 +741,7 @@ function showControls() {
       )
       .join(
         "",
-      )}</div><p class="modal-intro">Elites arrive every two minutes. Collect their treasure, gather materials, and defeat the final boss to win. Follow the compass to six landmarks in each zone. Shrines grant expedition blessings, guarded caches award equipment, and rituals reward holding a circle for 20 seconds. Press F nearby or tap the interaction button. Gold, character XP, loot, and materials return to camp even when you fall.</p>${button("close-modal", "Ready for adventure", "button primary full-width")}`,
+      )}</div><p class="modal-intro">Elites arrive every two minutes. Collect their treasure, gather materials, and defeat the final boss to win. Follow the compass to six landmarks in each zone. Shrines grant expedition blessings, guarded caches award equipment, and rituals reward holding a circle for 20 seconds. Press F nearby or tap the interaction button. Gold, character XP, loot, and materials return to camp even when you fall.</p>${renderControllerHelp()}${button("close-modal", "Ready for adventure", "button primary full-width")}`,
     "controls",
   );
 }
@@ -660,6 +761,12 @@ function showSettings() {
         "Screen shake",
         "A subtle impact when you take damage.",
       ],
+      [
+        "animation",
+        "boot",
+        "Character animation",
+        "Heroes, creatures, companions and mounts. Respects reduced motion.",
+      ],
     ]
       .map(
         ([id, i, n, d]) =>
@@ -667,9 +774,32 @@ function showSettings() {
       )
       .join(
         "",
-      )}</div><div class="sheet-divider"></div><h3>Your adventure, saved</h3><p class="modal-intro">Progress is saved in this browser. Export a copy to keep it safe or move it to another device.</p><div class="save-actions">${button("export", `${icon("download", 17)} Export save`, "button quiet")}${button("import", `${icon("upload", 17)} Import save`, "button quiet")}<input type="file" id="import-file" accept=".json,application/json" hidden /></div><div class="settings-controls-link">${button("controls", `${icon("info", 16)} Controls & field guide`, "text-button")}</div>`,
+      )}</div>${renderMusicSettings()}<div class="sheet-divider"></div>${renderControllerHelp()}<div class="sheet-divider"></div><h3>Your adventure, saved</h3><p class="modal-intro">Progress is saved in this browser. Export a copy to keep it safe or move it to another device.</p><div class="save-actions">${button("export", `${icon("download", 17)} Export save`, "button quiet")}${button("import", `${icon("upload", 17)} Import save`, "button quiet")}<input type="file" id="import-file" accept=".json,application/json" hidden /></div><div class="settings-controls-link">${button("controls", `${icon("info", 16)} Controls & field guide`, "text-button")}</div>`,
     "settings",
   );
+}
+function renderMusicSettings() {
+  const levels = [
+    ...new Set([0, 25, 50, 75, 100, save.settings.musicVolume]),
+  ].sort((a, b) => a - b);
+  return `<section class="music-settings" aria-label="Original music"><label class="setting-row">${icon("volume", 22)}<span><b>Original music</b><small>Camp, expedition and encounter themes.</small></span><input type="checkbox" data-setting="music" ${save.settings.music ? "checked" : ""}/><span class="toggle"></span></label><div class="music-volume"><label for="music-volume">Music volume</label><select id="music-volume">${levels.map((level) => `<option value="${level}" ${level === save.settings.musicVolume ? "selected" : ""}>${level === 0 ? "Muted" : `${level}%`}</option>`).join("")}</select></div><p id="music-status" class="music-status" role="status">${music.status()}</p><p class="music-credit">Ten original themes, composed and synthesized locally. Music and sound effects have separate controls. Combat music rests during paused choices and when the game loses focus.</p></section>`;
+}
+function refreshMusic() {
+  const scene = musicScene({
+    zone: game?.zone.id,
+    boss: !!game?.boss,
+    checkpoint: game?.checkpoint,
+    ended: game?.ended,
+    victory: game?.victory,
+    paused: !!game && (game.paused || game.choosing || !!game.shrineChoice),
+    health: game?.player.hp,
+    maxHealth: game?.player.maxHp,
+    focused: !document.hidden && document.hasFocus(),
+  });
+  music.update(scene.cue, scene.playing, scene.tension);
+  const status = document.getElementById("music-status");
+  const text = music.status();
+  if (status && status.textContent !== text) status.textContent = text;
 }
 function showUpgrade() {
   if (!game) return;
@@ -724,7 +854,7 @@ function showResult(result: RunRecord, reputationEarned: number) {
   sound.reward();
   const mats = Object.entries(result.materials);
   showModal(
-    `<div class="result-emblem ${result.victory ? "victory" : ""}">${icon(result.victory ? "crown" : "sword", 38)}</div><div class="eyebrow centered">${result.victory ? (result.zoneId === "deadmines" ? "THE BROTHERHOOD IS BROKEN" : result.zoneId === "ragefire" ? "THE SEARING BLADE IS SILENCED" : result.zoneId === "shadowfang" ? "THE MOONLIT CURSE IS BROKEN" : "THE FOREST WILL REMEMBER") : "THE ROAD DOES NOT END HERE"}</div><h2 id="modal-title">${result.victory ? "A legend begins." : "Until the next adventure."}</h2><p class="modal-intro centered">${CLASS_MAP[result.classId].name} · ${ZONES.find((z) => z.id === result.zoneId)!.name}</p><div class="result-stats"><div><b>${time(result.time)}</b><small>Survived</small></div><div><b>${result.kills}</b><small>Defeated</small></div><div><b>${result.level}</b><small>Run level</small></div></div><div class="result-rewards"><span>${icon("coin", 21)}<b>+${result.gold}</b> gold</span><span>${icon("spark", 21)}<b>+${result.xp}</b> character XP</span></div>${mats.length ? `<div class="result-materials">${mats.map(([m, n]) => `<span>${icon(MATERIALS[m as Material].icon, 16)} ${n} ${MATERIALS[m as Material].name}</span>`).join("")}</div>` : ""}${result.loot.length ? `<div class="result-loot">${result.loot.map((id) => `<span style="color:${RARITY_COLORS[GEAR_MAP[id].rarity]}">${icon(GEAR_MAP[id].icon, 23)} ${GEAR_MAP[id].name}</span>`).join("")}</div>` : ""}${dungeonRoute(result.zoneId) ? renderDungeonResult(result) : `<div class="result-exploration">${icon("compass", 19)}<b>${result.encounters || 0} / 6</b> landmarks completed</div>`}${renderFactionResult(save, result, reputationEarned)}${renderSkillCaps(save)}${renderTrialStatus(save)}${renderProfessionQuestStatus(save)}${renderCampaignStatus(save)}<p class="result-level">Your ${CLASS_MAP[result.classId].name} is now character level <b>${save.heroes[result.classId].level}</b>. ${availableTalents(save.heroes[result.classId])} talent points available.</p>${button("camp", `Return to camp ${icon("arrow", 18)}`, "button primary full-width")}`,
+    `<div class="result-emblem ${result.victory ? "victory" : ""}">${icon(result.victory ? "crown" : "sword", 38)}</div><div class="eyebrow centered">${result.victory ? (result.zoneId === "deadmines" ? "THE BROTHERHOOD IS BROKEN" : result.zoneId === "ragefire" ? "THE SEARING BLADE IS SILENCED" : result.zoneId === "shadowfang" ? "THE MOONLIT CURSE IS BROKEN" : "THE FOREST WILL REMEMBER") : "THE ROAD DOES NOT END HERE"}</div><h2 id="modal-title">${result.victory ? "A legend begins." : "Until the next adventure."}</h2><p class="modal-intro centered">${CLASS_MAP[result.classId].name} · ${ZONES.find((z) => z.id === result.zoneId)!.name}</p><div class="result-stats"><div><b>${time(result.time)}</b><small>Survived</small></div><div><b>${result.kills}</b><small>Defeated</small></div><div><b>${result.level}</b><small>Run level</small></div></div><div class="result-rewards"><span>${icon("coin", 21)}<b>+${result.gold}</b> gold</span><span>${icon("spark", 21)}<b>+${result.xp}</b> character XP</span></div>${mats.length ? `<div class="result-materials">${mats.map(([m, n]) => `<span>${icon(MATERIALS[m as Material].icon, 16)} ${n} ${MATERIALS[m as Material].name}</span>`).join("")}</div>` : ""}${result.loot.length ? `<div class="result-loot">${result.loot.map((id) => `<span style="color:${RARITY_COLORS[GEAR_MAP[id].rarity]}">${icon(GEAR_MAP[id].icon, 23)} ${GEAR_MAP[id].name}</span>`).join("")}</div>` : ""}${dungeonRoute(result.zoneId) ? renderDungeonResult(result) : `<div class="result-exploration">${icon("compass", 19)}<b>${result.encounters || 0} / 6</b> landmarks completed</div>`}${renderEquipmentResult(save, result)}${renderFactionResult(save, result, reputationEarned)}${renderSkillCaps(save)}${renderTrialStatus(save)}${renderProfessionQuestStatus(save)}${renderCampaignStatus(save)}<p class="result-level">Your ${CLASS_MAP[result.classId].name} is now character level <b>${save.heroes[result.classId].level}</b>. ${availableTalents(save.heroes[result.classId])} talent points available.</p>${button("camp", `Return to camp ${icon("arrow", 18)}`, "button primary full-width")}`,
     "result",
     "result-modal",
   );
@@ -781,6 +911,13 @@ function startGame() {
     classId: save.selectedClass,
     zone,
     stats: heroStats(save),
+    equipment: equipmentSnapshot(save),
+    onAmmunition: () => {
+      if (save.ammunition <= 0) return false;
+      save.ammunition--;
+      writeSave();
+      return true;
+    },
     spellBonuses: heroSpellBonuses(save),
     spellbook: save.heroes[save.selectedClass].spellbook,
     professions: { ...save.professions },
@@ -800,6 +937,9 @@ function startGame() {
       : undefined,
     food,
     onEvent: handleGameEvent,
+    onAction: (action) => renderer?.onAction(action),
+    onEnemyAction: (action) => renderer?.onEnemyAction(action),
+    onDeath: (action) => renderer?.onDeath(action),
     onConsume: (type) => {
       if (save.supplies[type] <= 0) return false;
       save.supplies[type]--;
@@ -808,15 +948,17 @@ function startGame() {
     },
   });
   document.body.classList.add("in-game");
-  app.innerHTML = `<main class="game-shell ${zone.dungeon ? "dungeon-game" : ""}" data-zone="${zone.id}"><canvas id="game-canvas" aria-label="Wow Survivors survival battlefield"></canvas><div class="game-xp-track"><i id="run-xp-fill"></i></div><div class="game-top"><div class="player-hud">${portrait(game.classDef.portrait)}<div class="player-hud-info"><div><b>${game.classDef.name}</b><span id="run-level">LEVEL 1</span></div><div class="health-track"><i id="health-fill"></i><span id="health-text"></span></div><div class="resource-track"><i id="resource-fill" class="${game.classDef.resource.toLowerCase()}"></i><span id="resource-text"></span></div></div></div><div class="game-timer"><span>${zone.name}</span><b id="run-time">00:00</b><small id="run-objective">Survive ${Math.round(zone.duration / 60)} minutes, then defeat ${zone.boss}</small></div><div class="game-counters"><span>${icon("sword", 18)}<b id="run-kills">0</b></span><span>${icon("coin", 18)}<b id="run-gold">0</b></span>${button("pause", icon("pause", 21), "game-pause", 'aria-label="Pause expedition"')}</div></div><section class="boss-hud" id="boss-hud" hidden aria-label="Dungeon guardian or final boss"><div><b id="boss-name"></b><span id="boss-phase"></span></div><div class="boss-health-track"><i id="boss-health-fill"></i></div><p id="boss-attack"></p></section><aside class="world-hud" aria-label="Exploration"><div class="exploration-heading">${icon("compass", 16)}<b id="landmark-count">LANDMARKS 0 / 6</b><span id="blessing-count"></span><button class="fieldwork-toggle" id="fieldwork-toggle" data-action="fieldwork" aria-expanded="false" aria-controls="fieldwork-panel">Gather</button></div><div id="explore-panel"><div class="landmark-compass"><span id="compass-arrow">↑</span><div><b id="landmark-name"></b><small id="landmark-hint"></small></div></div><div id="encounter-status" hidden><div class="encounter-progress"><i id="encounter-fill"></i></div><small id="encounter-detail"></small></div><button data-action="interact" id="landmark-button" class="landmark-button" hidden><kbd>F</kbd><span id="landmark-interact"></span>${icon("arrow", 15)}</button><small id="landmark-preview" hidden></small></div>${renderFieldwork()}</aside><button data-action="travel" id="travel-button" class="travel-action" aria-label="Travel" aria-pressed="false">${icon("horse", 23)}<span><b id="travel-label">Travel</b><small id="travel-hint"></small></span><kbd>R</kbd><i id="travel-channel" class="travel-channel"></i></button><div class="game-bottom"><div class="spell-loadout" id="spell-loadout"></div><div class="game-actions"><button data-action="active" id="active-button" class="action-slot"><span class="action-symbol">${icon(game.classDef.id, 24)}</span><b>${game.classDef.active}</b><kbd>SPACE</kbd><i id="active-cooldown"></i></button><button data-action="dash" class="action-slot compact"><span class="action-symbol">${icon("boot", 23)}</span><b id="dash-text">Dash</b><kbd>SHIFT</kbd></button><button data-action="heal" class="action-slot compact"><span class="action-symbol">${icon("potion", 23)}</span><b id="potion-count">${save.supplies.potions}</b><kbd>Q</kbd></button><button data-action="bomb" class="action-slot compact"><span class="action-symbol">${icon("bomb", 23)}</span><b id="bomb-count">${save.supplies.bombs}</b><kbd>E</kbd></button></div></div><div class="game-tutorial" id="game-tutorial">${icon("info", 18)}<span><b>Keep moving.</b> Your spells attack automatically. Collect blue gems to grow stronger.</span><kbd>WASD</kbd></div><div class="touch-controls"><div class="touch-pad" id="touch-pad"><div id="touch-stick"></div></div><button data-action="active" aria-label="Class ability">${icon(game.classDef.id, 28)}</button></div></main>`;
+  app.innerHTML = `<main class="game-shell ${zone.dungeon ? "dungeon-game" : ""}" data-zone="${zone.id}"><canvas id="game-canvas" aria-label="Wow Survivors survival battlefield"></canvas><div class="game-xp-track"><i id="run-xp-fill"></i></div><div class="game-top"><div class="player-hud">${portrait(game.classDef.portrait)}<div class="player-hud-info"><div><b>${game.classDef.name}</b><span id="run-level">LEVEL 1</span></div><div class="health-track"><i id="health-fill"></i><span id="health-text"></span></div><div class="resource-track"><i id="resource-fill" class="${game.classDef.resource.toLowerCase()}"></i><span id="resource-text"></span></div></div></div><div class="game-timer"><span>${zone.name}</span><b id="run-time">00:00</b><small id="run-objective">Survive ${Math.round(zone.duration / 60)} minutes, then defeat ${zone.boss}</small></div><div class="game-counters"><span>${icon("sword", 18)}<b id="run-kills">0</b></span><span>${icon("coin", 18)}<b id="run-gold">0</b></span>${button("pause", icon("pause", 21), "game-pause", 'aria-label="Pause expedition"')}</div></div><section class="boss-hud" id="boss-hud" hidden aria-label="Dungeon guardian or final boss"><div><b id="boss-name"></b><span id="boss-phase"></span></div><div class="boss-health-track"><i id="boss-health-fill"></i></div><p id="boss-attack"></p></section><aside class="world-hud" aria-label="Exploration"><div class="exploration-heading">${icon("compass", 16)}<b id="landmark-count">LANDMARKS 0 / 6</b><span id="blessing-count"></span><button class="fieldwork-toggle" id="fieldwork-toggle" data-action="fieldwork" aria-expanded="false" aria-controls="fieldwork-panel">Gather</button></div><div id="explore-panel"><div class="landmark-compass"><span id="compass-arrow">↑</span><div><b id="landmark-name"></b><small id="landmark-hint"></small></div></div><div id="encounter-status" hidden><div class="encounter-progress"><i id="encounter-fill"></i></div><small id="encounter-detail"></small></div><button data-action="interact" id="landmark-button" class="landmark-button" hidden><kbd>F</kbd><span id="landmark-interact"></span>${icon("arrow", 15)}</button><small id="landmark-preview" hidden></small></div>${renderFieldwork()}</aside><button data-action="travel" id="travel-button" class="travel-action" aria-label="Travel" aria-pressed="false">${icon("horse", 23)}<span><b id="travel-label">Travel</b><small id="travel-hint"></small></span><kbd>R</kbd><i id="travel-channel" class="travel-channel"></i></button>${game.shootingWeapon || game.equipment.primary ? `<button data-action="shoot" id="shoot-button" class="equipment-shoot"><span>${icon(game.shootingWeapon ? GEAR_MAP[game.shootingWeapon.item].icon : "sword", 20)} ${game.shootingWeapon ? "Shoot" : "Strike"} <kbd>T</kbd></span><small id="shot-status"></small></button>` : ""}<div class="game-bottom"><div class="spell-loadout" id="spell-loadout"></div><div class="game-actions"><button data-action="active" id="active-button" class="action-slot"><span class="action-symbol">${icon(game.classDef.id, 24)}</span><b>${game.classDef.active}</b><kbd>SPACE</kbd><i id="active-cooldown"></i></button><button data-action="dash" class="action-slot compact"><span class="action-symbol">${icon("boot", 23)}</span><b id="dash-text">Dash</b><kbd>SHIFT</kbd></button><button data-action="heal" class="action-slot compact"><span class="action-symbol">${icon("potion", 23)}</span><b id="potion-count">${save.supplies.potions}</b><kbd>Q</kbd></button><button data-action="bomb" class="action-slot compact"><span class="action-symbol">${icon("bomb", 23)}</span><b id="bomb-count">${save.supplies.bombs}</b><kbd>E</kbd></button></div></div><div class="game-tutorial" id="game-tutorial">${icon("info", 18)}<span><b>Keep moving.</b> Your spells attack automatically. Collect blue gems to grow stronger.</span><kbd>WASD</kbd></div><div class="touch-controls"><div class="touch-pad" id="touch-pad"><div id="touch-stick"></div></div><button data-action="active" aria-label="Class ability">${icon(game.classDef.id, 28)}</button></div></main>`;
   renderer = new GameRenderer(
     document.querySelector<HTMLCanvasElement>("#game-canvas")!,
     game,
   );
   renderer.particles = save.settings.particles;
   renderer.shake = save.settings.screenShake;
+  renderer.animation = save.settings.animation;
   updateHud();
   setupTouch();
+  refreshControllerHints();
 }
 function showShrine() {
   if (!game?.shrineChoice) return;
@@ -834,6 +976,18 @@ function updateHud() {
   if (!game) return;
   updateFieldwork(game);
   const p = game.player;
+  const shotStatus = document.getElementById("shot-status");
+  if (shotStatus)
+    shotStatus.textContent =
+      game.time < game.shotReadyAt
+        ? `${Math.ceil(game.shotReadyAt - game.time)}s cooldown`
+        : !game.shootingWeapon
+          ? "Melee · within 150"
+          : ["bow", "gun", "crossbow"].includes(
+                GEAR_MAP[game.shootingWeapon!.item].rangedType || "",
+              )
+            ? `${save.ammunition} ammunition`
+            : "No ammunition needed";
   const text = (id: string, value: string) => {
     const e = document.getElementById(id);
     if (e) e.textContent = value;
@@ -1092,7 +1246,9 @@ function setupTouch() {
       len = Math.hypot(dx, dy),
       scale = Math.min(38, len) / (len || 1);
     stick.style.transform = `translate(${dx * scale}px,${dy * scale}px)`;
-    game.setInput(dx / 38, dy / 38);
+    if (modalKind) return;
+    touchMovement = { x: dx / 38, y: dy / 38 };
+    syncInput();
   };
   pad.addEventListener("pointerdown", (e) => {
     pointer = e.pointerId;
@@ -1103,7 +1259,8 @@ function setupTouch() {
   const end = () => {
     pointer = -1;
     stick.style.transform = "";
-    game?.setInput(0, 0);
+    touchMovement = { x: 0, y: 0 };
+    syncInput();
   };
   pad.addEventListener("pointerup", end);
   pad.addEventListener("pointercancel", end);
@@ -1429,14 +1586,201 @@ document.addEventListener("click", (e) => {
     }
   }
   if (action === "equip") {
-    if (equip(save, id)) {
+    const ring = isRingSlot(GEAR_MAP[id]?.slot || "");
+    const target =
+      ring &&
+      isRingSlot(bagSlot) &&
+      !save.heroes[save.selectedClass].equipment[bagSlot]
+        ? bagSlot
+        : undefined;
+    if (
+      GEAR_MAP[id]?.rangedType &&
+      (GEAR_MAP[id].slot === "ranged" || bagSlot === "ranged")
+    ) {
+      if (save.inventory.includes(id) && !equipRestriction(save, id, "ranged"))
+        showModal(
+          modalClose() + renderRangedReview(save, id),
+          "ranged-review",
+          "weapon-review hand-review ranged-review",
+        );
+    } else if (
+      displacedOffhand(save.heroes[save.selectedClass].equipment, GEAR_MAP[id])
+    ) {
+      if (save.inventory.includes(id) && !equipRestriction(save, id))
+        showModal(
+          modalClose() + renderWeaponReview(save, id),
+          "weapon-review",
+          "weapon-review",
+        );
+    } else if (
+      save.heroes[save.selectedClass].dualWield &&
+      dualWieldClass(save.selectedClass) &&
+      secondaryWeapon(GEAR_MAP[id])
+    ) {
+      if (save.inventory.includes(id) && !equipRestriction(save, id))
+        showModal(
+          modalClose() + renderWeaponHandReview(save, id),
+          "weapon-hand-review",
+          "weapon-review hand-review",
+        );
+    } else if (ring && !equipmentTarget(save, id)) {
+      if (save.inventory.includes(id) && !equipRestriction(save, id))
+        showModal(renderRingReview(save, id), "ring-review", "ring-review");
+    } else if (equip(save, id, target)) {
       writeSave();
       render();
       toast(`${GEAR_MAP[id].name} equipped.`);
     }
   }
-  if (action === "unequip") {
-    delete save.heroes[save.selectedClass].equipment[id as Slot];
+  if (
+    action === "review-ranged" &&
+    save.inventory.includes(id) &&
+    GEAR_MAP[id]?.rangedType &&
+    !equipRestriction(save, id, "ranged")
+  )
+    showModal(
+      modalClose() + renderRangedReview(save, id),
+      "ranged-review",
+      "weapon-review hand-review ranged-review",
+    );
+  if (
+    action === "equip-ranged-position" &&
+    GEAR_MAP[id]?.rangedType &&
+    ["weapon", "ranged"].includes(target.dataset.slot || "") &&
+    equip(save, id, target.dataset.slot as Slot)
+  ) {
+    closeModal();
+    writeSave();
+    render();
+    toast(`${GEAR_MAP[id].name} equipped.`);
+  }
+  if (
+    action === "equip-ring" &&
+    RING_SLOTS.includes(target.dataset.slot as (typeof RING_SLOTS)[number])
+  ) {
+    if (equip(save, id, target.dataset.slot as Slot)) {
+      closeModal();
+      writeSave();
+      render();
+      toast(`${GEAR_MAP[id].name} equipped.`);
+    }
+  }
+  if (
+    action === "equip-two-handed" &&
+    displacedOffhand(save.heroes[save.selectedClass].equipment, GEAR_MAP[id]) &&
+    equip(save, id)
+  ) {
+    closeModal();
+    writeSave();
+    render();
+    toast(`${GEAR_MAP[id].name} equipped. Off-hand returned to your satchel.`);
+  }
+  if (
+    action === "review-weapon-training" &&
+    advancedWeaponType(id) &&
+    WEAPON_TRAINING[id].classes.includes(save.selectedClass)
+  )
+    showModal(
+      modalClose() + renderWeaponTrainingReview(save, id),
+      "weapon-type-training",
+      "weapon-review",
+    );
+  if (action === "train-weapon-type" && trainWeaponType(save, id)) {
+    closeModal();
+    writeSave();
+    render();
+    toast(
+      `${WEAPON_TYPE_LABELS[id as keyof typeof WEAPON_TYPE_LABELS]} learned for this hero.`,
+    );
+  }
+  if (action === "review-repair") {
+    const ids =
+      id === "loadout"
+        ? Object.values(save.heroes[save.selectedClass].equipment)
+        : [id];
+    if (repairQuote(save, ids).ids.length)
+      showModal(
+        modalClose() + renderRepairReview(save, ids),
+        "equipment-repair",
+        "weapon-review",
+      );
+  }
+  if (
+    action === "confirm-repair" &&
+    repairItems(
+      save,
+      (target.dataset.items || "").split(","),
+      Number(target.dataset.cost),
+    )
+  ) {
+    closeModal();
+    writeSave();
+    render();
+    toast("Equipment restored to full condition.");
+  }
+  if (
+    action === "review-attunement" &&
+    save.inventory.includes(id) &&
+    !protectedItem(id)
+  )
+    showModal(
+      modalClose() + renderAttunementReview(save, id),
+      "item-attunement",
+      "weapon-review",
+    );
+  if (
+    action === "confirm-attunement" &&
+    attuneEquipment(save, id, target.dataset.affix || "")
+  ) {
+    closeModal();
+    writeSave();
+    render();
+    toast("Affix applied. This item is now soulbound to your hero.");
+  }
+  if (action === "buy-ammunition" && buyAmmunition(save)) {
+    writeSave();
+    render();
+    toast("50 ammunition added to storage.");
+  }
+  if (action === "review-dual-wield" && !dualWieldRestriction(save))
+    showModal(
+      modalClose() + renderDualWieldTrainingReview(save),
+      "dual-wield-training",
+      "weapon-review",
+    );
+  if (action === "train-dual-wield" && trainDualWield(save)) {
+    closeModal();
+    writeSave();
+    render();
+    toast("Dual Wield learned for this hero.");
+  }
+  if (
+    action === "equip-weapon-hand" &&
+    ["weapon", "offhand"].includes(target.dataset.slot || "") &&
+    equip(save, id, target.dataset.slot as Slot)
+  ) {
+    closeModal();
+    writeSave();
+    render();
+    toast(`${GEAR_MAP[id].name} equipped.`);
+  }
+  if (
+    action === "review-hand-swap" &&
+    offhandMultiplier(save.selectedClass, save.heroes[save.selectedClass]) ===
+      DUAL_WIELD_RULES.factor
+  )
+    showModal(
+      modalClose() + renderHandSwapReview(save),
+      "weapon-hand-swap",
+      "weapon-review",
+    );
+  if (action === "swap-weapon-hands" && swapWeaponHands(save)) {
+    closeModal();
+    writeSave();
+    render();
+    toast("Weapon hands swapped.");
+  }
+  if (action === "unequip" && unequip(save, id as Slot)) {
     writeSave();
     render();
   }
@@ -1467,28 +1811,36 @@ document.addEventListener("click", (e) => {
     bagSlot = id as Slot;
     page = "armory";
     history.pushState(null, "", "#armory");
-    if (isWardrobeSlot(bagSlot)) {
+    const category = isRingSlot(bagSlot) ? "finger1" : bagSlot;
+    if (isWardrobeSlot(category)) {
       wardrobeFilters.open = true;
-      wardrobeFilters.slot = bagSlot;
+      wardrobeFilters.slot = category;
       wardrobeFilters.source = "all";
     }
     render();
     document
       .querySelector(
-        isWardrobeSlot(bagSlot) ? ".wardrobe-section" : ".bag-panel",
+        isWardrobeSlot(category) ? ".wardrobe-section" : ".bag-panel",
       )
       ?.scrollIntoView({ block: "start" });
   }
   if (action === "wardrobe-owned" && save.inventory.includes(id)) {
-    bagSlot = GEAR_MAP[id].slot;
+    bagSlot =
+      ["offhand", "ranged"].includes(wardrobeFilters.slot) &&
+      gearFitsSlot(GEAR_MAP[id], wardrobeFilters.slot)
+        ? (wardrobeFilters.slot as "offhand" | "ranged")
+        : GEAR_MAP[id].slot;
     bagFilter = "all";
     render();
     document
       .querySelector(`[data-gear-id="${id}"]`)
       ?.scrollIntoView({ block: "center" });
   }
-  if (action === "wardrobe-craft" && WARDROBE_SOURCES[id]?.type === "craft") {
-    const source = WARDROBE_SOURCES[id];
+  if (
+    action === "wardrobe-craft" &&
+    WARDROBE_CATALOG_SOURCES[id]?.type === "craft"
+  ) {
+    const source = WARDROBE_CATALOG_SOURCES[id];
     if (source.type === "craft") recipeFilter = source.profession;
     page = "professions";
     history.pushState(null, "", "#professions");
@@ -1600,6 +1952,7 @@ document.addEventListener("click", (e) => {
     updateHud();
   }
   if (action === "interact") game?.interact();
+  if (action === "shoot") game?.attackEquipment();
   if (action === "blessing" && game?.chooseBlessing(id)) {
     closeModal();
     sound.reward();
@@ -1647,6 +2000,8 @@ document.addEventListener("click", (e) => {
     save = pendingImport;
     pendingImport = null;
     sound.enabled = save.settings.sound;
+    music.configure(save.settings.music, save.settings.musicVolume);
+    music.unlock();
     writeSave();
     closeModal();
     render();
@@ -1682,19 +2037,31 @@ document.addEventListener("change", async (e) => {
     return;
   }
   const el = e.target as HTMLInputElement;
+  if (el.id === "music-volume") {
+    save.settings.musicVolume = Number(el.value);
+    music.configure(save.settings.music, save.settings.musicVolume);
+    music.unlock();
+    writeSave();
+    refreshMusic();
+  }
   if (el.id === "hero-switch") {
     save.selectedClass = el.value as ClassId;
     writeSave();
     render();
   }
   if (el.dataset.setting) {
-    const key = el.dataset.setting as keyof SaveData["settings"];
+    const key = el.dataset.setting as
+      "sound" | "particles" | "screenShake" | "animation" | "music";
     save.settings[key] = el.checked;
     sound.enabled = save.settings.sound;
+    music.configure(save.settings.music, save.settings.musicVolume);
+    if (key === "music") music.unlock();
+    refreshMusic();
     writeSave();
     if (renderer) {
       renderer.particles = save.settings.particles;
       renderer.shake = save.settings.screenShake;
+      renderer.animation = save.settings.animation;
     }
   }
   if (el.id === "import-file" && el.files?.[0]) {
@@ -1723,7 +2090,144 @@ document.addEventListener("change", (e) => {
     updateHud();
   }
 });
+function refreshControllerHints() {
+  updateControllerHints(controllerMode, !!game, !!modalKind);
+  const status = document.getElementById("controller-status");
+  if (status && status.textContent !== controllerStatus)
+    status.textContent = controllerStatus;
+}
+function setControllerMode(active: boolean) {
+  if (controllerMode === active) return;
+  controllerMode = active;
+  refreshControllerHints();
+}
+function resetMovement() {
+  keys.clear();
+  touchMovement = { x: 0, y: 0 };
+  controllerMovement = { x: 0, y: 0 };
+  controller.requireNeutral();
+  game?.setInput(0, 0);
+}
+function goBack() {
+  if (game && !game.ended) {
+    if (game.shrineChoice) {
+      game.leaveShrine();
+      closeModal();
+      updateHud();
+      return;
+    }
+    if (game.choosing || game.checkpoint) return;
+    if (game.paused) resume();
+    else showPause();
+  } else if (modalKind === "result") returnToCamp();
+  else if (modalKind) closeModal();
+}
+function pollController(now: number, delta: number) {
+  let devices: (Gamepad | null)[] = [];
+  const apiAvailable = typeof navigator.getGamepads === "function";
+  try {
+    if (apiAvailable) devices = [...navigator.getGamepads()];
+    else
+      controllerStatus =
+        "Controller access is unavailable in this browser. Keyboard and touch controls are ready.";
+  } catch {
+    controllerStatus =
+      "Controller access is blocked. Open the game directly over HTTPS or localhost; keyboard and touch controls are ready.";
+  }
+  if (devices.some((p) => p?.connected)) {
+    controllerStatus = devices.some(
+      (p) => p?.connected && p.mapping === "standard",
+    )
+      ? "Standard controller detected. Press and release a button to take control."
+      : "This controller has an unsupported layout. Use a standard-mapped controller or keyboard and touch controls.";
+  }
+  const sample = controller.sample(
+    devices,
+    now,
+    !document.hidden && document.hasFocus(),
+  );
+  controllerMovement = sample.movement;
+  if (sample.disconnected) {
+    resetMovement();
+    setControllerMode(false);
+    showPause();
+    toast(
+      "Controller disconnected. Reconnect, release the controls and resume when ready.",
+      "info",
+    );
+  }
+  if (controller.index !== null)
+    controllerStatus =
+      "Standard controller connected. Release controls between screens.";
+  else if (
+    !devices.some((p) => p?.connected) &&
+    apiAvailable &&
+    !controllerStatus.includes("blocked")
+  )
+    controllerStatus = "Connect a controller and press a button to detect it.";
+  const status = document.getElementById("controller-status");
+  if (status && status.textContent !== controllerStatus)
+    status.textContent = controllerStatus;
+  if (sample.activity) setControllerMode(true);
+  syncInput();
+  if (!sample.activity) return;
+  // Handle only one press per frame. A screen transition never consumes a second action.
+  if (sample.pressed.includes(9)) {
+    if (!modalKind || modalKind === "pause") goBack();
+    return;
+  }
+  const menu = !game || !!modalKind;
+  if (menu) {
+    const root = modalKind ? modalRoot : app;
+    ensureControllerFocus(root);
+    if (sample.pressed.includes(1)) {
+      goBack();
+      return;
+    }
+    if (sample.pressed.includes(0)) {
+      confirmControllerFocus(root);
+      return;
+    }
+    if (sample.pressed.includes(6) || sample.pressed.includes(7)) {
+      cycleControllerFocus(root, sample.pressed.includes(7) ? 1 : -1);
+      return;
+    }
+    if (
+      !game &&
+      !modalKind &&
+      (sample.pressed.includes(4) || sample.pressed.includes(5))
+    ) {
+      const tabs = [...app.querySelectorAll<HTMLElement>(".nav-link")];
+      const current = tabs.findIndex((el) => el.classList.contains("active"));
+      const next =
+        tabs[
+          (current + (sample.pressed.includes(5) ? 1 : -1) + tabs.length) %
+            tabs.length
+        ];
+      next?.click();
+      app.querySelector<HTMLElement>(".nav-link.active")?.focus();
+      controller.requireNeutral();
+      return;
+    }
+    if (sample.direction) moveControllerFocus(root, sample.direction);
+    if (sample.scroll) scrollControllerMenu(root, sample.scroll * 650 * delta);
+  } else {
+    const binding = CONTROLLER_BINDINGS.find((b) =>
+      sample.pressed.includes(b.button),
+    );
+    if (binding)
+      app
+        .querySelector<HTMLElement>(`[data-action="${binding.action}"]`)
+        ?.click();
+  }
+}
+document.addEventListener("pointerdown", () => {
+  setControllerMode(false);
+  music.unlock();
+});
 document.addEventListener("keydown", (e) => {
+  music.unlock();
+  setControllerMode(false);
   if (modalKind && e.key === "Tab") {
     const list = [
       ...modalRoot.querySelectorAll<HTMLElement>(
@@ -1749,18 +2253,7 @@ document.addEventListener("keydown", (e) => {
     return;
   if (e.key === "Escape" || (game && e.key.toLowerCase() === "p")) {
     e.preventDefault();
-    if (game && !game.ended) {
-      if (game.shrineChoice) {
-        game.leaveShrine();
-        closeModal();
-        updateHud();
-        return;
-      }
-      if (game.choosing || game.checkpoint) return;
-      if (game.paused) resume();
-      else showPause();
-    } else if (modalKind === "result") returnToCamp();
-    else if (modalKind) closeModal();
+    goBack();
     return;
   }
   if (!game) return;
@@ -1823,6 +2316,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key.toLowerCase() === "q") game.usePotion();
   if (e.key.toLowerCase() === "e") game.useBomb();
   if (e.key.toLowerCase() === "f") game.interact();
+  if (e.key.toLowerCase() === "t") game.attackEquipment();
   if (e.key.toLowerCase() === "r") {
     game.toggleTravel();
     updateHud();
@@ -1834,16 +2328,29 @@ document.addEventListener("keyup", (e) => {
 });
 function syncInput() {
   if (!game) return;
-  game.setInput(
-    Number(keys.has("d") || keys.has("arrowright")) -
+  if (modalKind || game.paused || game.ended) {
+    game.setInput(0, 0);
+    return;
+  }
+  const keyboard = {
+    x:
+      Number(keys.has("d") || keys.has("arrowright")) -
       Number(keys.has("a") || keys.has("arrowleft")),
-    Number(keys.has("s") || keys.has("arrowdown")) -
+    y:
+      Number(keys.has("s") || keys.has("arrowdown")) -
       Number(keys.has("w") || keys.has("arrowup")),
-  );
+  };
+  const movement =
+    touchMovement.x || touchMovement.y
+      ? touchMovement
+      : keyboard.x || keyboard.y
+        ? keyboard
+        : controllerMovement;
+  game.setInput(movement.x, movement.y);
 }
 window.addEventListener("blur", () => {
-  keys.clear();
-  game?.setInput(0, 0);
+  music.hold();
+  resetMovement();
   if (
     game &&
     !game.ended &&
@@ -1856,8 +2363,8 @@ window.addEventListener("blur", () => {
 });
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
-    keys.clear();
-    game?.setInput(0, 0);
+    music.hold();
+    resetMovement();
     if (
       game &&
       !game.ended &&
@@ -1881,19 +2388,21 @@ let previous = performance.now(),
 function frame(now: number) {
   const delta = Math.min((now - previous) / 1000, 0.1);
   previous = now;
+  pollController(now, delta);
   if (game && renderer) {
     accumulator += delta;
     while (accumulator >= 1 / 60) {
       game.update(1 / 60);
       accumulator -= 1 / 60;
     }
-    renderer.render();
+    renderer.render(delta);
     hudTimer += delta;
     if (hudTimer >= 0.1) {
       updateHud();
       hudTimer = 0;
     }
   } else accumulator = 0;
+  refreshMusic();
   requestAnimationFrame(frame);
 }
 render();

@@ -1,17 +1,18 @@
 {
   "name": "wow-survivors",
   "private": true,
-  "version": "0.16.0",
+  "version": "0.30.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
+    "dev": "node scripts/local-server.mjs --open",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --host 127.0.0.1",
+    "preview": "node scripts/local-server.mjs --preview --open",
     "test": "tsx --test tests/*.test.ts",
     "test:e2e": "playwright test",
     "format": "prettier --write src scripts tests docs *.json *.ts index.html",
     "format:check": "prettier --check src scripts tests docs *.json *.ts index.html",
-    "balance": "tsx scripts/balance.ts"
+    "balance": "tsx scripts/balance.ts",
+    "check:repo": "node scripts/check-repository.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

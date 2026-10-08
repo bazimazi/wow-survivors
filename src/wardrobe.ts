@@ -2,7 +2,18 @@ import type { GearDef, Recipe, Slot, Stats, ProfessionId } from "./content";
 import { DUSKWOOD_GEAR } from "./duskwood";
 import type { FactionId } from "./factions";
 
-export const WARDROBE_SLOTS = ["shoulders", "back", "waist", "legs"] as const;
+export const WARDROBE_SLOTS = [
+  "shoulders",
+  "back",
+  "waist",
+  "legs",
+  "wrists",
+  "finger1",
+  "neck",
+  "weapon",
+  "offhand",
+  "ranged",
+] as const;
 export type WardrobeSlot = (typeof WARDROBE_SLOTS)[number];
 export type WardrobeSource =
   | { type: "world"; zone: string }
@@ -21,6 +32,12 @@ const icons: Record<WardrobeSlot, string> = {
   back: "cape",
   waist: "belt",
   legs: "legs",
+  wrists: "bracers",
+  finger1: "ring",
+  neck: "necklace",
+  weapon: "sword",
+  offhand: "shield",
+  ranged: "bow",
 };
 function add(
   id: string,

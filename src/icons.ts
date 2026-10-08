@@ -1,4 +1,10 @@
 const paths: Record<string, string> = {
+  axe: '<path d="m5 22 9-18M12 5l5-3 5 5-6 5-6-3M8 15l4 2"/>',
+  polearm: '<path d="m4 22 12-16M15 8l-3-3 7-4 3 4-4 7-3-4M7 17l3 2"/>',
+  focus:
+    '<circle cx="12" cy="9" r="5"/><path d="M8 14l-2 6h12l-2-6M9 9h6M12 6v6"/>',
+  necklace:
+    '<path d="M4 4c-1 7 2 11 8 12 6-1 9-5 8-12M6 4c0 5 2 8 6 9 4-1 6-4 6-9"/><path d="m12 13 4 4-4 5-4-5Z"/>',
   shoulders:
     '<path d="m3 8 5-4 4 3 4-3 5 4-2 7-4-2-3 3-3-3-4 2Z"/><path d="m4 11 4-2m8 0 4 2M8 4l1 9m7-9-1 9"/>',
   cape: '<path d="m9 3 3 2 3-2 5 18-8-3-8 3Z"/><path d="M9 3c0-2 6-2 6 0M12 5v13M7 14l2-6m8 6-2-6"/>',
@@ -36,6 +42,9 @@ const paths: Record<string, string> = {
   heart:
     '<path d="M12 21 3 12C-3 4 7-1 12 6c5-7 15-2 9 6Z"/><path d="M5 12h4l2-4 2 8 2-4h4"/>',
   boot: '<path d="M7 2h9v10l5 3v6H3v-6l4-4Z"/><path d="M7 6h9M8 15h6M3 18h18"/>',
+  bracers:
+    '<path d="m6 3 12 0-1 18H7Z"/><path d="M6 7h12M7 17h10M10 10l4 4m0-4-4 4"/>',
+  ring: '<circle cx="12" cy="14" r="7"/><path d="m8 5 4-4 4 4-4 4ZM8 5h8M9 10a4 4 0 0 0 0 8"/>',
   robe: '<path d="m8 2-6 6 4 5 2-2-2 11h12l-2-11 2 2 4-5-6-6-4 3Z"/><path d="M8 9h8m-8 5h8"/>',
   drop: '<path d="M12 2C8 8 3 12 5 17c3 8 14 5 14-2 0-4-4-8-7-13Z"/><path d="M8 15c0 2 1 3 3 3"/>',
   spark:
@@ -46,6 +55,11 @@ const paths: Record<string, string> = {
     '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="m12 12 9-9M18 2l4 0v4"/>',
   pickaxe:
     '<path d="M4 8C10 1 19 2 22 10L12 6Z"/><path d="m14 7-9 15-3-2L11 6"/>',
+  greataxe: '<path d="M8 21 17 3m-7 4C5 3 2 7 3 12l7 1m5-9c5-2 8 2 6 7l-6-2"/>',
+  fist: '<path d="M7 21h10l3-8-2-4-3 1V4h-3v6h-1V3H8v7H7V5H4v8l3 8Z"/>',
+  gun: '<path d="m3 16 4-2 3 2 2-5 9-4-1-3-12 6-5 6Zm8-5 3 2m-7 1 2-4"/>',
+  crossbow:
+    '<path d="m5 19 14-14M4 4c3-2 6 0 9 7s5 10 7 9M3 5l16 16M5 19l-2 2m7-10 3 3"/>',
   anvil:
     '<path d="M2 6h20v4l-7 3v4l5 3v2H4v-2l5-3v-4l-7-3Z"/><path d="M9 2h10v4"/>',
   gear: '<path d="m9 2 1 3h4l1-3 4 2-1 3 2 3 3 1v4l-3 1-2 3 1 3-4 1-1-3h-4l-1 3-4-2 1-3-2-3-3-1v-4l3-1 2-3-1-3Z"/><circle cx="12" cy="12" r="3"/>',

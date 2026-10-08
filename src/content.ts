@@ -1,3 +1,9 @@
+import {
+  TRAINED_WEAPON_GEAR,
+  TRAINED_WEAPON_RECIPES,
+  LEGACY_WEAPON_TYPES,
+} from "./weapon-training";
+import type { WeaponType } from "./weapon-training";
 import { MATERIALS, gradedCosts } from "./resources";
 export { MATERIALS } from "./resources";
 export type { Material } from "./resources";
@@ -8,6 +14,11 @@ import { SHADOWFANG_GEAR } from "./shadowfang";
 import { CAMPAIGN_GEAR } from "./campaigns";
 import { PROFESSION_MASTERY_GEAR } from "./profession-quests";
 import { CLASS_TECHNIQUES } from "./spellbook";
+import { ACCESSORY_GEAR, ACCESSORY_RECIPES } from "./accessories";
+import { NECKLACE_GEAR } from "./necklaces";
+import { OFFHAND_GEAR, OFFHAND_RECIPES } from "./offhands";
+import { DUAL_WIELD_GEAR, DUAL_WIELD_RECIPES } from "./dual-wield";
+import { RANGED_GEAR, RANGED_RECIPES, LEGACY_RANGED } from "./ranged";
 import {
   WARDROBE_GEAR,
   WARDROBE_RECIPES,
@@ -58,6 +69,12 @@ export const SLOTS = [
   "back",
   "waist",
   "legs",
+  "wrists",
+  "finger1",
+  "finger2",
+  "neck",
+  "offhand",
+  "ranged",
 ] as const;
 export type Slot = (typeof SLOTS)[number];
 export const SLOT_ICONS: Record<Slot, string> = {
@@ -71,6 +88,12 @@ export const SLOT_ICONS: Record<Slot, string> = {
   back: "cape",
   waist: "belt",
   legs: "legs",
+  wrists: "bracers",
+  finger1: "ring",
+  finger2: "ring",
+  neck: "necklace",
+  offhand: "shield",
+  ranged: "bow",
 };
 export const SLOT_LABELS: Record<Slot, string> = {
   weapon: "Weapon",
@@ -83,6 +106,12 @@ export const SLOT_LABELS: Record<Slot, string> = {
   back: "Cloak",
   waist: "Belt",
   legs: "Leggings",
+  wrists: "Wrists",
+  finger1: "Ring I",
+  finger2: "Ring II",
+  neck: "Necklace",
+  offhand: "Off-hand",
+  ranged: "Ranged",
 };
 
 export type ProfessionId =
@@ -1455,6 +1484,10 @@ export interface GearDef {
   level?: number;
   set?: string;
   dropZones?: string[];
+  weaponHands?: 1 | 2;
+  weaponType?: WeaponType;
+  offhandType?: "shield" | "focus";
+  rangedType?: "bow" | "wand" | "thrown" | "gun" | "crossbow";
 }
 export interface GearSet {
   id: string;
@@ -2301,8 +2334,43 @@ GEAR.push(
 );
 GEAR.push(...PROFESSION_MASTERY_GEAR);
 GEAR.push(...WARDROBE_GEAR);
+GEAR.push(...ACCESSORY_GEAR);
+GEAR.push(
+  ...NECKLACE_GEAR,
+  ...OFFHAND_GEAR,
+  ...DUAL_WIELD_GEAR,
+  ...RANGED_GEAR,
+  ...TRAINED_WEAPON_GEAR,
+);
 GEAR.push(...SHADOWFANG_GEAR, ...DUSKWOOD_GEAR);
 for (const set of GEAR_SETS) set.bonuses.push(WARDROBE_SET_BONUSES[set.id]);
+// Explicit fit preserves item identity; wands and branches are not inferred from icons.
+const TWO_HANDED_WEAPONS = new Set([
+  "starter_warrior",
+  "starter_mage",
+  "starter_hunter",
+  "starter_warlock",
+  "starter_druid",
+  "ember_staff",
+  "longbow",
+  "reinforced_bow",
+  "dockmaster_maul",
+  "rigging_longbow",
+  "rigging_staff",
+  "ash_bow",
+  "ember_branch",
+  "moonhowl_longbow",
+  "tower_staff",
+  "ravenhill_bow",
+  "twilight_staff",
+]);
+for (const g of GEAR)
+  if (g.slot === "weapon")
+    g.weaponHands ??= TWO_HANDED_WEAPONS.has(g.id) ? 2 : 1;
+for (const g of GEAR)
+  if (LEGACY_WEAPON_TYPES[g.id]) g.weaponType = LEGACY_WEAPON_TYPES[g.id];
+for (const g of GEAR)
+  if (LEGACY_RANGED[g.id]) g.rangedType = LEGACY_RANGED[g.id];
 export const GEAR_MAP = Object.fromEntries(
   GEAR.map((g) => [g.id, g]),
 ) as Record<string, GearDef>;
@@ -3037,6 +3105,13 @@ RECIPES.push({
   quantity: 6,
 });
 RECIPES.push(...WARDROBE_RECIPES);
+RECIPES.push(
+  ...ACCESSORY_RECIPES,
+  ...OFFHAND_RECIPES,
+  ...DUAL_WIELD_RECIPES,
+  ...RANGED_RECIPES,
+  ...TRAINED_WEAPON_RECIPES,
+);
 for (const recipe of RECIPES)
   recipe.cost = gradedCosts(recipe.cost, recipe.skill);
 export interface ZoneDef {

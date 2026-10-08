@@ -72,7 +72,7 @@ async function defeat(p: Page) {
   });
   await p.clock.runFor(18);
 }
-test("Shadowfang preview checks the selected hero gate and displays all sixteen guardian sources", async ({
+test("Shadowfang preview checks the selected hero gate and displays all thirty-three guardian sources", async ({
   page,
 }) => {
   const s = ready();
@@ -92,7 +92,7 @@ test("Shadowfang preview checks the selected hero gate and displays all sixteen 
     "6:30 of survival, plus 4 boss fights",
   );
   await page.getByText("Preview dungeon equipment", { exact: true }).click();
-  await expect(page.locator(".dungeon-loot-guide section p")).toHaveCount(16);
+  await expect(page.locator(".dungeon-loot-guide section p")).toHaveCount(33);
   await page.locator('[data-action="hero"][data-id="warrior"]').click();
   await expect(
     page.getByRole("button", { name: "Begin Dungeon" }),

@@ -1,4 +1,5 @@
-import { DUSKWOOD_GEAR } from "./duskwood";
+import { GEAR } from "./content";
+import { gearUseLabel } from "./equipment";
 import { createLandmarks, ENCOUNTER_RULES } from "./expedition";
 import { expeditionRestriction, zoneUnlocked } from "./progression";
 import type { SaveData } from "./progression";
@@ -21,12 +22,12 @@ export function renderDuskwoodPreview(s: SaveData): string {
     )
     .join(
       "",
-    )}</ol><div class="duskwood-tactics"><div>${icon("sword", 22)}<b>Read the cleaver lanes</b><p>Stitches aims before swinging. Sidestep the marked fan; below half health it grows wider.</p></div><div>${icon("leaf", 22)}<b>Keep out of green clouds</b><p>Leave the spill during its warning. Poison remains for 3.2 seconds and hits every 0.8 seconds.</p></div><div>${icon("shield", 22)}<b>Watchkeeper’s Oath</b><p>Guaranteed epic trinket from Stitches: +16% damage, +50 health, +7 armor and +0.8 regeneration. Level 20 to equip.</p></div></div><details class="dungeon-loot-guide"><summary>Preview Duskwood equipment</summary><div><section><h4>Guarded caches and elites · one eligible reward</h4>${DUSKWOOD_GEAR.filter(
-    (g) => g.dropZones,
+    )}</ol><div class="duskwood-tactics"><div>${icon("sword", 22)}<b>Read the cleaver lanes</b><p>Stitches aims before swinging. Sidestep the marked fan; below half health it grows wider.</p></div><div>${icon("leaf", 22)}<b>Keep out of green clouds</b><p>Leave the spill during its warning. Poison remains for 3.2 seconds and hits every 0.8 seconds.</p></div><div>${icon("shield", 22)}<b>Watchkeeper’s Oath</b><p>Guaranteed epic trinket from Stitches: +16% damage, +50 health, +7 armor and +0.8 regeneration. Level 20 to equip.</p></div></div><details class="dungeon-loot-guide"><summary>Preview Duskwood equipment</summary><div><section><h4>Guarded caches and elites · one eligible reward</h4>${GEAR.filter(
+    (g) => g.dropZones?.includes("duskwood"),
   )
     .map(
       (g) =>
-        `<p>${icon(g.icon, 17)}<b>${g.name}</b><small>${g.armor || "All armor types"} · ${g.slot} · level 20${g.classes ? ` · ${g.classes.join(" / ")}` : ""}</small></p>`,
+        `<p>${icon(g.icon, 17)}<b>${g.name}</b><small>${g.armor || (g.classes ? "Class restricted" : "All classes")} · ${gearUseLabel(g)} · level ${g.level || 1}${g.classes ? ` · ${g.classes.join(" / ")}` : ""}</small></p>`,
     )
     .join(
       "",

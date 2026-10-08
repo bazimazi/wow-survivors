@@ -1,16 +1,17 @@
-import { chromium } from "@playwright/test";
+import { openCaptureSession } from "./capture-session.mjs";
 import { mkdir } from "node:fs/promises";
 import assert from "node:assert/strict";
 
 await mkdir("output/screenshots", { recursive: true });
-const browser = await chromium.launch({ args: ["--disable-gpu"] });
+const session = await openCaptureSession({ args: ["--disable-gpu"] });
+const browser = session.browser;
 try {
   const page = await browser.newPage({
     viewport: { width: 1440, height: 1000 },
   });
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("http://127.0.0.1:5176/");
+  await page.goto(session.url);
   // This fixture is isolated from the player's browser and local save.
   await page.evaluate(async () => {
     const { freshSave, specializeProfession, craft, equip, persist } =
@@ -35,7 +36,7 @@ try {
     s.training.fishing = 2;
     persist(s);
   });
-  await page.goto("http://127.0.0.1:5176/#professions");
+  await page.goto(`${session.url}#professions`);
   await page.reload();
   await page.evaluate(() => document.fonts.ready);
   for (const [selector, name] of [
@@ -94,5 +95,5 @@ try {
     ),
   );
 } finally {
-  await browser.close();
+  await session.close();
 }
