@@ -168,5 +168,7 @@ test("older saves enable animation safely, validate booleans and preserve all ot
     screenShake: true,
     music: true,
     musicVolume: 75,
+    largeText: false,
+    highContrast: false,
   });
 });

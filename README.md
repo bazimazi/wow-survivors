@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-The game opens in your browser on the first free port starting at **5173**. The terminal prints the actual URL; an occupied port is skipped automatically. Run `npm run dev -- --no-open` to keep the browser closed, or `npm run dev -- --port 6000` to choose a different starting port.
+The game opens in your browser on the first free port starting at **5678**. The terminal prints the actual URL; an occupied port is skipped automatically. Run `npm run dev -- --no-open` to keep the browser closed, or `npm run dev -- --port 6000` to choose a different starting port.
 
 ```powershell
 npm run build
@@ -17,6 +17,31 @@ npm run preview
 ```
 
 Preview opens the first free port starting at **4173** and accepts the same `--port` and `--no-open` options. The production build is in `dist/` and can be served by any static web host. Requires Node 20.19+ or 22.12+ and a modern browser. All artwork and fonts are bundled locally. No backend, accounts, API keys, or runtime third-party requests are required.
+
+## Class identity — 1.2
+
+**Space dashes; C uses your class signature.** Dash works from a standstill in your facing direction. Touch has a dedicated dash button; controller B / Circle dashes.
+
+All nine classes now have distinct combat loops: Rage and frontal cleaves, stationary Focus and Shatter, target-bound rogue combos, hunter range/Aim/pet commands and traps, paladin seals and holy ground, priest Grace and party protection, three elemental shaman territories, warlock health trades/curses/souls, and three druid forms with separate Mana/Energy/Rage reserves. Class-specific body motions, spell shapes, projectiles, audio, target marks, live meters, and newly illustrated Cat/Moonkin forms make those choices visible.
+
+Read [the class guide and release notes](docs/RELEASE-1.2.md). Reproduce 81 seeded starter-build diagnostics with `npx tsx scripts/class-balance.ts`.
+
+## Beyond the Horde — 1.1
+
+The camp now puts your next goal, hero and expedition build in reach. Use **Shape your build** before departure, or open the crown in the header for the Hall of Mastery.
+
+- **Three challenge settings:** Explorer reduces enemy health by 15% and incoming damage by 30%, with full progression. Adventurer retains the original challenge. Heroic adds 20% enemy health, 30% incoming damage and 15% spawn frequency, with 25% more base gold and character XP. Choose before each expedition.
+- **Four expedition oaths:** keep your original class strengths with The Unbound, trade speed for durability with The Vanguard, trade health for power with The Spellbinder, or trade armor for mobility and pickup reach with The Wayfarer. The preview shows your resulting health and damage. Oaths reset their effects after the run; your selection is saved.
+- **Six combat keystones:** at run levels 4, 8 and 12, choose a new rule for your build: critical-hit lightning, healing on defeats, dash novas, experience vacuum, low-health finishing damage or a once-per-hero lethal-hit rescue. Two free rerolls per expedition help shape your choices. Upgrade cards show roles, stat changes and spell evolution progress.
+- **Momentum:** defeats within five seconds continue your chain. At 10 / 20 / 30 defeats, gain 5% / 10% / 15% damage. Health damage or five seconds without a defeat breaks the chain. Pauses and choices freeze it; shields protect it.
+- **Three optional objectives per expedition:** defeat 60 enemies; complete two landmarks or dungeon guardians; use class abilities four times while defeating at least 20 enemies. Their gold and XP settle automatically, including on partial returns. Expand Expedition objectives in the combat HUD.
+- **Eight permanent mastery milestones and four relics:** earn gold for once-only milestones, unlock relics through play, and freely choose one relic for future runs. Relics offer pickup reach, power, a shorter dash cooldown or a starting shield. Existing saves receive credit for their recorded achievements.
+- **Clearer return screens:** review your oath, keystones, best momentum, ability use and objectives. One more adventure starts a fresh run with your selected build.
+- **Readable UI:** a refreshed camp, stronger upgrade hierarchy, larger-text and high-contrast settings, brighter danger outlines, responsive phone layouts and retained keyboard/controller support. All settings and progression stay in your local save and exports.
+
+In local co-op, both heroes use the chosen oath and relic, share momentum and objectives, and benefit from keystones. P1 chooses keystones. Second Wind can rescue each hero once. Storm Conduit shares one proc cooldown across the party.
+
+Research, exact mechanics and the human-playtest plan are in [the 1.1 release notes](docs/RELEASE-1.1.md). Run `npx tsx scripts/adventure-balance.ts` for deterministic novice-build diagnostics; these are not human win-rate estimates.
 
 ## The adventure
 
@@ -31,7 +56,7 @@ Preview opens the first free port starting at **4173** and accepts the same `--p
 - **Concluding journeys:** after the earlier faction campaigns and guild mastery projects, accept three faction epilogues and twelve guild conclusions in the Journal. Win the named destination after acceptance, deliver exact Artisan materials where required, and review a once-only reward. Both northern clears and all fifteen conclusions display the completed journey; you can keep playing afterward.
 - **Independent equipment copies:** duplicate expedition rewards and explicit copy crafts create separately owned items with a deterministic stat, attribute and resistance roll. Condition, enchantments, binding, repairs and destruction belong to each copy. Two copies of the same ring can fill both positions. The satchel holds up to 1,000 items; full-bag expedition drops convert to gold, and copy crafting requires space.
 - **Primary attributes and resistances:** strength/intellect add damage, agility adds critical chance and speed, stamina adds health and spirit adds regeneration. Five magical resistance schools reduce matching enemy projectiles and hazards by up to 60%, alongside existing armor. Northern equipment and rolled copies show these properties in the Armory.
-- **Local co-op:** choose another roster hero at camp. P1 uses WASD and Space; P2 uses arrows and Enter. Both heroes attack automatically with their own prepared abilities, gear and resources. A shared camera and separation limit keep the party together; stand within 90 units of a fallen ally for three seconds to revive them. Both falling ends the expedition. Either living player collects pickups. Each earns character XP; gold, loot and materials settle once. P1 chooses their own upgrade bonuses and manages supplies and gathering; P2's prepared abilities gain ranks automatically. This mode uses one keyboard and one local save.
+- **Local co-op:** choose another roster hero at camp. P1 uses WASD, C and Space; P2 uses arrows, Enter and Backspace. Both heroes attack automatically with their own prepared abilities, gear and resources. A shared camera and separation limit keep the party together; stand within 90 units of a fallen ally for three seconds to revive them. Both falling ends the expedition. Either living player collects pickups. Each earns character XP; gold, loot and materials settle once. P1 chooses their own upgrade bonuses and manages supplies and gathering; P2's prepared abilities gain ranks automatically. This mode uses one keyboard and one local save.
 - **A complete run loop:** mixed enemy waves, experience gems, three-choice upgrades, elite enemies, treasure chests, gathering, telegraphed attacks, final bosses, victory or defeat, and persistent rewards.
 - **World encounters:** six landmarks per zone, a discovery compass and minimap markers. Choose expedition blessings at shrines, defeat marked cache guards for equipment, or defend ritual circles for materials, gold, healing and XP.
 - **Distinct boss fights:** Hogger's charges and stomps, the Defias Captain's firing lanes and dynamite, and the Gravekeeper's soul rings and grave eruptions. Each has an enraged phase, visible warnings and a dedicated health/attack HUD.
@@ -58,21 +83,22 @@ Runs have separate levels from your persistent character. Run spells and tempora
 
 ## Controls
 
-| Key               | Action                           |
-| ----------------- | -------------------------------- |
-| WASD / arrow keys | Move                             |
-| Space             | Class active ability             |
-| Shift             | Dash while moving                |
-| Q                 | Use a healing supply             |
-| E                 | Use a crafted bomb               |
-| F                 | Interact with a landmark         |
-| T                 | Equipment shot / melee strike    |
-| G                 | Toggle the gathering compass     |
-| R                 | Summon / cancel / dismiss travel |
-| 1 / 2 / 3         | Choose an upgrade or blessing    |
-| Escape / P        | Pause or resume                  |
+| Key               | Action                            |
+| ----------------- | --------------------------------- |
+| WASD / arrow keys | Move                              |
+| Space             | Dash, including from a standstill |
+| C                 | Signature class ability           |
+| Shift             | Dash shortcut                     |
+| Q                 | Use a healing supply              |
+| E                 | Use a crafted bomb                |
+| F                 | Interact with a landmark          |
+| T                 | Equipment shot / melee strike     |
+| G                 | Toggle the gathering compass      |
+| R                 | Summon / cancel / dismiss travel  |
+| 1 / 2 / 3         | Choose an upgrade or blessing     |
+| Escape / P        | Pause or resume                   |
 
-In local co-op, arrows control P2 and Enter uses their class ability; WASD/Space control P1. The existing gamepad and touch controls manage P1 and shared menus. A second gamepad, remote networking and trading are outside this local mode.
+In local co-op, arrows control P2, Enter uses their class ability and Backspace dashes; WASD/C/Space control P1. The existing gamepad and touch controls manage P1 and shared menus. A second gamepad, remote networking and trading are outside this local mode.
 
 Connect a standard-mapped controller and press a button, then release it. The left stick or D-pad moves. Controller support uses button positions with Xbox / PlayStation labels:
 

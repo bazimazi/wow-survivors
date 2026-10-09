@@ -99,7 +99,7 @@ test("real casts and an active ability complete accepted trial progress on retur
   await clock(page);
   await page.getByRole("button", { name: "Begin Expedition" }).click();
   await page.clock.runFor(2500);
-  await page.keyboard.press("Space");
+  await page.keyboard.press("c");
   await page.keyboard.press("Escape");
   await expect(page.locator(".trial-status")).toContainText("40 / 40");
   await expect(page.locator(".trial-status")).toContainText("2 / 2");

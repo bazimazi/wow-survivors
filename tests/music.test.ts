@@ -182,6 +182,8 @@ test("old and malformed saves keep music opt-in and clamp volume without alterin
     animation: true,
     music: true,
     musicVolume: 75,
+    largeText: false,
+    highContrast: false,
   });
 });
 

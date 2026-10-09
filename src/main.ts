@@ -1,3 +1,21 @@
+import { CLASS_KITS, classStatus } from "./class-combat";
+import {
+  DIFFICULTIES,
+  OATHS,
+  claimMilestone,
+  relicUnlocked,
+  adventureStats,
+} from "./adventure";
+import type { Difficulty } from "./adventure";
+import {
+  renderBriefing,
+  renderAdventureSetup,
+  renderMastery,
+  upgradeContext,
+  renderAdventureHud,
+  updateAdventureHud,
+  renderAdventureResult,
+} from "./adventure-ui";
 import { renderEndgameGuide } from "./endgame-ui";
 import { renderFinalJourney, renderEpilogueReview } from "./final-journey-ui";
 import { journeySnapshots } from "./final-journey";
@@ -259,6 +277,8 @@ import type { GameEvent } from "./engine";
 import { GameRenderer } from "./renderer";
 import { icon, logo } from "./icons";
 import { Sound } from "./audio";
+import "./adventure.css";
+import "./class-combat.css";
 
 type Page =
   | "camp"
@@ -353,6 +373,10 @@ function writeSave() {
       "info",
     );
 }
+function applyAccessibility() {
+  document.body.classList.toggle("large-text", save.settings.largeText);
+  document.body.classList.toggle("high-contrast", save.settings.highContrast);
+}
 function toast(message: string, type = "check") {
   toastRoot.replaceChildren();
   const el = document.createElement("div");
@@ -393,13 +417,14 @@ function header() {
     ["journal", "book", "Journal"],
     ["stable", "horse", "Stable"],
   ];
-  return `<header class="site-header"><a class="brand" href="#" data-action="nav" data-id="camp" aria-label="Wow Survivors home">${logo}<div><span class="brand-top">WOW</span><span class="brand-bottom">SURVIVORS</span></div></a><nav aria-label="Main navigation">${nav.map(([id, i, label]) => `<button class="nav-link ${page === id ? "active" : ""}" data-action="nav" data-id="${id}">${icon(i, 17)}<span>${label}</span>${id === "professions" && guildReady ? `<b class="nav-count" aria-hidden="true">${guildReady}</b>` : id === "journal" && ready ? `<b class="nav-count" aria-hidden="true">${ready}</b>` : id === "outposts" && outpostReady ? `<b class="nav-count" aria-hidden="true">${outpostReady}</b>` : ""}</button>`).join("")}</nav><div class="header-tools"><div class="gold-balance" title="Gold">${icon("coin", 18)}<span>${save.gold.toLocaleString()}</span><small>G</small></div>${button("settings", icon("gear", 20), "icon-button", 'aria-label="Settings" title="Settings"')}</div></header>`;
+  return `<header class="site-header"><a class="brand" href="#" data-action="nav" data-id="camp" aria-label="Wow Survivors home">${logo}<div><span class="brand-top">WOW</span><span class="brand-bottom">SURVIVORS</span></div></a><nav aria-label="Main navigation">${nav.map(([id, i, label]) => `<button class="nav-link ${page === id ? "active" : ""}" data-action="nav" data-id="${id}">${icon(i, 17)}<span>${label}</span>${id === "professions" && guildReady ? `<b class="nav-count" aria-hidden="true">${guildReady}</b>` : id === "journal" && ready ? `<b class="nav-count" aria-hidden="true">${ready}</b>` : id === "outposts" && outpostReady ? `<b class="nav-count" aria-hidden="true">${outpostReady}</b>` : ""}</button>`).join("")}</nav><div class="header-tools"><div class="gold-balance" title="Gold">${icon("coin", 18)}<span>${save.gold.toLocaleString()}</span><small>G</small></div>${button("mastery", icon("crown", 20), "icon-button", 'aria-label="Hall of mastery" title="Mastery & relics"')}${button("settings", icon("gear", 20), "icon-button", 'aria-label="Settings" title="Settings"')}</div></header>`;
 }
 function footer() {
-  return `<footer class="site-footer"><span><i class="status-dot"></i> A world of adventure. Your journey.</span><span>WOW SURVIVORS <i>·</i> <span class="muted">RELEASE 1.0</span></span>${button("controls", `${icon("info", 14)} How to play`, "text-button")}</footer>`;
+  return `<footer class="site-footer"><span><i class="status-dot"></i> A world of adventure. Your journey.</span><span>WOW SURVIVORS <i>·</i> <span class="muted">BEYOND THE HORDE · 1.1</span></span>${button("controls", `${icon("info", 14)} How to play`, "text-button")}</footer>`;
 }
 function render() {
   if (game) return;
+  applyAccessibility();
   if (partnerClass === save.selectedClass) partnerClass = "";
   const restoreFocus = controllerMode ? captureControllerFocus(app) : null;
   document.body.classList.remove("in-game");
@@ -410,10 +435,14 @@ function render() {
 function renderCamp() {
   const c = CLASS_MAP[save.selectedClass],
     h = save.heroes[c.id],
-    stats = heroStats(save),
+    stats = adventureStats(
+      heroStats(save),
+      save.adventure.oath,
+      save.adventure.relic,
+    ),
     z = ZONES.find((z) => z.id === save.selectedZone)!;
-  return `<section class="welcome-row"><div><div class="eyebrow"><span class="tiny-line"></span> YOUR NEXT CHAPTER</div><h1>Azeroth awaits<span class="gold-text">.</span></h1><p>Choose your path. Face the horde. Become a legend.</p></div><div class="camp-summary"><div>${icon("sword", 18)}<span><b>${save.totals.kills.toLocaleString()}</b> enemies defeated</span></div><div>${icon("crown", 18)}<span><b>${save.totals.wins}</b> expeditions completed</span></div></div></section>
-  <div class="camp-layout"><div class="camp-main"><section class="world-card zone-${z.id}" aria-label="Selected expedition"><div class="world-image"></div><div class="world-overlay"></div><div class="world-top"><span class="world-label">${icon("map", 15)} ${z.id === "ragefire" ? "KALIMDOR" : "EASTERN KINGDOMS"}</span><span class="zone-badge"><i></i> ${z.dungeon ? "DUNGEON" : z.id === "elwynn" ? "RECOMMENDED" : z.id === "westfall" ? "CHALLENGING" : "DANGEROUS"}</span></div><div class="world-content"><div class="world-kicker">${z.subtitle}</div><h2>${z.name}</h2><p>${z.description}</p><div class="world-meta"><span>${icon("shield", 15)} ${z.difficulty === 1 ? "Normal" : z.difficulty < 1.5 ? "Veteran" : "Heroic"}</span><span>${icon("whirl", 15)} ${z.dungeon ? `${dungeonRoute(z.id)!.stages.length} stages · ${time(z.duration)} + boss fights` : `${Math.round(z.duration / 60)} minute expedition`}</span><span>${icon("target", 15)} ${partnerClass ? "Local co-op" : "Solo survival"}</span></div><label class="coop-selector">Journey mode<select id="coop-hero"><option value="">Solo expedition</option>${CLASSES.filter(
+  return `<section class="welcome-row"><div><div class="eyebrow"><span class="tiny-line"></span> YOUR NEXT CHAPTER</div><h1>Your next legend<span class="gold-text">.</span></h1><p>A new oath. An impossible horde. A story worth bringing home.</p></div><div class="camp-summary">${heroSelect()}<div>${icon("sword", 18)}<span><b>${save.totals.kills.toLocaleString()}</b> enemies defeated</span></div><div>${icon("crown", 18)}<span><b>${save.totals.wins}</b> expeditions completed</span></div></div></section>
+  ${renderBriefing(save)}<div class="camp-layout"><div class="camp-main"><section class="world-card zone-${z.id}" aria-label="Selected expedition"><div class="world-image"></div><div class="world-overlay"></div><div class="world-top"><span class="world-label">${icon("map", 15)} ${z.id === "ragefire" ? "KALIMDOR" : "EASTERN KINGDOMS"}</span><span class="zone-badge"><i></i> ${z.dungeon ? "DUNGEON" : z.id === "elwynn" ? "RECOMMENDED" : z.id === "westfall" ? "CHALLENGING" : "DANGEROUS"}</span></div><div class="world-content"><div class="world-kicker">${z.subtitle}</div><h2>${z.name}</h2><p>${z.description}</p><div class="world-meta"><span>${icon("shield", 15)} ${DIFFICULTIES[save.adventure.difficulty].name}</span><span>${icon("whirl", 15)} ${z.dungeon ? `${dungeonRoute(z.id)!.stages.length} stages · ${time(z.duration)} + boss fights` : `${Math.round(z.duration / 60)} minute expedition`}</span><span>${icon("target", 15)} ${partnerClass ? "Local co-op" : "Solo survival"}</span></div><label class="coop-selector">Journey mode<select id="coop-hero"><option value="">Solo expedition</option>${CLASSES.filter(
     (hero) => hero.id !== c.id,
   )
     .map(
@@ -422,16 +451,16 @@ function renderCamp() {
     )
     .join(
       "",
-    )}</select></label>${partnerClass && partnerClass !== c.id ? `<p class="coop-intro">P1: WASD + Space. P2: arrows + Enter. Stand near a fallen ally for three seconds to revive them. Both heroes earn character XP; supplies and treasure are shared. ${partyRestriction(z.id) || ""}</p>` : ""}${button("begin", `Begin ${z.dungeon ? "Dungeon" : "Expedition"} ${icon("arrow", 19)}`, "button primary expedition-button", expeditionRestriction(save, z.id) || partyRestriction(z.id) ? `disabled title="${expeditionRestriction(save, z.id) || partyRestriction(z.id)}"` : "")}<small class="world-hint">${expeditionRestriction(save, z.id) || (z.dungeon ? "Rare boss loot. Recover between stages. One final victory." : "Your abilities attack automatically. You make the next move.")}</small></div><div class="world-coordinates"><span>ELWYNN & BEYOND</span><i>01 — ${String(ZONES.length).padStart(2, "0")}</i></div></section>
+    )}</select></label>${partnerClass && partnerClass !== c.id ? `<p class="coop-intro">P1: WASD + C; Space to dash. P2: arrows + Enter; Backspace to dash. Stand near a fallen ally for three seconds to revive them. Both heroes earn character XP; supplies and treasure are shared. ${partyRestriction(z.id) || ""}</p>` : ""}${button("begin", `Begin ${z.dungeon ? "Dungeon" : "Expedition"} ${icon("arrow", 19)}`, "button primary expedition-button", expeditionRestriction(save, z.id) || partyRestriction(z.id) ? `disabled title="${expeditionRestriction(save, z.id) || partyRestriction(z.id)}"` : "")}${button("prepare-run", `Shape your build ${icon("rune", 16)}`, "text-button prepare-run-button")}<div class="departure-build"><span>${DIFFICULTIES[save.adventure.difficulty].name}</span><span>${OATHS.find((o) => o.id === save.adventure.oath)?.name}</span><span>Keystones at 4 · 8 · 12</span></div><small class="world-hint">${expeditionRestriction(save, z.id) || (z.dungeon ? "Rare boss loot. Recover between stages. One final victory." : "Your abilities attack automatically. You make the next move.")}</small></div><div class="world-coordinates"><span>ELWYNN & BEYOND</span><i>01 — ${String(ZONES.length).padStart(2, "0")}</i></div></section>
   <div class="zone-strip" aria-label="Choose expedition">${ZONES.map(
     (zone, i) => {
       const unlocked = zoneUnlocked(save, zone.id);
       return `<button class="zone-option ${zone.id === z.id ? "selected" : ""} ${!unlocked ? "locked" : ""}" data-action="zone" data-id="${zone.id}" aria-pressed="${zone.id === z.id}" title="${zone.unlockText}"><div class="zone-mini ${zone.id}">${icon(unlocked ? zone.icon : "lock", 23)}</div><span><b>${zone.name}</b><small>${zone.dungeon ? dungeonOptionText(save, zone.id) : zone.id === "duskwood" ? duskwoodOptionText(save) : unlocked ? `${Math.round(zone.duration / 60)} min · ${i === 0 ? "Normal" : i === 1 ? "Veteran" : "Heroic"}` : i === 1 ? `${save.totals.kills} / 120 defeated` : "Complete an expedition"}</small></span>${icon(zone.id === z.id ? "check" : unlocked ? "chevron" : "lock", 15)}</button>`;
     },
   ).join("")}</div>
-  ${renderDungeonPreview(save)}${renderDuskwoodPreview(save)}${renderFactionCamp(save)}${renderCampaignStatus(save, undefined, save.selectedZone)}${renderTrialCamp(save)}${renderProfessionQuestCamp(save)}${renderTravelCamp(save)}${renderSpellbookCamp(save)}<section class="hero-roster"><div class="section-heading"><div><div class="eyebrow">NINE CLASSES. ENDLESS POSSIBILITIES.</div><h2>Choose your hero</h2></div><span class="subtle-label">CLASSIC ROSTER ${icon("spark", 15)}</span></div><div class="class-grid">${CLASSES.map((hero) => `<button class="class-card ${hero.id === c.id ? "selected" : ""}" style="--class-color:${hero.color}" data-action="hero" data-id="${hero.id}" aria-pressed="${hero.id === c.id}">${portrait(hero.portrait)}<span class="class-copy"><b>${hero.name}</b><small>${hero.subtitle}</small><span class="class-level">LV. ${save.heroes[hero.id].level}</span></span><span class="class-symbol">${icon(hero.id, 19)}</span>${hero.id === c.id ? '<i class="class-selected-dot"></i>' : ""}</button>`).join("")}</div></section>
-  <div class="journey-tip">${icon("book", 24)}<div><b>Every expedition leaves a mark.</b><p>Bring home gold, equipment, and materials. Build your character for the adventure ahead.</p></div>${button("nav", `View journal ${icon("arrow", 16)}`, "text-button", 'data-id="journal"')}</div></div>
-  <aside class="hero-sheet" style="--class-color:${c.color}"><div class="sheet-label"><span>YOUR ADVENTURER</span><span>${icon("spark", 14)} LV. ${h.level}</span></div><div class="hero-art">${portrait(c.portrait)}<div class="hero-art-gradient"></div><div class="hero-art-name"><span>${c.race} · ${c.faction}</span><h2>${c.name}</h2><p>${c.subtitle}</p></div><div class="hero-art-emblem">${icon(c.id, 24)}</div></div><div class="sheet-body"><p class="hero-description">${c.description}</p><div class="hero-stats"><div>${icon("heart", 17)}<b>${Math.round(stats.health)}</b><span>Health</span></div><div>${icon("sword", 17)}<b>+${Math.round(stats.power)}%</b><span>Damage</span></div><div>${icon("target", 17)}<b>${Math.round(stats.crit)}%</b><span>Critical</span></div></div><div class="sheet-divider"></div><div class="sheet-section-label">STARTING ABILITIES</div><div class="starting-ability"><span class="ability-icon">${icon(SPELLS[c.spells[0]].icon, 23)}</span><div><b>${SPELLS[c.spells[0]].name}</b><small>Automatic attack</small></div><span class="micro-tag">RANK 1</span></div><div class="starting-ability"><span class="ability-icon active-skill">${icon(c.id, 22)}</span><div><b>${c.active}</b><small>${c.activeCooldown}s cooldown</small></div><kbd>SPACE</kbd></div><div class="passive-note">${icon("spark", 15)}<div><b>${c.passive}</b><p>${c.passiveDescription}</p></div></div><div class="sheet-divider"></div><div class="equipment-heading"><span class="sheet-section-label">EQUIPMENT</span>${button("nav", "Manage", "text-button", 'data-id="armory"')}</div><div class="equipment-row">${SLOTS.map(
+  <section class="hero-roster"><div class="section-heading"><div><div class="eyebrow">NINE CLASSES. ENDLESS POSSIBILITIES.</div><h2>Choose your hero</h2></div><span class="subtle-label">CLASSIC ROSTER ${icon("spark", 15)}</span></div><div class="class-grid">${CLASSES.map((hero) => `<button class="class-card ${hero.id === c.id ? "selected" : ""}" style="--class-color:${hero.color}" data-action="hero" data-id="${hero.id}" aria-pressed="${hero.id === c.id}">${portrait(hero.portrait)}<span class="class-copy"><b>${hero.name}</b><small>${hero.subtitle}</small><span class="class-level">LV. ${save.heroes[hero.id].level}</span></span><span class="class-symbol">${icon(hero.id, 19)}</span>${hero.id === c.id ? '<i class="class-selected-dot"></i>' : ""}</button>`).join("")}</div></section>
+  ${renderAdventureSetup(save)}${renderDungeonPreview(save)}${renderDuskwoodPreview(save)}${renderFactionCamp(save)}${renderCampaignStatus(save, undefined, save.selectedZone)}${renderTrialCamp(save)}${renderProfessionQuestCamp(save)}${renderTravelCamp(save)}${renderSpellbookCamp(save)}<div class="journey-tip">${icon("book", 24)}<div><b>Every expedition leaves a mark.</b><p>Bring home gold, equipment, and materials. Build your character for the adventure ahead.</p></div>${button("nav", `View journal ${icon("arrow", 16)}`, "text-button", 'data-id="journal"')}</div></div>
+  <aside class="hero-sheet" style="--class-color:${c.color}"><div class="sheet-label"><span>YOUR ADVENTURER</span><span>${icon("spark", 14)} LV. ${h.level}</span></div><div class="hero-art">${portrait(c.portrait)}<div class="hero-art-gradient"></div><div class="hero-art-name"><span>${c.race} · ${c.faction}</span><h2>${c.name}</h2><p>${c.subtitle}</p></div><div class="hero-art-emblem">${icon(c.id, 24)}</div></div><div class="sheet-body"><p class="hero-description">${c.description}</p><div class="hero-stats"><div>${icon("heart", 17)}<b>${Math.round(stats.health)}</b><span>Health</span></div><div>${icon("sword", 17)}<b>+${Math.round(stats.power)}%</b><span>Damage</span></div><div>${icon("target", 17)}<b>${Math.round(stats.crit)}%</b><span>Critical</span></div></div><div class="sheet-divider"></div><div class="sheet-section-label">STARTING ABILITIES</div><div class="starting-ability"><span class="ability-icon">${icon(SPELLS[c.spells[0]].icon, 23)}</span><div><b>${SPELLS[c.spells[0]].name}</b><small>Automatic attack</small></div><span class="micro-tag">RANK 1</span></div><div class="starting-ability"><span class="ability-icon active-skill">${icon(c.id, 22)}</span><div><b>${CLASS_KITS[c.id].action}</b><small>${CLASS_KITS[c.id].cooldown}s cooldown</small></div><kbd>C</kbd></div><div class="class-loop"><strong>${CLASS_KITS[c.id].title}</strong><p>${CLASS_KITS[c.id].loop}</p><small>SPACE · ${CLASS_KITS[c.id].dash} &nbsp; C · ${CLASS_KITS[c.id].action}</small></div><div class="passive-note">${icon("spark", 15)}<div><b>${c.passive}</b><p>${c.passiveDescription}</p></div></div><div class="sheet-divider"></div><div class="equipment-heading"><span class="sheet-section-label">EQUIPMENT</span>${button("nav", "Manage", "text-button", 'data-id="armory"')}</div><div class="equipment-row">${SLOTS.map(
     (slot) => {
       const gear = GEAR_MAP[h.equipment[slot] || ""];
       return `<button class="equipment-socket ${gear ? "filled" : ""}" data-action="browse-slot" data-id="${slot}" title="${gear ? `${gear.name} · ${gearUseLabel(gear, slot)}` : slot === "offhand" && !hasOneHandedWeapon(h.equipment) ? "Off-hand requires a one-handed weapon" : `Empty ${SLOT_LABELS[slot].toLowerCase()} slot`}" aria-label="${gear ? gear.name : `Empty ${SLOT_LABELS[slot].toLowerCase()} slot`}">${icon(gear?.icon || SLOT_ICONS[slot], 24)}<small>${SLOT_LABELS[slot]}</small></button>`;
@@ -439,7 +468,7 @@ function renderCamp() {
   ).join(
     "",
   )}</div><div class="talent-callout"><span>${icon("spark", 16)} <b>${availableTalents(h)}</b> talent ${availableTalents(h) === 1 ? "point" : "points"} available</span>${button("nav", icon("arrow", 17), "icon-button", 'data-id="talents" aria-label="Spend talent points"')}</div><div class="hero-xp"><div><span>CHARACTER LEVEL ${h.level}</span><span>${h.xp} / ${characterXpRequired(h.level)} XP</span></div><div class="progress-track"><i style="width:${(h.xp / characterXpRequired(h.level)) * 100}%"></i></div></div></div></aside></div>
-  <section class="controls-strip"><span class="controls-title">THE ART OF SURVIVAL</span><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</span><span><kbd>SPACE</kbd> Class ability</span><span><kbd>SHIFT</kbd> Dash</span><span><kbd>Q</kbd> Heal</span><span><kbd>ESC</kbd> Pause</span></section>`;
+  <section class="controls-strip"><span class="controls-title">THE ART OF SURVIVAL</span><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</span><span><kbd>C</kbd> Class ability</span><span><kbd>SPACE</kbd> Dash</span><span><kbd>Q</kbd> Heal</span><span><kbd>ESC</kbd> Pause</span></section>`;
 }
 function pageTitle(kicker: string, title: string, description: string) {
   return `<section class="page-title"><div><div class="eyebrow"><span class="tiny-line"></span>${kicker}</div><h1>${title}</h1><p>${description}</p></div>${heroSelect()}</section>`;
@@ -768,8 +797,8 @@ function showControls() {
   showModal(
     `${modalClose()}<div class="eyebrow">YOUR FIELD GUIDE</div><h2 id="modal-title">Survive. Grow. Return.</h2><p class="modal-intro">Move through the horde. Your spells find their targets automatically. Gather the blue experience gems to choose new spells and stronger upgrades.</p><div class="control-list">${[
       ["W A S D / ↑ ↓ ← →", "Move through the world"],
-      ["SPACE", "Use your active class ability"],
-      ["SHIFT", "Dash in your movement direction"],
+      ["C", "Use your signature class ability"],
+      ["SPACE", "Dash in your movement direction, or facing when still"],
       ["Q", "Use a healing potion or bandage"],
       ["E", "Throw a crafted bomb"],
       ["F", "Interact with a nearby landmark"],
@@ -809,6 +838,18 @@ function showSettings() {
         "Character animation",
         "Heroes, creatures, companions and mounts. Respects reduced motion.",
       ],
+      [
+        "largeText",
+        "book",
+        "Larger text",
+        "Larger interface text and battlefield warnings.",
+      ],
+      [
+        "highContrast",
+        "target",
+        "High contrast",
+        "Brighter text, stronger borders and clearer danger warnings.",
+      ],
     ]
       .map(
         ([id, i, n, d]) =>
@@ -845,13 +886,15 @@ function refreshMusic() {
 }
 function showUpgrade() {
   if (!game) return;
+  const turningPoint = game.upgrades[0]?.type === "keystone";
   sound.levelup();
   showModal(
-    `<div class="upgrade-star">${icon("spark", 38)}</div><div class="eyebrow centered">YOUR POWER GROWS</div><h2 id="modal-title">Level ${game.level + 1}</h2><p class="modal-intro centered">A new power. A stronger spell. The choice is yours.</p><div class="upgrade-options">${game.upgrades.map((u, i) => `<button class="upgrade-card ${u.evolution ? "evolution" : ""}" data-action="upgrade" data-id="${u.id}" style="--spell-color:${u.color}"><span class="upgrade-shortcut">${i + 1}</span><span class="upgrade-icon">${icon(u.icon, 38)}</span><span class="upgrade-type">${u.evolution ? "SPELL EVOLUTION" : u.type === "spell" ? (u.rank === 1 ? "NEW ABILITY" : `RANK ${u.rank} UPGRADE`) : "SURVIVAL BONUS"}</span><h3>${u.name}</h3><p>${u.description}</p><span class="upgrade-choose">Choose upgrade ${icon("arrow", 17)}</span></button>`).join("")}</div><small class="upgrade-footnote">Time is paused. Press 1, 2 or 3 to choose.</small>`,
+    `<div class="upgrade-star">${icon(turningPoint ? "rune" : "spark", 38)}</div><div class="eyebrow centered">${turningPoint ? "A BUILD-DEFINING MOMENT" : "YOUR POWER GROWS"}</div><h2 id="modal-title">${turningPoint ? "Choose your keystone" : `Level ${game.level + 1}`}</h2><p class="modal-intro centered">${turningPoint ? "A new rule. A new way to fight. Make it yours." : "Deepen a strength, discover a spell, or give yourself room to survive."}</p><div class="upgrade-options">${game.upgrades.map((u, i) => `<button class="upgrade-card ${u.evolution ? "evolution" : ""} ${u.type === "keystone" ? "keystone-card" : ""}" data-action="upgrade" data-id="${u.id}" style="--spell-color:${u.color}"><span class="upgrade-shortcut">${i + 1}</span><span class="upgrade-icon">${icon(u.icon, 38)}</span><span class="upgrade-type">${u.type === "keystone" ? "EXPEDITION KEYSTONE" : u.evolution ? "SPELL EVOLUTION" : u.type === "spell" ? (u.rank === 1 ? "NEW ABILITY" : `RANK ${u.rank} UPGRADE`) : "SURVIVAL BONUS"}</span><h3>${u.name}</h3><p>${u.description}</p>${upgradeContext(game!, u)}<span class="upgrade-choose">Choose upgrade ${icon("arrow", 17)}</span></button>`).join("")}</div><div class="upgrade-tools">${button("reroll", `${icon("whirl", 17)} Reroll choices · ${game.rerolls} left`, "button quiet", game.rerolls ? "" : "disabled")}<small>Two free rerolls per expedition. No gold cost.</small></div><small class="upgrade-footnote">Time is paused. Press 1, 2 or 3 to choose. ${turningPoint ? "Keystones last until you return to camp." : "Spell evolutions arrive at rank 5."}</small>`,
     "upgrade",
     "upgrade-modal",
   );
 }
+
 function renderBlessings() {
   if (!game?.blessings.length) return "";
   return `<div class="pause-blessings">${game.blessings
@@ -896,15 +939,15 @@ function showResult(result: RunRecord, reputationEarned: number) {
   sound.reward();
   const mats = Object.entries(result.materials);
   showModal(
-    `<div class="result-emblem ${result.victory ? "victory" : ""}">${icon(result.victory ? "crown" : "sword", 38)}</div><div class="eyebrow centered">${result.victory ? (result.zoneId === "deadmines" ? "THE BROTHERHOOD IS BROKEN" : result.zoneId === "ragefire" ? "THE SEARING BLADE IS SILENCED" : result.zoneId === "shadowfang" ? "THE MOONLIT CURSE IS BROKEN" : "THE FOREST WILL REMEMBER") : "THE ROAD DOES NOT END HERE"}</div><h2 id="modal-title">${result.victory ? "A legend begins." : "Until the next adventure."}</h2><p class="modal-intro centered">${CLASS_MAP[result.classId].name} · ${ZONES.find((z) => z.id === result.zoneId)!.name}</p><div class="result-stats"><div><b>${time(result.time)}</b><small>Survived</small></div><div><b>${result.kills}</b><small>Defeated</small></div><div><b>${result.level}</b><small>Run level</small></div></div><div class="result-rewards"><span>${icon("coin", 21)}<b>+${result.gold}</b> gold</span><span>${icon("spark", 21)}<b>+${result.xp}</b> character XP</span></div>${mats.length ? `<div class="result-materials">${mats.map(([m, n]) => `<span>${icon(MATERIALS[m as Material].icon, 16)} ${n} ${MATERIALS[m as Material].name}</span>`).join("")}</div>` : ""}${result.loot.length ? `<div class="result-loot">${result.loot.map((id) => `<span style="color:${RARITY_COLORS[GEAR_MAP[id].rarity]}">${icon(GEAR_MAP[id].icon, 23)} ${GEAR_MAP[id].name}</span>`).join("")}</div>` : ""}${dungeonRoute(result.zoneId) ? renderDungeonResult(result) : `<div class="result-exploration">${icon("compass", 19)}<b>${result.encounters || 0} / 6</b> landmarks completed</div>`}${renderEquipmentResult(save, result)}${renderFactionResult(save, result, reputationEarned)}${renderSkillCaps(save)}${renderTrialStatus(save)}${renderProfessionQuestStatus(save)}${renderCampaignStatus(save)}${result.party ? `<p class="result-level">Your ${CLASS_MAP[result.party.classId].name} partner also earns ${result.xp} character XP. The party’s gold, treasure and materials are paid once.</p>` : ""}<p class="result-level">Your ${CLASS_MAP[result.classId].name} is now character level <b>${save.heroes[result.classId].level}</b>. ${availableTalents(save.heroes[result.classId])} talent points available.</p>${button("camp", `Return to camp ${icon("arrow", 18)}`, "button primary full-width")}`,
+    `<div class="result-emblem ${result.victory ? "victory" : ""}">${icon(result.victory ? "crown" : "sword", 38)}</div><div class="eyebrow centered">${result.victory ? (result.zoneId === "deadmines" ? "THE BROTHERHOOD IS BROKEN" : result.zoneId === "ragefire" ? "THE SEARING BLADE IS SILENCED" : result.zoneId === "shadowfang" ? "THE MOONLIT CURSE IS BROKEN" : "THE FOREST WILL REMEMBER") : "THE ROAD DOES NOT END HERE"}</div><h2 id="modal-title">${result.victory ? "A legend begins." : "Until the next adventure."}</h2><p class="modal-intro centered">${CLASS_MAP[result.classId].name} · ${ZONES.find((z) => z.id === result.zoneId)!.name}</p><div class="result-stats"><div><b>${time(result.time)}</b><small>Survived</small></div><div><b>${result.kills}</b><small>Defeated</small></div><div><b>${result.level}</b><small>Run level</small></div></div><div class="result-rewards"><span>${icon("coin", 21)}<b>+${result.gold}</b> gold</span><span>${icon("spark", 21)}<b>+${result.xp}</b> character XP</span></div>${mats.length ? `<div class="result-materials">${mats.map(([m, n]) => `<span>${icon(MATERIALS[m as Material].icon, 16)} ${n} ${MATERIALS[m as Material].name}</span>`).join("")}</div>` : ""}${result.loot.length ? `<div class="result-loot">${result.loot.map((id) => `<span style="color:${RARITY_COLORS[GEAR_MAP[id].rarity]}">${icon(GEAR_MAP[id].icon, 23)} ${GEAR_MAP[id].name}</span>`).join("")}</div>` : ""}${dungeonRoute(result.zoneId) ? renderDungeonResult(result) : `<div class="result-exploration">${icon("compass", 19)}<b>${result.encounters || 0} / 6</b> landmarks completed</div>`}${renderEquipmentResult(save, result)}${renderFactionResult(save, result, reputationEarned)}${renderSkillCaps(save)}${renderTrialStatus(save)}${renderProfessionQuestStatus(save)}${renderCampaignStatus(save)}${result.party ? `<p class="result-level">Your ${CLASS_MAP[result.party.classId].name} partner also earns ${result.xp} character XP. The party’s gold, treasure and materials are paid once.</p>` : ""}<p class="result-level">Your ${CLASS_MAP[result.classId].name} is now character level <b>${save.heroes[result.classId].level}</b>. ${availableTalents(save.heroes[result.classId])} talent points available.</p>${renderAdventureResult(result)}${button("camp", `Return to camp ${icon("arrow", 18)}`, "button quiet full-width")}${button("retry", `One more adventure ${icon("play", 18)}`, "button primary full-width")}`,
     "result",
     "result-modal",
   );
 }
 function handleGameEvent(event: GameEvent) {
-  if (event.type === "cast") sound.cast();
+  if (event.type === "cast") sound.cast(event.classId);
   if (event.type === "hit") sound.hit();
-  if (event.type === "active") sound.active();
+  if (event.type === "active") sound.active(event.classId);
   if (event.type === "levelup") showUpgrade();
   if (event.type === "shrine") showShrine();
   if (event.type === "checkpoint" && game) {
@@ -950,6 +993,14 @@ function startGame() {
   writeSave();
   keys.clear();
   game = new GameEngine({
+    classCombat: true,
+    adventure: {
+      difficulty: save.adventure.difficulty,
+      oath: save.adventure.oath,
+      relic: relicUnlocked(save, save.adventure.relic)
+        ? save.adventure.relic
+        : "",
+    },
     classId: save.selectedClass,
     ...(partnerClass && partnerClass !== save.selectedClass
       ? {
@@ -1008,7 +1059,7 @@ function startGame() {
     },
   });
   document.body.classList.add("in-game");
-  app.innerHTML = `<main class="game-shell ${game.partner ? "coop-game" : ""} ${zone.dungeon ? "dungeon-game" : ""}" data-zone="${zone.id}"><canvas id="game-canvas" aria-label="Wow Survivors survival battlefield"></canvas><div class="game-xp-track"><i id="run-xp-fill"></i></div><div class="game-top"><div class="player-hud">${portrait(game.classDef.portrait)}<div class="player-hud-info"><div><b>${game.classDef.name}</b><span id="run-level">LEVEL 1</span></div><div class="health-track"><i id="health-fill"></i><span id="health-text"></span></div><div class="resource-track"><i id="resource-fill" class="${game.classDef.resource.toLowerCase()}"></i><span id="resource-text"></span></div></div></div><div class="game-timer"><span>${zone.name}</span><b id="run-time">00:00</b><small id="run-objective">Survive ${Math.round(zone.duration / 60)} minutes, then defeat ${zone.boss}</small></div><div class="game-counters"><span>${icon("sword", 18)}<b id="run-kills">0</b></span><span>${icon("coin", 18)}<b id="run-gold">0</b></span>${button("pause", icon("pause", 21), "game-pause", 'aria-label="Pause expedition"')}</div></div>${game.partner ? `<aside class="partner-hud" aria-label="Cooperative partner"><b>P2 · ${game.partner.classDef.name}</b><span id="partner-health"></span><small id="partner-status">Arrows move · Enter class ability</small><button class="button quiet" data-action="partner-active">P2 ability · Enter</button></aside>` : ""}<section class="boss-hud" id="boss-hud" hidden aria-label="Dungeon guardian or final boss"><div><b id="boss-name"></b><span id="boss-phase"></span></div><div class="boss-health-track"><i id="boss-health-fill"></i></div><p id="boss-attack"></p></section><aside class="world-hud" aria-label="Exploration"><div class="exploration-heading">${icon("compass", 16)}<b id="landmark-count">LANDMARKS 0 / 6</b><span id="blessing-count"></span><button class="fieldwork-toggle" id="fieldwork-toggle" data-action="fieldwork" aria-expanded="false" aria-controls="fieldwork-panel">Gather</button></div><div id="explore-panel"><div class="landmark-compass"><span id="compass-arrow">↑</span><div><b id="landmark-name"></b><small id="landmark-hint"></small></div></div><div id="encounter-status" hidden><div class="encounter-progress"><i id="encounter-fill"></i></div><small id="encounter-detail"></small></div><button data-action="interact" id="landmark-button" class="landmark-button" hidden><kbd>F</kbd><span id="landmark-interact"></span>${icon("arrow", 15)}</button><small id="landmark-preview" hidden></small></div>${renderFieldwork()}</aside><button data-action="travel" id="travel-button" class="travel-action" aria-label="Travel" aria-pressed="false">${icon("horse", 23)}<span><b id="travel-label">Travel</b><small id="travel-hint"></small></span><kbd>R</kbd><i id="travel-channel" class="travel-channel"></i></button>${game.shootingWeapon || game.equipment.primary ? `<button data-action="shoot" id="shoot-button" class="equipment-shoot"><span>${icon(game.shootingWeapon ? GEAR_MAP[game.shootingWeapon.item].icon : "sword", 20)} ${game.shootingWeapon ? "Shoot" : "Strike"} <kbd>T</kbd></span><small id="shot-status"></small></button>` : ""}<div class="game-bottom"><div class="spell-loadout" id="spell-loadout"></div><div class="game-actions"><button data-action="active" id="active-button" class="action-slot"><span class="action-symbol">${icon(game.classDef.id, 24)}</span><b>${game.classDef.active}</b><kbd>SPACE</kbd><i id="active-cooldown"></i></button><button data-action="dash" class="action-slot compact"><span class="action-symbol">${icon("boot", 23)}</span><b id="dash-text">Dash</b><kbd>SHIFT</kbd></button><button data-action="heal" class="action-slot compact"><span class="action-symbol">${icon("potion", 23)}</span><b id="potion-count">${save.supplies.potions}</b><kbd>Q</kbd></button><button data-action="bomb" class="action-slot compact"><span class="action-symbol">${icon("bomb", 23)}</span><b id="bomb-count">${save.supplies.bombs}</b><kbd>E</kbd></button></div></div><div class="game-tutorial" id="game-tutorial">${icon("info", 18)}<span><b>Keep moving.</b> Your spells attack automatically. Collect blue gems to grow stronger.</span><kbd>WASD</kbd></div><div class="touch-controls"><div class="touch-pad" id="touch-pad"><div id="touch-stick"></div></div><button data-action="active" aria-label="Class ability">${icon(game.classDef.id, 28)}</button></div></main>`;
+  app.innerHTML = `<main class="game-shell ${game.partner ? "coop-game" : ""} ${zone.dungeon ? "dungeon-game" : ""}" data-zone="${zone.id}"><canvas id="game-canvas" aria-label="Wow Survivors survival battlefield"></canvas><div class="game-xp-track"><i id="run-xp-fill"></i></div><div class="game-top"><div class="player-hud">${portrait(game.classDef.portrait)}<div class="player-hud-info"><div><b>${game.classDef.name}</b><span id="run-level">LEVEL 1</span></div><div class="health-track"><i id="health-fill"></i><span id="health-text"></span></div><div class="resource-track"><i id="resource-fill" class="${game.classDef.resource.toLowerCase()}"></i><span id="resource-text"></span></div></div></div><div class="game-timer"><span>${zone.name}</span><b id="run-time">00:00</b><small id="run-objective">Survive ${Math.round(zone.duration / 60)} minutes, then defeat ${zone.boss}</small></div><div class="game-counters"><span>${icon("sword", 18)}<b id="run-kills">0</b></span><span>${icon("coin", 18)}<b id="run-gold">0</b></span>${button("pause", icon("pause", 21), "game-pause", 'aria-label="Pause expedition"')}</div></div>${game.partner ? `<aside class="partner-hud" aria-label="Cooperative partner"><b>P2 · ${game.partner.classDef.name}</b><span id="partner-health"></span><small id="partner-status">Arrows move · Enter ability · Backspace dash</small><button class="button quiet" data-action="partner-active">P2 ability · Enter</button></aside>` : ""}<section class="boss-hud" id="boss-hud" hidden aria-label="Dungeon guardian or final boss"><div><b id="boss-name"></b><span id="boss-phase"></span></div><div class="boss-health-track"><i id="boss-health-fill"></i></div><p id="boss-attack"></p></section><aside class="world-hud" aria-label="Exploration"><div class="exploration-heading">${icon("compass", 16)}<b id="landmark-count">LANDMARKS 0 / 6</b><span id="blessing-count"></span><button class="fieldwork-toggle" id="fieldwork-toggle" data-action="fieldwork" aria-expanded="false" aria-controls="fieldwork-panel">Gather</button></div><div id="explore-panel"><div class="landmark-compass"><span id="compass-arrow">↑</span><div><b id="landmark-name"></b><small id="landmark-hint"></small></div></div><div id="encounter-status" hidden><div class="encounter-progress"><i id="encounter-fill"></i></div><small id="encounter-detail"></small></div><button data-action="interact" id="landmark-button" class="landmark-button" hidden><kbd>F</kbd><span id="landmark-interact"></span>${icon("arrow", 15)}</button><small id="landmark-preview" hidden></small></div>${renderFieldwork()}</aside><button data-action="travel" id="travel-button" class="travel-action" aria-label="Travel" aria-pressed="false">${icon("horse", 23)}<span><b id="travel-label">Travel</b><small id="travel-hint"></small></span><kbd>R</kbd><i id="travel-channel" class="travel-channel"></i></button>${game.shootingWeapon || game.equipment.primary ? `<button data-action="shoot" id="shoot-button" class="equipment-shoot"><span>${icon(game.shootingWeapon ? GEAR_MAP[game.shootingWeapon.item].icon : "sword", 20)} ${game.shootingWeapon ? "Shoot" : "Strike"} <kbd>T</kbd></span><small id="shot-status"></small></button>` : ""}<div class="game-bottom"><div class="spell-loadout" id="spell-loadout"></div><div class="game-actions"><button data-action="active" id="active-button" class="action-slot"><span class="action-symbol">${icon(game.classDef.id, 24)}</span><b id="class-action-name">${CLASS_KITS[game.classDef.id].action}</b><kbd>C</kbd><i id="active-cooldown"></i></button><button data-action="dash" class="action-slot compact"><span class="action-symbol">${icon("boot", 23)}</span><b id="dash-text">${CLASS_KITS[game.classDef.id].dash}</b><kbd>SPACE</kbd></button><button data-action="heal" class="action-slot compact"><span class="action-symbol">${icon("potion", 23)}</span><b id="potion-count">${save.supplies.potions}</b><kbd>Q</kbd></button><button data-action="bomb" class="action-slot compact"><span class="action-symbol">${icon("bomb", 23)}</span><b id="bomb-count">${save.supplies.bombs}</b><kbd>E</kbd></button></div></div><section class="combat-briefing" aria-label="Combat and expedition status">${renderAdventureHud()}<aside class="class-kit-hud" style="--class-color:${game.classDef.color}" aria-label="Class combat mechanics"><details><summary>${CLASS_KITS[game.classDef.id].title}<span>HOW TO PLAY</span></summary><p>${CLASS_KITS[game.classDef.id].loop}</p><small>Spells attack automatically. Collect blue gems to level up.</small></details><div class="class-kit-track"><i id="class-kit-fill"></i></div><b id="class-kit-status"></b><small><kbd>SPACE</kbd> ${CLASS_KITS[game.classDef.id].dash} &nbsp; <kbd>C</kbd> Signature ability</small></aside></section><div class="game-tutorial" id="game-tutorial">${icon("info", 18)}<span><b>Keep moving.</b> Your spells attack automatically. Collect blue gems to grow stronger.</span><kbd>WASD</kbd></div><div class="touch-controls"><div class="touch-pad" id="touch-pad"><div id="touch-stick"></div></div><button data-action="dash" class="touch-dash" aria-label="Dash with Space">${icon("boot", 25)}<small>Dash</small></button><button data-action="active" aria-label="Class ability">${icon(game.classDef.id, 28)}</button></div></main>`;
   renderer = new GameRenderer(
     document.querySelector<HTMLCanvasElement>("#game-canvas")!,
     game,
@@ -1016,6 +1067,8 @@ function startGame() {
   renderer.particles = save.settings.particles;
   renderer.shake = save.settings.screenShake;
   renderer.animation = save.settings.animation;
+  renderer.largeText = save.settings.largeText;
+  renderer.highContrast = save.settings.highContrast;
   updateHud();
   setupTouch();
   refreshControllerHints();
@@ -1034,6 +1087,7 @@ function showShrine() {
 let spellMarkup = "";
 function updateHud() {
   if (!game) return;
+  updateAdventureHud(game);
   updateFieldwork(game);
   const p = game.player;
   if (game.partner) {
@@ -1041,14 +1095,14 @@ function updateHud() {
       health = document.getElementById("partner-health"),
       status = document.getElementById("partner-status");
     if (health)
-      health.textContent = `${Math.max(0, Math.ceil(buddy.player.hp))} / ${Math.ceil(buddy.player.maxHp)} HP`;
+      health.textContent = `${Math.max(0, Math.ceil(buddy.player.hp))} / ${Math.ceil(buddy.player.maxHp)} HP · ${classStatus(buddy.classDef.id, buddy.player, game.time).text.split(" · ")[0]}`;
     if (status)
       status.textContent =
         buddy.player.hp <= 0
           ? `Downed · revive ${Math.round((buddy.revive / 3) * 100)}% · stand within 90 units`
           : p.hp <= 0
             ? `P1 downed · revive ${Math.round((game.revivePrimary / 3) * 100)}%`
-            : `Arrows move · Enter ability · ${Math.ceil(buddy.player.activeCooldown)}s cooldown`;
+            : `Arrows · Enter skill · ⌫ dash`;
   }
   const shotStatus = document.getElementById("shot-status");
   if (shotStatus)
@@ -1075,12 +1129,11 @@ function updateHud() {
   text("run-gold", String(game.gold));
   text("run-level", `LEVEL ${game.level}`);
   text("health-text", `${Math.max(0, Math.ceil(p.hp))} / ${p.maxHp}`);
-  text(
-    "resource-text",
-    `${game.classDef.resource} · ${Math.floor(p.resource)}`,
-  );
+  text("resource-text", `${game.resourceKind} · ${Math.floor(p.resource)}`);
   width("health-fill", (p.hp / p.maxHp) * 100);
   width("resource-fill", p.resource);
+  const resourceFill = document.getElementById("resource-fill");
+  if (resourceFill) resourceFill.className = game.resourceKind.toLowerCase();
   width("run-xp-fill", (game.xp / game.xpNeeded) * 100);
   text("potion-count", String(save.supplies.potions));
   text("bomb-count", String(save.supplies.bombs));
@@ -1124,11 +1177,21 @@ function updateHud() {
   }
   text(
     "dash-text",
-    p.dashCooldown > 0 ? `${p.dashCooldown.toFixed(1)}s` : "Dash",
+    p.dashCooldown > 0
+      ? `${p.dashCooldown.toFixed(1)}s`
+      : CLASS_KITS[game.classDef.id].dash,
   );
+  const kitStatus = classStatus(game.classDef.id, p, game.time);
+  text("class-kit-status", kitStatus.text);
+  width("class-kit-fill", kitStatus.meter);
+  text("class-action-name", kitStatus.action);
+  for (const button of document.querySelectorAll<HTMLButtonElement>(
+    '[data-action="active"]',
+  ))
+    button.disabled = !game.signatureReady;
   const cd = document.getElementById("active-cooldown");
   if (cd) {
-    cd.style.height = `${(p.activeCooldown / game.classDef.activeCooldown) * 100}%`;
+    cd.style.height = `${(p.activeCooldown / CLASS_KITS[game.classDef.id].cooldown) * 100}%`;
     cd.textContent =
       p.activeCooldown > 0 ? `${Math.ceil(p.activeCooldown)}s` : "";
   }
@@ -1361,6 +1424,46 @@ document.addEventListener("click", (e) => {
   sound.click();
   const action = target.dataset.action!,
     id = target.dataset.id || "";
+  if (!game && action === "difficulty" && Object.hasOwn(DIFFICULTIES, id)) {
+    save.adventure.difficulty = id as Difficulty;
+    writeSave();
+    render();
+  }
+  if (!game && action === "oath" && OATHS.some((o) => o.id === id)) {
+    save.adventure.oath = id;
+    writeSave();
+    render();
+  }
+  if (!game && action === "mastery")
+    showModal(
+      `${modalClose()}${renderMastery(save)}`,
+      "mastery",
+      "mastery-modal",
+    );
+  if (!game && action === "claim-mastery" && claimMilestone(save, id)) {
+    sound.reward();
+    writeSave();
+    render();
+    showModal(
+      `${modalClose()}${renderMastery(save)}`,
+      "mastery",
+      "mastery-modal",
+    );
+  }
+  if (action === "reroll" && game?.rerollUpgrades()) showUpgrade();
+  if (!game && action === "prepare-run") {
+    document
+      .querySelector(".adventure-setup")
+      ?.scrollIntoView({ block: "center" });
+    document
+      .querySelector<HTMLElement>(".difficulty-choice.selected")
+      ?.focus({ preventScroll: true });
+  }
+  if (!game && action === "launch-prepared") startGame();
+  if (action === "retry" && game?.ended) {
+    returnToCamp();
+    startGame();
+  }
   if (action === "nav") {
     if (game) return;
     page = id as Page;
@@ -2119,6 +2222,7 @@ document.addEventListener("click", (e) => {
   if (action === "import") document.getElementById("import-file")?.click();
   if (action === "confirm-import" && pendingImport) {
     save = pendingImport;
+    applyAccessibility();
     pendingImport = null;
     sound.enabled = save.settings.sound;
     music.configure(save.settings.music, save.settings.musicVolume);
@@ -2131,6 +2235,14 @@ document.addEventListener("click", (e) => {
 });
 document.addEventListener("change", async (e) => {
   const select = e.target as HTMLSelectElement;
+  if (select.id === "adventure-relic" && !game) {
+    if (!select.value || relicUnlocked(save, select.value)) {
+      save.adventure.relic = select.value;
+      writeSave();
+      render();
+    }
+    return;
+  }
   if (select.id === "coop-hero") {
     partnerClass = Object.hasOwn(CLASS_MAP, select.value)
       ? (select.value as ClassId)
@@ -2179,8 +2291,15 @@ document.addEventListener("change", async (e) => {
   }
   if (el.dataset.setting) {
     const key = el.dataset.setting as
-      "sound" | "particles" | "screenShake" | "animation" | "music";
+      | "sound"
+      | "particles"
+      | "screenShake"
+      | "animation"
+      | "music"
+      | "largeText"
+      | "highContrast";
     save.settings[key] = el.checked;
+    applyAccessibility();
     sound.enabled = save.settings.sound;
     music.configure(save.settings.music, save.settings.musicVolume);
     if (key === "music") music.unlock();
@@ -2190,6 +2309,8 @@ document.addEventListener("change", async (e) => {
       renderer.particles = save.settings.particles;
       renderer.shake = save.settings.screenShake;
       renderer.animation = save.settings.animation;
+      renderer.largeText = save.settings.largeText;
+      renderer.highContrast = save.settings.highContrast;
     }
   }
   if (el.id === "import-file" && el.files?.[0]) {
@@ -2444,7 +2565,12 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault();
     game.activatePartner();
   }
-  if (e.key === " ") game.activate();
+  if (e.key === " ") game.dash();
+  if (e.key.toLowerCase() === "c") game.activate();
+  if (e.key === "Backspace" && game.partner) {
+    e.preventDefault();
+    game.dashPartner();
+  }
   if (e.key === "Shift") game.dash();
   if (e.key.toLowerCase() === "q") game.usePotion();
   if (e.key.toLowerCase() === "e") game.useBomb();

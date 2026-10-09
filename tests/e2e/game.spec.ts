@@ -76,7 +76,7 @@ test("real keyboard gameplay, active ability, level-up choice and paused reward 
   await page.keyboard.down("d");
   await page.waitForTimeout(650);
   await page.keyboard.up("d");
-  await page.keyboard.press("Space");
+  await page.keyboard.press("c");
   await expect(page.locator("#active-cooldown")).not.toBeEmpty();
   // Make small loops through the melee kill area to physically collect XP.
   await page.waitForTimeout(4500);

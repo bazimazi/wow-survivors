@@ -1,4 +1,24 @@
+import {
+  CLASS_KITS,
+  createClassState,
+  classSpeed,
+  classResource,
+  classDamage,
+  recordClassHit,
+  recordClassKill,
+  classSignature,
+  updateClass,
+} from "./class-combat";
+import type { ClassWorld } from "./class-combat";
 import { weaponAccuracy } from "./item-progression";
+import {
+  DIFFICULTIES,
+  KEYSTONES,
+  CONTRACTS,
+  contractProgress,
+  adventureStats,
+} from "./adventure";
+import type { Difficulty, KeystoneId } from "./adventure";
 import type { EquipmentSnapshot, WeaponPractice } from "./item-progression";
 import type { WeaponType } from "./weapon-training";
 import { resistanceMultiplier } from "./attributes";
@@ -99,6 +119,7 @@ export interface PeriodicEffect {
   ramp?: boolean;
 }
 export interface Projectile extends Vec {
+  classId?: ClassId;
   spellId?: string;
   vx: number;
   vy: number;
@@ -128,7 +149,10 @@ export interface Area extends Vec {
   slow: number;
 }
 export interface Effect extends Vec {
-  kind: "ring" | "line" | "burst";
+  kind: "ring" | "line" | "burst" | "class";
+  classId?: ClassId;
+  motif?: "cast" | "signature" | "dash";
+  facing?: number;
   color: string;
   radius: number;
   life: number;
@@ -170,7 +194,7 @@ export interface SpellState {
 }
 export interface Upgrade {
   id: string;
-  type: "spell" | "stat";
+  type: "spell" | "stat" | "keystone";
   name: string;
   description: string;
   icon: string;
@@ -194,6 +218,7 @@ export type GameEvent = {
     | "encounter"
     | "shrine"
     | "checkpoint";
+  classId?: ClassId;
   message?: string;
   amount?: number;
   victory?: boolean;
@@ -226,6 +251,8 @@ export type DeathAction =
       bear: boolean;
     };
 export interface EngineConfig {
+  classCombat?: boolean;
+  adventure?: { difficulty: Difficulty; oath: string; relic: string };
   partner?: PartnerConfig;
   classId: ClassId;
   zone: ZoneDef;
@@ -336,6 +363,16 @@ class SpatialGrid {
 }
 
 export class GameEngine {
+  keystones: KeystoneId[] = [];
+  rerolls = 2;
+  streak = 0;
+  streakTimer = 0;
+  peakStreak = 0;
+  damageTaken = 0;
+  dashCount = 0;
+  adventureActives = 0;
+  private stormReadyAt = 0;
+  private secondWindActors = new WeakSet<object>();
   private partnerActing = false;
   partner: PartnerState | null = null;
   revivePrimary = 0;
@@ -367,6 +404,7 @@ export class GameEngine {
     shieldTimer: 0,
     activeBuff: 0,
     facing: 0,
+    kit: createClassState(),
     dashTimer: 0,
     dashCooldown: 0,
     activeCooldown: 0,
@@ -510,12 +548,22 @@ export class GameEngine {
         ? { ...travel }
         : null;
     this.zone = config.zone;
-    this.stats = { ...config.stats };
+    this.stats = config.adventure
+      ? adventureStats(
+          config.stats,
+          config.adventure.oath,
+          config.adventure.relic,
+        )
+      : { ...config.stats };
     this.rng = new Random(config.seed ?? Math.floor(Math.random() * 2 ** 31));
     this.runId = `run-${Date.now()}-${this.rng.state}-${Math.floor(Math.random() * 1e9)}`;
     this.player.maxHp = this.stats.health + (config.food ? 15 : 0);
     this.player.hp = this.player.maxHp;
-    this.player.resource = this.classDef.resource === "Rage" ? 30 : 100;
+    if (config.adventure?.relic === "aegis") {
+      this.player.shield = 30;
+      this.player.shieldTimer = 60;
+    }
+    this.player.resource = this.resourceKind === "Rage" ? 30 : 100;
     this.landmarks = this.zone.dungeon ? [] : createLandmarks(this.zone.id);
     this.addSpell(this.classDef.spells[0]);
     if (this.classDef.id === "hunter" || this.classDef.id === "warlock")
@@ -565,6 +613,13 @@ export class GameEngine {
       CLASS_MAP[config.partner.classId]
     ) {
       const buddy = config.partner,
+        partnerStats = config.adventure
+          ? adventureStats(
+              buddy.stats,
+              config.adventure.oath,
+              config.adventure.relic,
+            )
+          : { ...buddy.stats },
         def = CLASS_MAP[buddy.classId],
         book = normalizeSpellbook(
           buddy.classId,
@@ -582,12 +637,13 @@ export class GameEngine {
       this.partner = {
         config: { ...buddy },
         classDef: def,
-        stats: { ...buddy.stats },
+        stats: partnerStats,
         player: {
           ...this.player,
+          kit: createClassState(),
           x: 90,
-          maxHp: buddy.stats.health,
-          hp: buddy.stats.health,
+          maxHp: partnerStats.health,
+          hp: partnerStats.health,
           resource: def.resource === "Rage" ? 30 : 100,
         },
         prepared: book.prepared,
@@ -637,6 +693,8 @@ export class GameEngine {
       actives: this.trialActives,
     };
     const events: GameEvent[] = [];
+    this.primaryActor = original.player;
+    this.primaryClassId = original.classDef.id;
     this.partnerActing = true;
     this.player = buddy.player;
     this.stats = buddy.stats;
@@ -656,6 +714,8 @@ export class GameEngine {
     try {
       return action();
     } finally {
+      this.primaryActor = null;
+      this.primaryClassId = null;
       this.partnerActing = false;
       this.player = original.player;
       this.stats = original.stats;
@@ -683,6 +743,9 @@ export class GameEngine {
     )
       return false;
     return this.withPartner(() => this.activate()) || false;
+  }
+  dashPartner(): boolean {
+    return this.partner ? this.withPartner(() => this.dash()) || false : false;
   }
   private hurtActor(
     actor: GameEngine["player"],
@@ -742,7 +805,11 @@ export class GameEngine {
         }
       }
     }
-    if (p.hp <= 0) return;
+    if (p.hp <= 0) {
+      p.kit.anchors = [];
+      p.kit.curses.clear();
+      return;
+    }
     for (const key of [
       "invulnerable",
       "activeBuff",
@@ -754,20 +821,32 @@ export class GameEngine {
       p[key] = Math.max(0, p[key] - dt);
     if (p.shieldTimer > 0 && (p.shieldTimer -= dt) <= 0) p.shield = 0;
     p.hp = Math.min(p.maxHp, p.hp + buddy.stats.regen * dt);
-    if (buddy.classDef.resource !== "Rage")
+    const partnerResource = this.classCombat
+      ? classResource(buddy.classDef.id, p.kit)
+      : buddy.classDef.resource;
+    if (partnerResource !== "Rage")
       p.resource = Math.min(
         100,
         p.resource +
-          (buddy.classDef.resource === "Energy"
-            ? 20
-            : 14 + buddy.stats.regen * 2) *
-            dt,
+          (partnerResource === "Energy" ? 20 : 14 + buddy.stats.regen * 2) * dt,
       );
-    const speed = buddy.classDef.speed * (1 + buddy.stats.speed / 100),
+    const speed =
+        buddy.classDef.speed *
+        (1 + buddy.stats.speed / 100) *
+        (this.config.classCombat ? classSpeed(buddy.classDef.id, p.kit) : 1) *
+        (p.dashTimer > 0 ? 3.5 : 1),
       bounds = this.movementBounds;
-    p.x = clamp(p.x + buddy.input.x * speed * dt, -bounds.x, bounds.x);
-    p.y = clamp(p.y + buddy.input.y * speed * dt, -bounds.y, bounds.y);
-    if (buddy.input.x || buddy.input.y)
+    p.x = clamp(
+      p.x + (p.dashTimer > 0 ? p.kit.dashX : buddy.input.x) * speed * dt,
+      -bounds.x,
+      bounds.x,
+    );
+    p.y = clamp(
+      p.y + (p.dashTimer > 0 ? p.kit.dashY : buddy.input.y) * speed * dt,
+      -bounds.y,
+      bounds.y,
+    );
+    if ((buddy.input.x || buddy.input.y) && p.dashTimer <= 0)
       p.facing = Math.atan2(buddy.input.y, buddy.input.x);
     this.tetherParty();
     const unlocked = buddy.prepared.slice(
@@ -784,7 +863,15 @@ export class GameEngine {
       spell.rank = Math.min(5, 1 + Math.floor((this.level - 1) / 4));
     if (buddy.pet) {
       const pet = buddy.pet,
-        target = this.nearest(p, 500),
+        target =
+          (this.config.classCombat
+            ? this.enemies.find(
+                (e) =>
+                  !e.dead &&
+                  e.id === p.kit.target &&
+                  distanceSq(e, p) < 800 ** 2,
+              )
+            : undefined) || this.nearest(p, 500),
         follow =
           pet.spellId === "beast" && target
             ? target
@@ -797,6 +884,8 @@ export class GameEngine {
       pet.y += (dy / length) * step;
     }
     this.withPartner(() => {
+      if (this.config.classCombat)
+        updateClass(this.classWorld(), dt, !!(buddy.input.x || buddy.input.y));
       for (const [id, buff] of Object.entries(buddy.buffs))
         if (this.time >= buff.until) {
           for (const [key, value] of Object.entries(buff.stats))
@@ -833,7 +922,15 @@ export class GameEngine {
                 100);
         } else if (def.kind === "pet" && buddy.pet) {
           const pet = buddy.pet,
-            target = this.nearest(p, 500);
+            target =
+              (this.config.classCombat
+                ? this.enemies.find(
+                    (e) =>
+                      !e.dead &&
+                      e.id === p.kit.target &&
+                      distanceSq(e, p) < 800 ** 2,
+                  )
+                : undefined) || this.nearest(p, 500);
           if (
             target &&
             (def.id !== "beast" || distanceSq(pet, target) < 100 ** 2)
@@ -850,7 +947,14 @@ export class GameEngine {
           }
         } else
           state.timer = this.castSpell(def, state.rank)
-            ? def.cooldown / (1 + buddy.stats.haste / 100)
+            ? (def.cooldown *
+                (this.config.classCombat &&
+                this.classDef.id === "druid" &&
+                p.kit.form === "cat" &&
+                def.id === this.classDef.spells[0]
+                  ? 0.55
+                  : 1)) /
+              (1 + buddy.stats.haste / 100)
             : 0.12;
         if (this.ended || this.checkpoint) break;
       }
@@ -945,6 +1049,19 @@ export class GameEngine {
     this.hazards = [];
     this.areas = [];
     this.effects = [];
+    for (const actor of [
+      this.player,
+      ...(this.partner ? [this.partner.player] : []),
+    ]) {
+      actor.kit.anchors = [];
+      actor.kit.curses.clear();
+      actor.kit.target = null;
+      if (
+        this.classDef.id === "rogue" ||
+        (actor === this.partner?.player && this.partner.classDef.id === "rogue")
+      )
+        actor.kit.points = 0;
+    }
     this.texts = [];
     // Loose treasure becomes secured before leaving this room.
     for (const item of this.pickups) {
@@ -966,7 +1083,10 @@ export class GameEngine {
     return true;
   }
   private emit(event: GameEvent) {
-    this.config.onEvent?.(event);
+    this.config.onEvent?.({
+      ...event,
+      classId: event.classId || this.classDef.id,
+    });
   }
   private action(
     actor: Vec,
@@ -974,6 +1094,22 @@ export class GameEngine {
     spell?: SpellDef,
     ability?: ClassId,
   ) {
+    if (this.config.classCombat) {
+      const facing = target
+        ? Math.atan2(target.y - actor.y, target.x - actor.x)
+        : this.player.facing;
+      if (!ability)
+        this.classWorld().visual(
+          actor,
+          spell?.kind === "melee" ? 95 : 45,
+          "cast",
+          facing,
+        );
+      if (actor === this.player) {
+        this.player.kit.motionAt = this.time;
+        this.player.kit.motionFacing = facing;
+      }
+    }
     this.config.onAction?.({
       actor,
       time: this.time,
@@ -985,6 +1121,38 @@ export class GameEngine {
       ability,
     });
   }
+  private classWorld(): ClassWorld {
+    const actor = this.player;
+    return {
+      id: this.classDef.id,
+      actor,
+      time: this.time,
+      power: this.stats.power,
+      enemies: this.enemies,
+      allies: [
+        actor,
+        ...(this.partner
+          ? [this.partnerActing ? this.primaryActor! : this.partner.player]
+          : []),
+      ].filter(Boolean),
+      damage: (enemy, amount, source) =>
+        this.damageEnemy(enemy, amount, source, false),
+      visual: (at, radius, motif, facing = actor.facing) =>
+        this.addEffect({
+          kind: "class",
+          classId: this.classDef.id,
+          motif,
+          facing,
+          x: at.x,
+          y: at.y,
+          radius,
+          color: this.classDef.color,
+          life: motif === "dash" ? 0.5 : 0.65,
+        }),
+    };
+  }
+  private primaryActor: GameEngine["player"] | null = null;
+  private primaryClassId: ClassId | null = null;
   private enemyAction(
     actor: Enemy,
     kind: EnemyAction["kind"],
@@ -1024,6 +1192,42 @@ export class GameEngine {
       });
   }
 
+  get signatureReady(): boolean {
+    const p = this.player;
+    if (
+      p.hp <= 0 ||
+      this.paused ||
+      this.choosing ||
+      this.checkpoint ||
+      this.shrineChoice ||
+      this.ended ||
+      p.activeCooldown > 0
+    )
+      return false;
+    if (!this.classCombat)
+      return p.resource >= (this.classDef.resource === "Rage" ? 25 : 20);
+    if (this.classDef.id === "warrior") return p.resource >= 25;
+    if (this.classDef.id === "rogue")
+      return (
+        p.resource >= 20 &&
+        p.kit.points > 0 &&
+        this.enemies.some(
+          (e) =>
+            !e.dead && e.id === p.kit.target && distanceSq(e, p) <= 170 ** 2,
+        )
+      );
+    if (this.classDef.id === "warlock")
+      return p.kit.points > 0 || p.hp > p.maxHp * 0.15 + 1;
+    return true;
+  }
+  get resourceKind(): "Mana" | "Energy" | "Rage" {
+    return this.classCombat
+      ? classResource(this.classDef.id, this.player.kit)
+      : this.classDef.resource;
+  }
+  get classCombat(): boolean {
+    return !!this.config.classCombat;
+  }
   get travelling(): boolean {
     return this.travel.active || this.travel.channel > 0;
   }
@@ -1083,6 +1287,10 @@ export class GameEngine {
       return;
     dt = Math.min(dt, 0.05);
     this.time += dt;
+    if (this.config.adventure) {
+      this.streakTimer = Math.max(0, this.streakTimer - dt);
+      if (this.streakTimer === 0) this.streak = 0;
+    }
     for (const [id, buff] of Object.entries(this.timedBuffs))
       if (this.time >= buff.until) {
         for (const [key, value] of Object.entries(buff.stats))
@@ -1124,35 +1332,42 @@ export class GameEngine {
             (p.activeBuff > 0 && this.classDef.id === "druid" ? 5 : 0)) *
             dt,
       );
-    if (this.classDef.resource !== "Rage")
+    if (this.resourceKind !== "Rage")
       p.resource = Math.min(
         100,
         p.resource +
-          (this.classDef.resource === "Energy"
-            ? 20
-            : 14 + this.stats.regen * 2) *
+          (this.resourceKind === "Energy" ? 20 : 14 + this.stats.regen * 2) *
             dt,
       );
     const speed =
       this.classDef.speed *
       (1 + this.stats.speed / 100) *
       (this.travel.active ? 1 + this.travelOption!.speed / 100 : 1) *
+      (this.config.classCombat ? classSpeed(this.classDef.id, p.kit) : 1) *
       (p.dashTimer > 0 ? 3.5 : 1) *
       (p.activeBuff > 0 && this.classDef.id === "rogue" ? 1.4 : 1);
     const bounds = this.movementBounds;
     p.x = clamp(
-      p.x + (p.hp > 0 ? this.input.x : 0) * speed * dt,
+      p.x +
+        (p.hp > 0 ? (p.dashTimer > 0 ? p.kit.dashX : this.input.x) : 0) *
+          speed *
+          dt,
       -bounds.x,
       bounds.x,
     );
     p.y = clamp(
-      p.y + (p.hp > 0 ? this.input.y : 0) * speed * dt,
+      p.y +
+        (p.hp > 0 ? (p.dashTimer > 0 ? p.kit.dashY : this.input.y) : 0) *
+          speed *
+          dt,
       -bounds.y,
       bounds.y,
     );
-    if (this.input.x || this.input.y)
+    if ((this.input.x || this.input.y) && p.dashTimer <= 0)
       p.facing = Math.atan2(this.input.y, this.input.x);
 
+    if (this.config.classCombat)
+      updateClass(this.classWorld(), dt, !!(this.input.x || this.input.y));
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0 && !this.boss) {
       const spawnCount = Math.min(
@@ -1161,7 +1376,11 @@ export class GameEngine {
       );
       for (let i = 0; i < spawnCount; i++) this.spawnEnemy();
       this.spawnTimer +=
-        Math.max(0.28, 1.05 - this.time / 600) / this.zone.difficulty;
+        Math.max(0.28, 1.05 - this.time / 600) /
+        this.zone.difficulty /
+        (this.config.adventure
+          ? DIFFICULTIES[this.config.adventure.difficulty].spawn
+          : 1);
     }
     const stageTime = this.dungeonStage ? this.dungeonStageTime : this.time;
     const duration = this.dungeonStage?.duration ?? this.zone.duration;
@@ -1196,14 +1415,28 @@ export class GameEngine {
     for (const e of this.enemies) {
       if (e.dead) continue;
       e.flash = Math.max(0, e.flash - dt);
+      const concealed = this.classCombat && p.kit.concealedUntil > this.time,
+        buddyConcealed =
+          this.classCombat &&
+          !!this.partner &&
+          this.partner.player.kit.concealedUntil > this.time;
       const focus =
         this.partner &&
         this.partner.player.hp > 0 &&
-        (p.hp <= 0 || distanceSq(e, this.partner.player) < distanceSq(e, p))
+        (p.hp <= 0 ||
+          (concealed && !buddyConcealed) ||
+          (distanceSq(e, this.partner.player) < distanceSq(e, p) &&
+            (!buddyConcealed || concealed)))
           ? this.partner.player
           : p;
-      const dx = focus.x - e.x,
-        dy = focus.y - e.y,
+      const pursuit =
+        this.classCombat &&
+        focus.kit.concealedUntil > this.time &&
+        focus.kit.decoy
+          ? focus.kit.decoy
+          : focus;
+      const dx = pursuit.x - e.x,
+        dy = pursuit.y - e.y,
         length = Math.hypot(dx, dy) || 1;
       if (
         e.frozenUntil <= this.time &&
@@ -1227,7 +1460,9 @@ export class GameEngine {
         }
       }
       if (
-        length < e.radius + 14 &&
+        (this.classCombat
+          ? distanceSq(e, focus) < (e.radius + 14) ** 2
+          : length < e.radius + 14) &&
         !focus.invulnerable &&
         this.hurtActor(focus, e.damage)
       )
@@ -1252,6 +1487,7 @@ export class GameEngine {
           e.type === "cultist" ||
           e.type === "dusk_mage") &&
         e.attackTimer <= 0 &&
+        !(this.classCombat && focus.kit.concealedUntil > this.time) &&
         length < 650
       ) {
         e.attackTimer = 5.5;
@@ -1316,7 +1552,14 @@ export class GameEngine {
         if (state.timer <= 0) {
           if (this.castSpell(def, state.rank))
             state.timer =
-              (def.cooldown * Math.max(0.3, 1 - (state.rank - 1) * 0.09)) /
+              (def.cooldown *
+                (this.config.classCombat &&
+                this.classDef.id === "druid" &&
+                this.player.kit.form === "cat" &&
+                def.id === this.classDef.spells[0]
+                  ? 0.55
+                  : 1) *
+                Math.max(0.3, 1 - (state.rank - 1) * 0.09)) /
               (1 +
                 (this.stats.haste +
                   (this.config.spellBonuses?.[def.id]?.haste || 0)) /
@@ -1328,7 +1571,17 @@ export class GameEngine {
     for (const pet of this.pets) {
       const def = SPELLS[pet.spellId],
         state = this.spells.find((s) => s.id === pet.spellId)!;
-      const target = this.travelling || p.hp <= 0 ? null : this.nearest(p, 500);
+      const target =
+        this.travelling || p.hp <= 0
+          ? null
+          : (this.config.classCombat
+              ? this.enemies.find(
+                  (e) =>
+                    !e.dead &&
+                    e.id === p.kit.target &&
+                    distanceSq(e, p) < 800 ** 2,
+                )
+              : undefined) || this.nearest(p, 500);
       const follow =
         pet.spellId === "beast" && target
           ? target
@@ -1597,7 +1850,10 @@ export class GameEngine {
       (boss ? this.bossIdentity?.baseHealth || base[0] : base[0]) *
       (1 + this.time / 240) *
       this.zone.difficulty *
-      (boss ? 42 : elite ? 7 : 1);
+      (boss ? 42 : elite ? 7 : 1) *
+      (this.config.adventure
+        ? DIFFICULTIES[this.config.adventure.difficulty].health
+        : 1);
     const e: Enemy = {
       id: this.id++,
       x: clamp(
@@ -2508,6 +2764,47 @@ export class GameEngine {
     );
   }
   private castSpell(def: SpellDef, rank: number): boolean {
+    if (
+      this.classCombat &&
+      this.classDef.id === "druid" &&
+      this.player.kit.form !== "moonkin" &&
+      def.id !== this.classDef.spells[0] &&
+      ["projectile", "ground", "dot", "chain", "heal"].includes(def.kind)
+    )
+      return false;
+    if (
+      this.config.classCombat &&
+      this.classDef.id === "druid" &&
+      def.id === this.classDef.spells[0] &&
+      this.player.kit.form !== "moonkin"
+    ) {
+      const bear = this.player.kit.form === "bear",
+        range = bear ? 150 : 110,
+        target = this.nearest(this.player, range + 30);
+      if (!target || (!bear && this.player.resource < 15)) return false;
+      const empowered = bear && this.player.resource >= 20;
+      this.player.resource -= bear ? (empowered ? 20 : 0) : 15;
+      for (const e of this.enemies)
+        if (
+          !e.dead &&
+          distanceSq(e, this.player) < (range + e.radius) ** 2 &&
+          (bear || e === target)
+        ) {
+          this.damageEnemy(
+            e,
+            this.spellDamage(def, rank) *
+              (bear ? (empowered ? 1.2 : 0.85) : 1.5),
+            def.id,
+          );
+          if (bear) {
+            e.slow = 0.55;
+            e.slowUntil = this.time + 1.2;
+          }
+        }
+      this.action(this.player, target, { ...def, kind: "melee" });
+      this.emit({ type: "cast" });
+      return true;
+    }
     const bonus = this.config.spellBonuses?.[def.id] || {},
       area = 1 + (bonus.area || 0) / 100;
     const cost =
@@ -2577,19 +2874,38 @@ export class GameEngine {
       this.emit({ type: "cast" });
       return true;
     }
-    const target = this.nearest(
-      this.player,
+    const targetRange =
       def.kind === "dot" || def.executeBelow || def.singleTarget
         ? def.range
         : def.kind === "melee" || def.kind === "nova"
           ? def.range * (1 + (rank - 1) * 0.1) * area + 30
-          : 800,
-      new Set(),
-      (e) =>
-        def.kind === "dot"
-          ? !e.dots?.[def.id]
-          : !def.executeBelow || e.hp <= e.maxHp * def.executeBelow,
-    );
+          : 800;
+    const marked =
+      this.classCombat &&
+      ["rogue", "hunter"].includes(this.classDef.id) &&
+      def.id === this.classDef.spells[0]
+        ? this.enemies.find(
+            (e) =>
+              !e.dead &&
+              e.id === this.player.kit.target &&
+              distanceSq(e, this.player) <= targetRange ** 2,
+          )
+        : undefined;
+    const target =
+      marked ||
+      this.nearest(
+        this.player,
+        def.kind === "dot" || def.executeBelow || def.singleTarget
+          ? def.range
+          : def.kind === "melee" || def.kind === "nova"
+            ? def.range * (1 + (rank - 1) * 0.1) * area + 30
+            : 800,
+        new Set(),
+        (e) =>
+          def.kind === "dot"
+            ? !e.dots?.[def.id]
+            : !def.executeBelow || e.hp <= e.maxHp * def.executeBelow,
+      );
     if (!target) return false;
     this.player.resource -= cost;
     if (def.id === this.classDef.spells[0]) this.trialCasts++;
@@ -2605,7 +2921,12 @@ export class GameEngine {
         color: def.color,
         life: 0.38,
       });
-    } else if (def.singleTarget) {
+    } else if (
+      def.singleTarget ||
+      (this.classCombat &&
+        this.classDef.id === "rogue" &&
+        def.id === this.classDef.spells[0])
+    ) {
       this.damageEnemy(target, damage, def.id);
       this.addEffect({
         kind: "line",
@@ -2771,6 +3092,7 @@ export class GameEngine {
     const angle = Math.atan2(target.y - from.y, target.x - from.x) + offset;
     this.projectiles.push({
       spellId: def.id,
+      ...(this.config.classCombat ? { classId: this.classDef.id } : {}),
       x: from.x,
       y: from.y,
       vx: Math.cos(angle) * 420,
@@ -2849,7 +3171,18 @@ export class GameEngine {
         this.rng.next() <
           Math.min(0.8, (this.stats.crit + (bonus.crit || 0)) / 100),
       rawDamage = amount * (critical ? 1.8 : 1);
-    let damage = rawDamage;
+    let damage =
+      rawDamage *
+      (1 +
+        (this.config.adventure && source !== "keystone_storm"
+          ? Math.min(3, Math.floor(this.streak / 10)) * 0.05
+          : 0));
+    if (
+      source !== "keystone_storm" &&
+      this.keystones.includes("executioner") &&
+      e.hp / e.maxHp < 0.3
+    )
+      damage *= 1.35;
     if (e.boss && this.zone.id === "scarlet" && this.dungeonStageIndex === 3) {
       if (!this.commanderRevived && e.hp - damage <= e.maxHp / 2) {
         this.commanderRevived = true;
@@ -2865,6 +3198,8 @@ export class GameEngine {
       } else if (this.revivedCommander && !this.revivedCommander.dead)
         damage = Math.min(damage, Math.max(0, e.hp - 1));
     }
+    if (this.config.classCombat)
+      damage *= classDamage(this.classWorld(), e, source);
     const dealt = Math.min(e.hp, damage);
     if (weapon && dealt > 0) {
       this.weaponHits[weapon.type] = (this.weaponHits[weapon.type] || 0) + 1;
@@ -2883,9 +3218,37 @@ export class GameEngine {
         this.player.maxHp,
         this.player.hp + (dealt * bonus.leech) / 100,
       );
+    if (this.config.classCombat && dealt > 0)
+      recordClassHit(this.classWorld(), e, source, this.classDef.spells[0]);
     e.hp -= damage;
     e.flash = 0.12;
-    if (this.classDef.resource === "Rage")
+    if (
+      critical &&
+      this.keystones.includes("storm") &&
+      this.time >= this.stormReadyAt
+    ) {
+      this.stormReadyAt = this.time + 0.4;
+      const targets = this.enemies
+        .filter(
+          (target) =>
+            target !== e && !target.dead && distanceSq(target, e) < 180 ** 2,
+        )
+        .sort((a, b) => distanceSq(a, e) - distanceSq(b, e))
+        .slice(0, 2);
+      for (const target of targets) {
+        this.addEffect({
+          kind: "line",
+          x: e.x,
+          y: e.y,
+          end: { x: target.x, y: target.y },
+          radius: 3,
+          color: "#8dcfff",
+          life: 0.22,
+        });
+        this.damageEnemy(target, dealt * 0.45, "keystone_storm", false);
+      }
+    }
+    if (this.resourceKind === "Rage")
       this.player.resource = Math.min(100, this.player.resource + 2);
     if (this.texts.length < 90)
       this.texts.push({
@@ -2897,9 +3260,38 @@ export class GameEngine {
       });
     if (e.hp <= 0) {
       e.dead = true;
+      if (this.config.classCombat) {
+        const world = this.classWorld();
+        recordClassKill(world, e);
+        const other = this.partnerActing
+            ? this.primaryActor
+            : this.partner?.player,
+          otherId = this.partnerActing
+            ? this.primaryClassId
+            : this.partner?.classDef.id;
+        if (other && otherId)
+          recordClassKill({ ...world, id: otherId, actor: other }, e);
+      }
       delete e.dots;
       this.config.onDeath?.({ kind: "enemy", actor: e, time: this.time });
       this.kills++;
+      if (this.config.adventure) {
+        this.streak++;
+        this.streakTimer = 5;
+        this.peakStreak = Math.max(this.peakStreak, this.streak);
+        if (
+          this.keystones.includes("blood") &&
+          this.kills % 5 === 0 &&
+          this.player.hp > 0
+        )
+          this.player.hp = Math.min(this.player.maxHp, this.player.hp + 4);
+        if (this.keystones.includes("gravity") && this.streak % 10 === 0)
+          for (const gem of this.pickups)
+            if (gem.kind === "xp") {
+              gem.x = this.player.x + this.rng.between(-25, 25);
+              gem.y = this.player.y + this.rng.between(-25, 25);
+            }
+      }
       if (e.elite && !e.boss) this.trialElites++;
       if (e.boss) this.trialBosses++;
       this.dropPickup({
@@ -3067,19 +3459,68 @@ export class GameEngine {
     this.travel.lock = TRAVEL_RULES.damageLock;
     const armor =
       this.stats.armor +
-      (p.activeBuff > 0 && this.classDef.id === "druid" ? 45 : 0);
+      (p.activeBuff > 0 && this.classDef.id === "druid" ? 45 : 0) +
+      (this.config.classCombat &&
+      this.classDef.id === "druid" &&
+      p.kit.form === "bear"
+        ? 35
+        : 0) +
+      (this.config.classCombat &&
+      p.kit.anchors.some(
+        (a) => a.kind === "earth" && distanceSq(a, p) < 165 ** 2,
+      )
+        ? 18
+        : 0) +
+      (this.config.classCombat &&
+      this.classDef.id === "warrior" &&
+      !(this.partnerActing
+        ? this.partner!.input.x || this.partner!.input.y
+        : this.input.x || this.input.y)
+        ? 12
+        : 0);
     let taken = Math.max(1, damage * (100 / (100 + armor * 3)));
     if (school !== "physical")
       taken *= resistanceMultiplier(this.config.resistances?.[school] || 0);
+    if (this.config.adventure)
+      taken *= DIFFICULTIES[this.config.adventure.difficulty].damage;
     if (p.shield > 0) {
       const absorb = Math.min(p.shield, taken);
       p.shield -= absorb;
+      if (
+        this.config.classCombat &&
+        this.classDef.id === "priest" &&
+        absorb > 0
+      )
+        p.kit.points = Math.min(5, p.kit.points + 1);
       taken -= absorb;
     }
     p.hp -= taken;
+    if (this.config.adventure && taken > 0) {
+      this.damageTaken += taken;
+      this.streak = 0;
+      this.streakTimer = 0;
+    }
     p.invulnerable = 0.65;
+    if (
+      p.hp <= 0 &&
+      this.keystones.includes("reserve") &&
+      !this.secondWindActors.has(p)
+    ) {
+      this.secondWindActors.add(p);
+      p.hp = p.maxHp * 0.35;
+      p.invulnerable = 2;
+      this.addEffect({
+        kind: "ring",
+        x: p.x,
+        y: p.y,
+        radius: 100,
+        color: "#b4df91",
+        life: 0.7,
+      });
+      this.emit({ type: "active", message: "Second Wind · a new chance" });
+    }
     p.hurt = 0.25;
-    if (this.classDef.resource === "Rage")
+    if (this.resourceKind === "Rage")
       p.resource = Math.min(100, p.resource + 15);
     this.emit({ type: "hit", amount: taken });
     return true;
@@ -3258,8 +3699,29 @@ export class GameEngine {
   }
   activate(): boolean {
     if (this.player.hp <= 0) return false;
+    if (this.config.classCombat) {
+      if (
+        this.paused ||
+        this.choosing ||
+        this.shrineChoice ||
+        this.checkpoint ||
+        this.ended ||
+        this.player.activeCooldown > 0
+      )
+        return false;
+      if (!classSignature(this.classWorld())) return false;
+      this.stopTravel();
+      this.trialActives++;
+      if (this.config.adventure) this.adventureActives++;
+      this.action(this.player, undefined, undefined, this.classDef.id);
+      this.emit({
+        type: "active",
+        message: CLASS_KITS[this.classDef.id].action,
+      });
+      return true;
+    }
     const p = this.player,
-      cost = this.classDef.resource === "Rage" ? 25 : 20;
+      cost = this.resourceKind === "Rage" ? 25 : 20;
     if (
       this.paused ||
       this.choosing ||
@@ -3273,6 +3735,7 @@ export class GameEngine {
     p.resource -= cost;
     this.stopTravel();
     this.trialActives++;
+    if (this.config.adventure) this.adventureActives++;
     p.activeCooldown = this.classDef.activeCooldown;
     const id = this.classDef.id;
     if (id === "rogue") {
@@ -3342,14 +3805,77 @@ export class GameEngine {
       this.shrineChoice ||
       this.checkpoint ||
       this.ended ||
-      this.player.dashCooldown > 0 ||
-      !(this.input.x || this.input.y)
+      this.player.dashCooldown > 0
     )
       return false;
-    this.player.dashCooldown = 4;
+    this.player.dashCooldown = Math.max(
+      2,
+      4 -
+        Number(this.config.adventure?.relic === "wind") -
+        Number(this.keystones.includes("windstep")),
+    );
     this.stopTravel();
-    this.player.dashTimer = 0.22;
-    this.player.invulnerable = 0.3;
+    const p = this.player,
+      k = p.kit,
+      input = this.partnerActing ? this.partner!.input : this.input,
+      length = Math.hypot(input.x, input.y);
+    k.dashX = length ? input.x / length : Math.cos(p.facing);
+    k.dashY = length ? input.y / length : Math.sin(p.facing);
+    p.facing = Math.atan2(k.dashY, k.dashX);
+    k.dashHits.clear();
+    p.dashTimer = 0.22;
+    p.invulnerable = Math.max(p.invulnerable, 0.3);
+    if (this.config.classCombat) {
+      this.classWorld().visual(p, 90, "dash", p.facing);
+      if (this.classDef.id === "mage") {
+        p.x = clamp(
+          p.x + k.dashX * 190,
+          -this.movementBounds.x,
+          this.movementBounds.x,
+        );
+        p.y = clamp(
+          p.y + k.dashY * 190,
+          -this.movementBounds.y,
+          this.movementBounds.y,
+        );
+        p.dashTimer = 0;
+        this.classWorld().visual(p, 70, "dash", p.facing);
+      }
+      if (this.classDef.id === "rogue") {
+        k.decoy = { x: p.x, y: p.y };
+        k.concealedUntil = this.time + 2;
+        p.invulnerable = Math.max(p.invulnerable, 0.6);
+      }
+      if (this.classDef.id === "priest")
+        k.anchors.push({
+          kind: "prayer",
+          x: p.x,
+          y: p.y,
+          until: this.time + 3,
+          pulse: this.time,
+          strength: 0,
+        });
+      this.emit({ type: "active", message: CLASS_KITS[this.classDef.id].dash });
+    }
+    if (this.config.adventure) this.dashCount++;
+    if (this.keystones.includes("windstep")) {
+      this.addEffect({
+        kind: "ring",
+        x: this.player.x,
+        y: this.player.y,
+        radius: 140,
+        color: "#9fdfca",
+        life: 0.4,
+      });
+      for (const e of this.enemies)
+        if (!e.dead && distanceSq(e, this.player) <= (140 + e.radius) ** 2)
+          this.damageEnemy(
+            e,
+            35 * (1 + this.stats.power / 100),
+            "keystone_windstep",
+            false,
+          );
+    }
     return true;
   }
   get shootingWeapon(): WeaponPractice | undefined {
@@ -3511,6 +4037,16 @@ export class GameEngine {
     this.emit({ type: "levelup" });
   }
   generateUpgrades(): Upgrade[] {
+    if (this.config.adventure && [3, 7, 11].includes(this.level)) {
+      const pool = KEYSTONES.filter((k) => !this.keystones.includes(k.id));
+      const choices: Upgrade[] = [];
+      while (choices.length < 3 && pool.length) {
+        const index = Math.floor(this.rng.next() * pool.length);
+        const k = pool.splice(index, 1)[0];
+        choices.push({ ...k, type: "keystone" });
+      }
+      return choices;
+    }
     const choices: Upgrade[] = [];
     for (const id of this.preparedSpells) {
       const current = this.spells.find((s) => s.id === id),
@@ -3600,10 +4136,41 @@ export class GameEngine {
     }
     return output;
   }
+  rerollUpgrades(): boolean {
+    if (
+      !this.config.adventure ||
+      !this.choosing ||
+      this.ended ||
+      this.rerolls <= 0
+    )
+      return false;
+    const previous = this.upgrades
+      .map((u) => u.id)
+      .sort()
+      .join();
+    for (let i = 0; i < 8; i++) {
+      this.upgrades = this.generateUpgrades();
+      if (
+        this.upgrades
+          .map((u) => u.id)
+          .sort()
+          .join() !== previous
+      )
+        break;
+    }
+    this.rerolls--;
+    return true;
+  }
   chooseUpgrade(id: string): boolean {
     const choice = this.upgrades.find((c) => c.id === id);
     if (!this.choosing || !choice) return false;
-    if (choice.type === "spell") {
+    if (choice.type === "keystone") {
+      const k = KEYSTONES.find((k) => k.id === id);
+      if (!k || this.keystones.includes(k.id) || this.keystones.length >= 3)
+        return false;
+      this.keystones.push(k.id);
+      if (k.id === "gravity") this.stats.magnet += 35;
+    } else if (choice.type === "spell") {
       const s = this.spells.find((s) => s.id === id);
       if (
         !this.preparedSpells.includes(id) ||
@@ -3651,7 +4218,10 @@ export class GameEngine {
         kind: "player",
         actor: this.player,
         time: this.time,
-        bear: this.classDef.id === "druid" && this.player.activeBuff > 0,
+        bear:
+          this.classDef.id === "druid" &&
+          (this.player.activeBuff > 0 ||
+            (this.classCombat && this.player.kit.form === "bear")),
       });
     this.healingEffects = {};
     for (const e of this.enemies) delete e.dots;
@@ -3660,7 +4230,34 @@ export class GameEngine {
     this.emit({ type: "end", victory });
   }
   result(): RunRecord {
+    const contracts = this.config.adventure
+      ? CONTRACTS.filter(
+          (c) =>
+            contractProgress(
+              c.id,
+              this.kills,
+              this.completedEncounters + this.dungeonBosses,
+              this.adventureActives,
+            ) >= c.goal,
+        )
+      : [];
+    const multiplier = this.config.adventure
+      ? DIFFICULTIES[this.config.adventure.difficulty].reward
+      : 1;
     return {
+      ...(this.config.adventure
+        ? {
+            adventure: {
+              ...this.config.adventure,
+              keystones: [...this.keystones],
+              peakStreak: this.peakStreak,
+              damageTaken: Math.floor(this.damageTaken),
+              dashes: this.dashCount,
+              actives: this.adventureActives,
+              contracts: contracts.map((c) => c.id),
+            },
+          }
+        : {}),
       id: this.runId,
       classId: this.classDef.id,
       zoneId: this.zone.id,
@@ -3668,10 +4265,16 @@ export class GameEngine {
       time: this.time,
       kills: this.kills,
       level: this.level,
-      gold: this.gold + Math.floor(this.time / 8) + (this.victory ? 75 : 0),
-      xp: Math.floor(
-        this.kills * 1.5 + this.time * 0.4 + (this.victory ? 180 : 0),
-      ),
+      gold:
+        Math.floor(
+          (this.gold + Math.floor(this.time / 8) + (this.victory ? 75 : 0)) *
+            multiplier,
+        ) + contracts.reduce((n, c) => n + c.gold, 0),
+      xp:
+        Math.floor(
+          (this.kills * 1.5 + this.time * 0.4 + (this.victory ? 180 : 0)) *
+            multiplier,
+        ) + contracts.reduce((n, c) => n + c.xp, 0),
       materials: { ...this.materials },
       loot: [...this.loot],
       ...(this.partner

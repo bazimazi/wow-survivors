@@ -1,0 +1,916 @@
+/* Beyond the Horde: hierarchy, tactile choices and a readable field interface. */
+:root {
+  --gold: #e0b87c;
+  --gold-bright: #f2d5a0;
+  --muted: #a3adb3;
+  --border: #344148;
+  --panel: #17232a;
+  background: #0c141a;
+  color: #e3e6e6;
+}
+body {
+  min-width: 320px;
+  background:
+    radial-gradient(ellipse at 90% 0, #29404955, transparent 50%), #0c141a;
+}
+.site-header {
+  background: #0c141af2;
+  border-color: #dac19820;
+}
+.main-content {
+  max-width: 1536px;
+}
+.welcome-row {
+  padding-top: 8px;
+  margin-bottom: 24px;
+}
+.welcome-row h1 {
+  font-size: clamp(30px, 3.4vw, 48px);
+  letter-spacing: -1.5px;
+}
+.welcome-row p {
+  font-size: 15px;
+  margin-top: 10px;
+}
+.eyebrow {
+  color: #cfb68b;
+}
+.nav-link {
+  color: #a9b3b8;
+}
+.camp-summary {
+  color: #bbc4c5;
+}
+.camp-summary .hero-select {
+  min-height: 44px;
+  max-width: 100%;
+  background: #14262f;
+  border: 1px solid #52646c;
+  border-radius: 7px;
+  padding: 5px 10px;
+}
+.camp-summary .hero-select select {
+  background: transparent;
+  max-width: 220px;
+  color: #e3d8c0;
+  font-size: 14px;
+}
+.world-card {
+  border-color: #d6b67a55;
+  border-radius: 12px;
+  box-shadow: 0 16px 50px #0004;
+}
+.world-card h2 {
+  font-size: clamp(28px, 3vw, 42px);
+}
+.world-content p {
+  color: #d4dbd6;
+  font-size: 14px;
+  max-width: 440px;
+}
+.world-kicker {
+  color: #efd5a7;
+}
+.world-hint {
+  color: #c0c8c1;
+}
+.hero-sheet {
+  background: linear-gradient(135deg, #1e2c33, #111d24);
+  border-radius: 12px;
+  border-color: #56625b;
+}
+.hero-description {
+  color: #c0cbce;
+  font-size: 14px;
+}
+.hero-art-name h2 {
+  font-size: 33px;
+}
+.sheet-label {
+  color: #e4c797;
+}
+.hero-stats span,
+.starting-ability small {
+  color: #b7c1c2;
+}
+.zone-option {
+  background: #142129;
+  border-radius: 8px;
+}
+.zone-option.selected {
+  background: #26332f;
+}
+.zone-option.locked {
+  opacity: 0.7;
+}
+.class-card {
+  background: #16242b;
+  border-radius: 9px;
+  min-height: 88px;
+}
+.class-card.selected {
+  background: linear-gradient(120deg, #284046, #20302e);
+}
+.class-copy small {
+  color: #b3c0c7;
+}
+.class-level {
+  color: #c9d0c9;
+}
+.hero-roster {
+  margin-top: 26px;
+  margin-bottom: 26px;
+}
+.button {
+  min-height: 44px;
+  border-radius: 7px;
+}
+.button.primary {
+  background: linear-gradient(110deg, #f1d49a, #cba264);
+  color: #182026;
+  box-shadow: 0 4px 18px #b4833920;
+}
+.button.primary:hover {
+  filter: brightness(1.08);
+}
+.button.quiet {
+  background: #26343b;
+  border-color: #49565d;
+}
+.button:disabled {
+  opacity: 0.5;
+}
+.expedition-button {
+  min-height: 50px;
+  font-size: 15px;
+}
+.prepare-run-button {
+  margin-left: 16px;
+  min-height: 44px;
+  color: #f0d5a4;
+}
+.prepared-launch {
+  margin-top: 22px;
+}
+.departure-build {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 13px 0 8px;
+}
+.departure-build span {
+  font-size: 11px;
+  padding: 4px 8px;
+  background: #0d1d24bd;
+  border: 1px solid #b9c9c440;
+  border-radius: 4px;
+  color: #e1e6dc;
+}
+.chapter-briefing {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  padding: 22px 26px;
+  margin-bottom: 26px;
+  border: 1px solid #52656c;
+  background: linear-gradient(105deg, #1e333d, #14222b);
+  border-radius: 10px;
+}
+.chapter-mark {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  flex-shrink: 0;
+  border: 1px solid #c7ac7340;
+  border-radius: 50%;
+  color: #edce96;
+  background: #e0b87c0c;
+}
+.chapter-briefing > div:nth-child(2) {
+  flex: 1;
+}
+.chapter-briefing .eyebrow {
+  font-size: 10px;
+  letter-spacing: 2px;
+  margin-bottom: 5px;
+}
+.chapter-briefing h2 {
+  font-family: "DM Sans", sans-serif;
+  font-size: 19px;
+  font-weight: 600;
+}
+.chapter-briefing p {
+  margin-top: 5px;
+  max-width: 750px;
+  font-size: 14px;
+  color: #b9c8cd;
+}
+.chapter-progress {
+  min-width: 170px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.chapter-progress > b {
+  color: #f0d5a3;
+  font-size: 22px;
+}
+.chapter-progress small {
+  font-size: 13px;
+  color: #b2bfc5;
+  font-weight: 400;
+}
+progress {
+  appearance: none;
+  height: 5px;
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  background: #0d181f;
+  overflow: hidden;
+}
+progress::-webkit-progress-bar {
+  background: #0d181f;
+}
+progress::-webkit-progress-value {
+  background: #d5b67f;
+  border-radius: 10px;
+}
+progress::-moz-progress-bar {
+  background: #d5b67f;
+}
+.adventure-setup {
+  padding: 26px;
+  border: 1px solid #42535b;
+  background: linear-gradient(135deg, #1b2b33, #142027);
+  border-radius: 12px;
+  margin: 24px 0;
+}
+.adventure-setup .section-heading {
+  margin-bottom: 22px;
+  gap: 16px;
+}
+.adventure-setup .section-heading h2 {
+  margin-top: 6px;
+}
+.difficulty-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.difficulty-options legend {
+  font-size: 12px;
+  font-weight: 600;
+  color: #c6d2d6;
+  margin-bottom: 9px;
+}
+.difficulty-choice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 17px;
+  border: 1px solid #4d6069;
+  border-radius: 7px;
+  background: #12212a;
+  color: #c1cdd1;
+  font-size: 14px;
+}
+.difficulty-choice.selected {
+  border-color: #dfbe83;
+  background: #e0b87c15;
+  color: #f2d5a0;
+}
+.difficulty-choice:hover {
+  border-color: #a4b6bb;
+}
+.difficulty-description {
+  min-height: 24px;
+  margin: 10px 0 22px;
+  font-size: 13px;
+  color: #b4c4cc;
+}
+.oath-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.oath-card {
+  text-align: left;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 17px 14px;
+  border: 1px solid #40545e;
+  border-radius: 8px;
+  background: #12212a;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.oath-card:hover {
+  background: #1e343f;
+  border-color: #9baeb1;
+}
+.oath-card.selected {
+  background: linear-gradient(140deg, #3a3d32, #243239);
+  border: 1px solid #dfbe83;
+  box-shadow: inset 0 0 0 1px #dfbe8320;
+}
+.oath-symbol {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  margin-bottom: 14px;
+  background: #d3bc8610;
+  color: #e6c794;
+}
+.oath-card > small {
+  color: #b4c3c8;
+  font-size: 11px;
+}
+.oath-card > b {
+  font-size: 15px;
+  color: #f0e5cd;
+  margin: 6px 0 8px;
+}
+.oath-card p {
+  font-size: 12px;
+  line-height: 1.65;
+  color: #c1ccd0;
+  flex: 1;
+}
+.oath-status {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: #c9b68e;
+  font-size: 11px;
+  margin-top: 15px;
+}
+.relic-selector {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin: 23px 0 8px;
+}
+.relic-selector label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #e7d0aa;
+  font-size: 14px;
+}
+.relic-selector select {
+  min-width: 230px;
+  max-width: 100%;
+  background: #102029;
+  border: 1px solid #50646d;
+  padding: 12px;
+  border-radius: 6px;
+}
+.relic-description {
+  font-size: 13px;
+  color: #b5c6cd;
+}
+.keystone-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #5f77723b;
+  color: #b6c9d1;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.keystone-preview > .icon {
+  color: #dfbf82;
+}
+.keystone-preview b {
+  color: #e0e7df;
+}
+.keystone-preview strong {
+  color: #f1cf8b;
+  white-space: nowrap;
+}
+.modal {
+  background: linear-gradient(140deg, #1d2d34, #111c24);
+  border-color: #59676a;
+  border-radius: 14px;
+}
+.modal-intro {
+  color: #b9c7cb;
+  font-size: 14px;
+}
+.mastery-modal {
+  max-width: 850px;
+}
+.mastery-grid {
+  display: grid;
+  gap: 12px;
+}
+.mastery-card {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 16px;
+  background: #13212a;
+  border: 1px solid #3b4d56;
+  border-radius: 9px;
+}
+.mastery-card.complete {
+  border-color: #b79c634d;
+}
+.mastery-icon {
+  display: grid;
+  place-items: center;
+  color: #dabe88;
+  width: 38px;
+  flex-shrink: 0;
+}
+.mastery-card > div {
+  flex: 1;
+  min-width: 0;
+}
+.mastery-card h3 {
+  font-size: 16px;
+}
+.mastery-card p {
+  font-size: 13px;
+  margin: 5px 0 9px;
+  color: #b5c6ce;
+}
+.mastery-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 5px;
+  font-size: 11px;
+  color: #c4cdd0;
+}
+.mastery-meta b {
+  color: #e1bd7b;
+  font-weight: 400;
+}
+.mastery-note {
+  color: #c0ced1;
+  margin-top: 22px;
+  font-size: 13px;
+}
+.upgrade-card {
+  background: #152730;
+  border-radius: 10px;
+  border-color: #48606a;
+}
+.upgrade-card:hover {
+  background: #203a44;
+  transform: translateY(-3px);
+}
+.upgrade-card h3 {
+  font-size: 19px;
+  line-height: 1.4;
+}
+.upgrade-card p {
+  color: #c3d2d7;
+  font-size: 14px;
+  min-height: 100px;
+}
+.keystone-card {
+  border-top: 3px solid var(--spell-color);
+}
+.build-tag {
+  display: block;
+  color: var(--spell-color);
+  font-size: 10px;
+  letter-spacing: 1px;
+  line-height: 1.6;
+  margin: 10px 0;
+}
+.upgrade-impact {
+  display: block;
+  font-size: 12px;
+  color: #e2d4b6;
+  margin: 10px 0 15px;
+  line-height: 1.6;
+}
+.rank-pips {
+  display: flex;
+  gap: 5px;
+  margin: 10px 0;
+}
+.rank-pips i {
+  width: 24px;
+  height: 5px;
+  border: 1px solid #7b8d96;
+  border-radius: 3px;
+}
+.rank-pips i.filled {
+  background: var(--spell-color);
+  border-color: var(--spell-color);
+}
+.rank-pips i.next {
+  border-color: #f7dc9e;
+  background: #e4c58a55;
+}
+.upgrade-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  margin-top: 20px;
+}
+.upgrade-tools small {
+  color: #afc0c6;
+  font-size: 12px;
+}
+.upgrade-footnote {
+  color: #b3c3c9;
+  font-size: 12px;
+}
+.adventure-hud {
+  position: absolute;
+  right: 22px;
+  top: 102px;
+  width: 240px;
+  padding: 15px 17px;
+  border: 1px solid #89a4a24d;
+  border-radius: 9px;
+  background: #101e29e8;
+  box-shadow: 0 4px 16px #0004;
+  pointer-events: auto;
+}
+.momentum-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.momentum-row > span {
+  font-size: 10px;
+  letter-spacing: 1.3px;
+  font-weight: 600;
+  color: #b4c9d1;
+}
+.momentum-row > b {
+  font-size: 28px;
+  color: #e8cf9d;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.momentum-track {
+  height: 3px;
+  background: #45606c77;
+  margin: 10px 0 8px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.momentum-track i {
+  display: block;
+  background: #e1c18c;
+  height: 100%;
+  width: 0;
+  transition: width 0.1s linear;
+}
+.adventure-hud > small {
+  font-size: 11px;
+  color: #b3c4cb;
+}
+.adventure-hud[data-tier="3"] {
+  border-color: #e3c185;
+  background: #2c302ae8;
+}
+.coop-game .adventure-hud {
+  top: 260px;
+}
+.run-keystones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+.run-keystones:empty {
+  display: none;
+}
+.run-keystones > span {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  color: var(--keystone);
+  font-size: 10px;
+}
+.run-contracts {
+  border-top: 1px solid #60777740;
+  margin-top: 13px;
+  padding-top: 10px;
+}
+.run-contracts summary {
+  color: #cbd8dd;
+  font-size: 12px;
+  cursor: pointer;
+  min-height: 25px;
+}
+.run-contracts summary > span {
+  float: right;
+  color: #e0c68d;
+}
+.contract-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+.contract-line span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.contract-line b {
+  color: #e0e7df;
+  font-size: 12px;
+}
+.contract-line small {
+  font-size: 10px;
+  color: #aebfc6;
+  line-height: 1.4;
+}
+.contract-line > strong {
+  font-size: 10px;
+  white-space: nowrap;
+  color: #e0c68d;
+}
+.adventure-result {
+  padding: 20px;
+  margin: 24px 0;
+  border: 1px solid #57706d;
+  border-radius: 10px;
+  background: #11232c;
+}
+.result-build-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0 18px;
+  font-size: 12px;
+  color: #bacacf;
+}
+.result-build-line b {
+  color: #e7cb93;
+}
+.adventure-result-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.adventure-result-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.adventure-result-stats b {
+  font-size: 24px;
+  color: #e6d7b8;
+}
+.adventure-result-stats span {
+  font-size: 11px;
+  color: #b6c7ce;
+}
+.result-keystones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 18px 0;
+  color: #e1c894;
+  font-size: 12px;
+}
+.adventure-result p {
+  color: #c0cfd1;
+  font-size: 13px;
+}
+.result-coaching {
+  margin-top: 12px;
+  border-top: 1px solid #4b636c66;
+  padding-top: 12px;
+}
+.game-top,
+.game-bottom {
+  background: linear-gradient(#0d1928dd, #0e1e2900);
+}
+.game-bottom {
+  background: linear-gradient(#0e1e2900, #0d1928dd);
+}
+.player-hud,
+.world-hud,
+.boss-hud {
+  background: #11222de6;
+  border-color: #708b824d;
+  border-radius: 8px;
+}
+.game-tutorial {
+  background: #132934ed;
+  color: #c5d6dc;
+}
+.game-tutorial b {
+  color: #ffe0a5;
+}
+.action-slot {
+  border-radius: 7px;
+  background: #15252eea;
+}
+.large-text p,
+.large-text .modal-intro,
+.large-text .hero-description,
+.large-text .oath-card p {
+  font-size: 16px;
+}
+.large-text small,
+.large-text .world-hint,
+.large-text .class-copy small,
+.large-text .build-tag,
+.large-text .upgrade-footnote,
+.large-text .contract-line small {
+  font-size: 13px;
+}
+.large-text .nav-link,
+.large-text .button,
+.large-text .text-button {
+  font-size: 15px;
+}
+.high-contrast {
+  --muted: #d0dce0;
+  --border: #8199a2;
+}
+.high-contrast p,
+.high-contrast small,
+.high-contrast .nav-link,
+.high-contrast .class-level {
+  color: #e1ebec;
+}
+.high-contrast .world-content {
+  text-shadow: 0 1px 5px #000;
+}
+.high-contrast .zone-option.locked {
+  opacity: 1;
+}
+.high-contrast .world-card,
+.high-contrast .hero-sheet,
+.high-contrast .class-card,
+.high-contrast .upgrade-card,
+.high-contrast .adventure-hud {
+  border-color: #c5d3d5;
+}
+@media (max-width: 1200px) {
+  .oath-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .oath-card {
+    padding: 17px;
+  }
+}
+@media (min-width: 761px) and (max-width: 1000px) {
+  .coop-game .adventure-hud {
+    top: 365px;
+  }
+}
+@media (max-width: 760px) {
+  .chapter-briefing {
+    padding: 18px;
+    gap: 13px;
+    flex-wrap: wrap;
+  }
+  .chapter-mark {
+    width: 40px;
+    height: 40px;
+  }
+  .chapter-briefing > div:nth-child(2) {
+    flex-basis: calc(100% - 55px);
+  }
+  .chapter-progress {
+    flex: 1;
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+  }
+  .chapter-progress progress {
+    flex: 1;
+    min-width: 40px;
+  }
+  .chapter-progress > b {
+    font-size: 17px;
+    white-space: nowrap;
+  }
+  .chapter-progress .text-button {
+    font-size: 12px;
+  }
+  .adventure-setup {
+    padding: 20px 16px;
+  }
+  .adventure-setup .section-heading {
+    flex-wrap: wrap;
+  }
+  .relic-selector {
+    flex-wrap: wrap;
+  }
+  .relic-selector select {
+    width: 100%;
+    min-width: 0;
+  }
+  .mastery-card {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .mastery-card .button {
+    width: 100%;
+  }
+  .mastery-card > div {
+    flex-basis: calc(100% - 50px);
+  }
+  .world-hud {
+    width: calc(50% - 18px);
+    left: 12px;
+  }
+  .fieldwork-families {
+    grid-template-columns: repeat(2, minmax(44px, 1fr));
+  }
+  .adventure-hud {
+    top: 128px;
+    right: 12px;
+    width: calc(50% - 18px);
+    padding: 10px;
+  }
+  .momentum-row > span {
+    font-size: 9px;
+    letter-spacing: 0.5px;
+  }
+  .momentum-row > b {
+    font-size: 22px;
+  }
+  .adventure-hud > small {
+    font-size: 10px;
+  }
+  .run-contracts summary {
+    font-size: 11px;
+  }
+  .run-keystones > span > span {
+    display: none;
+  }
+  .has-boss .adventure-hud {
+    top: 225px;
+  }
+  .coop-game .adventure-hud {
+    top: 205px;
+  }
+  .coop-game.has-boss .adventure-hud {
+    top: 340px;
+  }
+  .adventure-result-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .upgrade-card p {
+    min-height: 0;
+  }
+}
+@media (max-width: 420px) {
+  .difficulty-choice {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+  .oath-grid {
+    gap: 8px;
+  }
+  .oath-card {
+    padding: 14px 11px;
+  }
+  .oath-card > b {
+    font-size: 14px;
+  }
+  .chapter-progress {
+    flex-wrap: wrap;
+  }
+  .chapter-progress .text-button {
+    min-height: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .upgrade-card,
+  .momentum-track i,
+  .oath-card {
+    transition: none;
+  }
+  .upgrade-card:hover {
+    transform: none;
+  }
+}

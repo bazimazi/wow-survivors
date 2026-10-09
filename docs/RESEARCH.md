@@ -1,6 +1,14 @@
 # Wow Survivors — research and design decisions
 
-## Current implementation — release 1.0
+## Current implementation — release 1.2
+
+[Class identity](RELEASE-1.2.md) uses nine different combat loops and explicit signature decisions: rage spending, casting windows, target-bound finishers, range and pet commands, holy ground, party shields, elemental territory, health trades and souls, and form-specific attacks/resources. Research reviewed October 9, 2026: Blizzard’s original class manual and Classic restoration discussion, linked in the release record. Numeric rules, graphics, and simplified loops are original adaptations.
+
+## Previous implementation — release 1.1
+
+[Beyond the Horde](RELEASE-1.1.md) adds a coherent camp-to-expedition loop: concrete next-step briefings, three transparent challenge settings, four oath trade-offs, six combat keystones, two free run rerolls, momentum, optional expedition objectives, eight mastery milestones and four earned relics. Research reviewed October 9, 2026 includes Supergiant's Hades design explanation and Microsoft's Xbox text, contrast and difficulty guidelines; the release notes link the sources and distinguish their guidance from this game's original numeric rules. A local, consent-based human-playtest protocol records comprehension and desire to replay. Automated combat diagnostics measure implementation and pacing, not human enjoyment.
+
+## Previous implementation — release 1.0
 
 The finite survivor-game roadmap is completed through the [acceptance checklist](COMPLETION.md) and [release notes](RELEASE-1.0.md): all 27 Classic talent structures, further class techniques, independent rolled equipment copies, primary attributes and resistances, Scarlet Monastery and Eastern Plaguelands, faction/guild conclusions, directional hero art, twelve original music cues and optional local co-op. The sections below preserve earlier research and release-specific deferrals; statements about later work describe those historical releases.
 

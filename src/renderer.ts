@@ -1,3 +1,11 @@
+import {
+  drawClassProjectile,
+  drawClassEffect,
+  drawClassAnchor,
+  drawClassMark,
+  classChoreography,
+  drawCatForm,
+} from "./class-visuals";
 import { RESOURCE_TIERS } from "./resources";
 import { MATERIALS, SPELLS } from "./content";
 import type { ClassDef } from "./content";
@@ -61,6 +69,8 @@ export class GameRenderer {
   particles = true;
   shake = true;
   animation = true;
+  largeText = false;
+  highContrast = false;
   private animator = new ActorAnimator();
   private combatAnimator = new CombatAnimator();
   private creatureCombatAnimator = new CreatureCombatAnimator();
@@ -81,6 +91,7 @@ export class GameRenderer {
   private heroBackAtlas = new Image();
   private companionAtlas = new Image();
   private travelAtlas = new Image();
+  private formAtlas = new Image();
   private ragefireAtlas = new Image();
   private shadowfangAtlas = new Image();
   private duskwoodAtlas = new Image();
@@ -101,6 +112,7 @@ export class GameRenderer {
     this.heroBackAtlas.src = "/art/hero-backs.png";
     this.companionAtlas.src = "/art/companions.png";
     this.travelAtlas.src = "/art/travel-sprites.png";
+    this.formAtlas.src = "/art/druid-forms.png";
     this.ragefireAtlas.src = "/art/ragefire-sprites.png";
     this.shadowfangAtlas.src = "/art/shadowfang-sprites.png";
     this.duskwoodAtlas.src = "/art/duskwood-sprites.png";
@@ -114,6 +126,7 @@ export class GameRenderer {
       this.heroBackAtlas.decode(),
       this.companionAtlas.decode(),
       this.travelAtlas.decode(),
+      this.formAtlas.decode(),
       this.ragefireAtlas.decode(),
       this.shadowfangAtlas.decode(),
       this.duskwoodAtlas.decode(),
@@ -190,12 +203,19 @@ export class GameRenderer {
         ? backHeroCrop(index, atlas.naturalWidth, atlas.naturalHeight)
         : atlas === this.heroAtlas
           ? heroCrop(index, atlas.naturalWidth, atlas.naturalHeight)
-          : {
-              x: (index % columns) * cellWidth,
-              y: (Math.floor(index / columns) * atlas.naturalHeight) / 2,
-              width: cellWidth,
-              height: atlas.naturalHeight / 2,
-            };
+          : atlas === this.formAtlas
+            ? {
+                x: (index % 2) * cellWidth,
+                y: 0,
+                width: cellWidth,
+                height: atlas.naturalHeight,
+              }
+            : {
+                x: (index % columns) * cellWidth,
+                y: (Math.floor(index / columns) * atlas.naturalHeight) / 2,
+                width: cellWidth,
+                height: atlas.naturalHeight / 2,
+              };
     const measured =
       creatureAtlas === "shadowfang" || creatureAtlas === "duskwood";
     const drawWidth = measured ? (size * crop.width) / cellWidth : size,
@@ -288,11 +308,20 @@ export class GameRenderer {
   private deathRig(data: DeathSnapshot): AnimationRig {
     return data.kind === "enemy"
       ? CREATURE_ART[data.actor.type]?.rig || "heavy"
-      : data.bear
+      : data.bear ||
+          (this.game.classCombat &&
+            this.game.classDef.id === "druid" &&
+            data.actor.kit.form === "cat")
         ? "quadruped"
-        : ["mage", "priest", "warlock", "druid"].includes(this.game.classDef.id)
-          ? "robe"
-          : "biped";
+        : this.game.classCombat &&
+            this.game.classDef.id === "druid" &&
+            data.actor.kit.form === "moonkin"
+          ? "heavy"
+          : ["mage", "priest", "warlock", "druid"].includes(
+                this.game.classDef.id,
+              )
+            ? "robe"
+            : "biped";
   }
   private death(entry: DeathScene<DeathSnapshot>) {
     const { data } = entry,
@@ -654,6 +683,10 @@ export class GameRenderer {
       }
       c.restore();
     }
+    if (g.classCombat)
+      for (const actor of [g.player, ...(g.partner ? [g.partner.player] : [])])
+        for (const anchor of actor.kit.anchors)
+          drawClassAnchor(c, anchor, g.time, this.motionEnabled);
     const actors: { y: number; draw: () => void }[] = [];
     for (const l of g.landmarks)
       if (this.visible(l, 100))
@@ -844,7 +877,11 @@ export class GameRenderer {
             c.restore();
           }
     for (const shot of g.projectiles) {
-      if (!this.visible(shot, 20)) continue;
+      if (!this.visible(shot, 30)) continue;
+      if (shot.classId && !shot.enemy) {
+        drawClassProjectile(c, shot, this.particles);
+        continue;
+      }
       c.strokeStyle = shot.color;
       c.lineWidth = shot.radius;
       c.lineCap = "round";
@@ -856,7 +893,33 @@ export class GameRenderer {
       c.fillRect(shot.x - 2, shot.y - 2, 4, 4);
     }
     c.lineCap = "butt";
+    if (g.classCombat)
+      for (const entry of [
+        { p: g.player, id: g.classDef.id },
+        ...(g.partner
+          ? [{ p: g.partner.player, id: g.partner.classDef.id }]
+          : []),
+      ]) {
+        for (const enemy of g.enemies)
+          if (
+            !enemy.dead &&
+            this.visible(enemy, 90) &&
+            (entry.p.kit.target === enemy.id ||
+              entry.p.kit.curses.has(enemy.id))
+          )
+            drawClassMark(
+              c,
+              entry.id,
+              entry.p,
+              enemy,
+              entry.p.kit.curses.has(enemy.id),
+            );
+      }
     for (const fx of g.effects) {
+      if (fx.kind === "class") {
+        drawClassEffect(c, fx, this.motionEnabled, this.particles);
+        continue;
+      }
       c.globalAlpha = fx.life / fx.maxLife;
       c.strokeStyle = fx.color;
       c.fillStyle = fx.color;
@@ -894,7 +957,7 @@ export class GameRenderer {
     }
     c.globalAlpha = 1;
     c.textAlign = "center";
-    c.font = "bold 12px sans-serif";
+    c.font = this.largeText ? "bold 17px sans-serif" : "bold 14px sans-serif";
     for (const t of g.texts) {
       c.globalAlpha = Math.min(1, t.life * 4);
       c.fillStyle = "#111912";
@@ -1133,6 +1196,11 @@ export class GameRenderer {
       this.shadow(p.x, p.y, snapshot === g.player && g.travel.active ? 30 : 19);
     c.save();
     c.translate(Math.round(p.x), Math.round(p.y));
+    if (!death && g.classCombat) {
+      classChoreography(c, classDef.id, p, g.time, this.motionEnabled);
+      if (classDef.id === "rogue" && p.kit.concealedUntil > g.time)
+        c.globalAlpha = 0.4;
+    }
     if (!death && p.invulnerable > 0 && Math.floor(g.time * 12) % 2)
       c.globalAlpha = 0.6;
     if (!death && (p.shield > 0 || p.invulnerable > 1)) {
@@ -1229,7 +1297,43 @@ export class GameRenderer {
       c.restore();
       return;
     }
-    if (death ? bear : classDef.id === "druid" && p.activeBuff > 0) {
+    if (g.classCombat && classDef.id === "druid" && p.kit.form !== "bear") {
+      if (
+        this.sprite(
+          this.formAtlas,
+          p.kit.form === "cat" ? 0 : 1,
+          2,
+          0,
+          0,
+          p.kit.form === "cat" ? 83 : 87,
+          pose.mirror,
+          { pose, rig: p.kit.form === "cat" ? "quadruped" : "heavy" },
+        )
+      ) {
+        c.restore();
+        return;
+      }
+      if (p.kit.form === "cat") {
+        drawCatForm(
+          c,
+          p,
+          g.time,
+          !death &&
+            this.motionEnabled &&
+            !!(snapshot === g.player
+              ? g.input.x || g.input.y || p.dashTimer
+              : g.partner?.input.x || g.partner?.input.y || p.dashTimer),
+        );
+        c.restore();
+        return;
+      }
+    }
+    if (
+      death
+        ? bear
+        : classDef.id === "druid" &&
+          (p.activeBuff > 0 || (g.classCombat && p.kit.form === "bear"))
+    ) {
       if (
         this.sprite(this.companionAtlas, 2, 2, 0, 0, 83, pose.mirror, {
           pose,
@@ -1544,8 +1648,14 @@ export class GameRenderer {
       : warning
         ? "#cb895e33"
         : "#ed967377";
-    c.strokeStyle = h.linger ? "#c0de88" : warning ? "#efc59c" : "#f9ad87";
-    c.lineWidth = 2;
+    c.strokeStyle = this.highContrast
+      ? "#fff4b0"
+      : h.linger
+        ? "#c0de88"
+        : warning
+          ? "#efc59c"
+          : "#f9ad87";
+    c.lineWidth = this.highContrast ? 4 : 2;
     c.setLineDash(warning ? [8, 5] : []);
     c.beginPath();
     let labelX = 0,
@@ -1579,7 +1689,7 @@ export class GameRenderer {
     if (h.shape === "line") c.rotate(-laneAngle);
     if (warning) {
       c.fillStyle = "#ffdec0";
-      c.font = "bold 12px sans-serif";
+      c.font = this.largeText ? "bold 18px sans-serif" : "bold 14px sans-serif";
       c.textAlign = "center";
       if (h.shape === "ring") {
         c.fillStyle = "#c5d9aa";

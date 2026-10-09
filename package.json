@@ -1,13 +1,13 @@
 {
   "name": "wow-survivors",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev": "node scripts/local-server.mjs --open",
     "build": "tsc --noEmit && vite build",
     "preview": "node scripts/local-server.mjs --preview --open",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "tsx --test --test-concurrency=4 tests/*.test.ts",
     "test:e2e": "playwright test",
     "format": "prettier --write src scripts tests docs *.json *.ts index.html",
     "format:check": "prettier --check src scripts tests docs *.json *.ts index.html",

@@ -1,3 +1,4 @@
+import { CLASS_KITS } from "./class-combat";
 import { CLASS_MAP, GEAR_MAP, SPELLS, STAT_LABELS } from "./content";
 import type { ClassId, Stat } from "./content";
 import { CLASS_TRIALS, TRIAL_CHAPTERS, trialRelicId } from "./class-trials";
@@ -11,7 +12,7 @@ export function trialGoalLabel(classId: ClassId, metric: TrialMetric): string {
   const c = CLASS_MAP[classId];
   return {
     casts: `Cast ${SPELLS[c.spells[0]].name} against a target`,
-    actives: `Use ${c.active} successfully`,
+    actives: `Use ${CLASS_KITS[classId].action} successfully`,
     mastery: `Reach rank 3 with ${SPELLS[c.spells[1]].name}`,
     elites: "Defeat an elite enemy",
     evolutions: "Evolve any class spell to rank 5",

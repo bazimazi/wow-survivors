@@ -327,7 +327,7 @@ test("gun equipment shooting works with RT and the phone Shoot button; misses sp
   await capture(page, "shoot-phone");
   const box = await page.locator("#shoot-button").boundingBox();
   const travel = await page.locator("#travel-button").boundingBox();
-  const tutorial = await page.locator("#game-tutorial").boundingBox();
+  const tutorial = await page.locator(".class-kit-hud").boundingBox();
   expect(box!.x + box!.width).toBeLessThanOrEqual(travel!.x);
   expect(tutorial!.y + tutorial!.height).toBeLessThanOrEqual(travel!.y);
   await expect(page.locator("#travel-label")).toBeVisible();

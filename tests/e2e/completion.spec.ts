@@ -106,7 +106,7 @@ test("co-op health and ability controls avoid timer, fieldwork and boss panels a
     await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
     await page.clock.runFor(150);
     const partner = (await page.locator(".partner-hud").boundingBox())!;
-    for (const selector of [".game-timer", ".world-hud"])
+    for (const selector of [".game-timer", ".world-hud", ".combat-briefing"])
       expect(
         disjoint(partner, (await page.locator(selector).boundingBox())!),
         `${width}: ${selector} · ${JSON.stringify(partner)}`,

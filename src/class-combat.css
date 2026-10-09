@@ -1,0 +1,201 @@
+.class-loop {
+  margin: 18px 0;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--class-color) 40%, transparent);
+  border-left: 3px solid var(--class-color);
+  border-radius: 7px;
+  background: #0c1821;
+}
+.class-loop strong {
+  color: var(--class-color);
+  font-size: 14px;
+}
+.class-loop p {
+  color: #c4d1d8;
+  line-height: 1.65;
+  font-size: 12px;
+  margin: 8px 0;
+}
+.class-loop small {
+  color: #e1c78d;
+  font-size: 10px;
+  line-height: 1.6;
+}
+.class-kit-hud {
+  position: absolute;
+  right: 22px;
+  bottom: 127px;
+  width: 330px;
+  padding: 12px 15px;
+  border: 1px solid #69849377;
+  border-left: 3px solid var(--class-color);
+  border-radius: 8px;
+  background: #0c1827;
+  box-shadow: 0 4px 20px #0005;
+  pointer-events: auto;
+}
+.combat-briefing {
+  --briefing-top: 102px;
+  position: absolute;
+  z-index: 5;
+  right: 22px;
+  top: var(--briefing-top);
+  width: 260px;
+  display: grid;
+  gap: 10px;
+  max-height: calc(100dvh - var(--briefing-top) - 225px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  pointer-events: auto;
+}
+.combat-briefing .adventure-hud,
+.combat-briefing .class-kit-hud {
+  position: relative;
+  left: auto;
+  right: auto;
+  top: auto;
+  bottom: auto;
+  width: 100%;
+}
+.coop-game .combat-briefing {
+  --briefing-top: 260px;
+}
+.class-kit-hud summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--class-color);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+.class-kit-hud summary span {
+  font-size: 8px;
+  color: #c1cbd1;
+  letter-spacing: 1px;
+}
+.class-kit-hud p {
+  font-size: 12px;
+  color: #d0dce1;
+  line-height: 1.6;
+  margin: 10px 0;
+}
+.class-kit-hud > b {
+  display: block;
+  color: #eef0e4;
+  font-size: 11px;
+  font-weight: 500;
+}
+.class-kit-hud small {
+  display: block;
+  font-size: 10px;
+  color: #bacbd4;
+  margin-top: 7px;
+}
+.class-kit-hud kbd {
+  font-size: 8px;
+  border: 1px solid #8ea4ae77;
+  padding: 2px 4px;
+  border-radius: 3px;
+  color: #eed7aa;
+}
+.class-kit-track {
+  height: 4px;
+  background: #45606c77;
+  border-radius: 3px;
+  margin: 10px 0 8px;
+  overflow: hidden;
+}
+.class-kit-track i {
+  display: block;
+  background: var(--class-color);
+  height: 100%;
+  width: 0;
+}
+.game-shell:has(.class-kit-hud) .game-tutorial {
+  display: none;
+}
+.touch-controls .touch-dash {
+  margin-left: auto;
+  margin-right: 12px;
+  border-color: #a5d6e7;
+  background: #173244ed;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 3px;
+}
+.touch-dash small {
+  font-size: 10px;
+}
+.high-contrast .class-kit-hud {
+  background: #061019;
+  border-color: #e2ecee;
+}
+.in-game #toast-root {
+  right: auto;
+  left: 26px;
+}
+.large-text .class-kit-hud > b,
+.large-text .class-kit-hud p,
+.large-text .class-kit-hud summary,
+.large-text .class-loop p {
+  font-size: 14px;
+}
+@media (min-width: 761px) and (max-width: 1000px) {
+  .coop-game .combat-briefing {
+    --briefing-top: 385px;
+  }
+}
+@media (max-width: 760px) {
+  .in-game #toast-root {
+    left: 12px;
+    max-width: calc(50vw - 18px);
+  }
+  .in-game .toast {
+    padding: 8px 9px;
+    font-size: 10px;
+  }
+  .combat-briefing {
+    --briefing-top: 128px;
+    right: 12px;
+    width: calc(50% - 18px);
+  }
+  .has-boss .combat-briefing {
+    --briefing-top: 225px;
+  }
+  .coop-game .combat-briefing {
+    --briefing-top: 205px;
+  }
+  .coop-game.has-boss .combat-briefing {
+    --briefing-top: 340px;
+  }
+  .class-kit-hud {
+    bottom: 100px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    padding: 9px 12px;
+  }
+  .class-kit-hud > b {
+    font-size: 12px;
+  }
+  .class-kit-hud small {
+    font-size: 9px;
+  }
+  .class-kit-hud summary {
+    font-size: 11px;
+  }
+  .class-kit-track {
+    margin: 7px 0;
+  }
+}
+@media (pointer: coarse) {
+  .class-kit-hud {
+    bottom: 235px;
+  }
+  .touch-controls .touch-dash {
+    width: 60px;
+    height: 60px;
+  }
+}

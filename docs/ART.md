@@ -1,5 +1,7 @@
 # Original game artwork
 
+Release 1.2 adds an original transparent Cat/Moonkin atlas and nine authored class effect families. [Art provenance, final prompt, and renderer integration](ART-1.2.md).
+
 From release 0.30, captures and downloaded source PDFs under `output/` are local, regeneratable evidence and are excluded from Git. Historical paths below describe the original validation sessions. Every bundled runtime image/SVG and both font licenses remain in `public/`; no new bitmap is needed for the equipment phase.
 
 Release 0.16 adds [`public/art/duskwood-sprites.png`](../public/art/duskwood-sprites.png) and a vector lantern-road scene. [Duskwood art notes](ART-0.16.md) record the built-in tool, exact final prompt, saved source, alpha inspection and measured sprite crops.

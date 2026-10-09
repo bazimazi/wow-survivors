@@ -342,6 +342,7 @@ test("successful combat actions dismiss travel while failed actions preserve it"
   mount(g);
   assert.equal(g.usePotion(), false);
   assert.equal(g.useBomb(), false);
+  g.player.dashCooldown = 1;
   assert.equal(g.dash(), false);
   assert.equal(g.travel.active, true);
   g.player.resource = 0;

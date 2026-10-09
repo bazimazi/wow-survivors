@@ -10,6 +10,14 @@ import {
   itemRoll,
   equipmentSnapshot,
 } from "./item-progression";
+import {
+  freshAdventure,
+  normalizeAdventure,
+  normalizeAdventureProof,
+  relicUnlocked,
+  settleAdventure,
+} from "./adventure";
+import type { AdventureProgress, AdventureProof } from "./adventure";
 import type { ItemState, EquipmentProof } from "./item-progression";
 import type { WeaponType } from "./weapon-training";
 import { CLASSIC_TREES, classicTalentBudget } from "./classic-talents";
@@ -167,6 +175,7 @@ export interface HeroProgress {
   weaponSkills: Partial<Record<WeaponType, number>>;
 }
 export interface SaveData {
+  adventure: AdventureProgress;
   journey: JourneyProgress;
   version: 1;
   selectedClass: ClassId;
@@ -211,9 +220,12 @@ export interface SaveData {
     animation: boolean;
     music: boolean;
     musicVolume: number;
+    largeText: boolean;
+    highContrast: boolean;
   };
 }
 export interface RunRecord {
+  adventure?: AdventureProof;
   party?: { classId: ClassId; equipmentProof: EquipmentProof };
   journeyProof?: JourneySnapshot[];
   id: string;
@@ -349,6 +361,7 @@ export function freshSave(): SaveData {
   ) as Record<ClassId, HeroProgress>;
   return {
     version: 1,
+    adventure: freshAdventure(),
     journey: {},
     selectedClass: "mage",
     selectedZone: "elwynn",
@@ -410,6 +423,8 @@ export function freshSave(): SaveData {
       animation: true,
       music: false,
       musicVolume: 50,
+      largeText: false,
+      highContrast: false,
     },
   };
 }
@@ -689,10 +704,13 @@ export function validateSave(raw: unknown): SaveData {
     "screenShake",
     "animation",
     "music",
+    "largeText",
+    "highContrast",
   ] as const)
     if (typeof obj(data.settings)[k] === "boolean")
       s.settings[k] = obj(data.settings)[k] as boolean;
   s.settings.musicVolume = finite(obj(data.settings).musicVolume, 50, 100);
+  s.adventure = normalizeAdventure(data.adventure);
   s.history = Array.isArray(data.history)
     ? data.history.slice(0, 20).flatMap((r) => {
         const h = obj(r);
@@ -707,6 +725,7 @@ export function validateSave(raw: unknown): SaveData {
         return [
           {
             id: h.id,
+            adventure: normalizeAdventureProof(h.adventure),
             classId: h.classId as ClassId,
             zoneId: h.zoneId as string,
             victory:
@@ -752,6 +771,8 @@ export function validateSave(raw: unknown): SaveData {
     ]),
   ];
   if (!zoneUnlocked(s, s.selectedZone)) s.selectedZone = "elwynn";
+  if (s.adventure.relic && !relicUnlocked(s, s.adventure.relic))
+    s.adventure.relic = "";
   return s;
 }
 export function readSave(): { save: SaveData; recovered: boolean } {
@@ -1548,6 +1569,7 @@ export function settleRun(
   s.totals.kills += run.kills;
   s.totals.bestTime = Math.max(s.totals.bestTime, Math.floor(run.time));
   s.totals.runs++;
+  settleAdventure(s, run);
   for (const [id, amount] of Object.entries(professionGains))
     if (id === "fishing" || PROFESSIONS.some((p) => p.id === id))
       grantProfessionSkill(s, id as TradeId, amount!);

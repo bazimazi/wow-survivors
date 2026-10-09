@@ -659,7 +659,7 @@ test("real keyboard and phone pointer actions show combat gestures with readable
     e.damage = 0;
     g.player.resource = 100;
   });
-  await page.keyboard.press("Space");
+  await page.keyboard.press("c");
   await page.clock.runFor(120);
   expect((await readPose(page)).pose.frame).toBeGreaterThanOrEqual(14);
   await page.screenshot({

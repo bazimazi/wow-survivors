@@ -380,11 +380,11 @@ test("keyboard and pointer restore hints and touch movement coexists with contro
   await page.clock.runFor(250);
   await page.keyboard.up("d");
   expect((await game(page)).x).toBeGreaterThan(0);
-  await expect(page.locator("#active-button kbd")).toHaveText("SPACE");
+  await expect(page.locator("#active-button kbd")).toHaveText("C");
   await press(page, 8);
   await expect(page.locator("#active-button kbd")).toHaveText("A / ×");
   await page.getByRole("button", { name: "Travel", exact: true }).click();
-  await expect(page.locator("#active-button kbd")).toHaveText("SPACE");
+  await expect(page.locator("#active-button kbd")).toHaveText("C");
   // Real pointer events on the production touch pad, without a runtime input hook.
   await page.setViewportSize({ width: 390, height: 844 });
   const pad = page.locator("#touch-pad"),

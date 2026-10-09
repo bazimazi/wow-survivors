@@ -400,11 +400,13 @@ test("real wolf, imp and totem following and Bear Form use their separate locomo
   });
   expect(pets).toHaveLength(3);
   for (const pet of pets) expect(pet.frame, pet.id).toBeGreaterThanOrEqual(0);
-  await page.keyboard.press("Space");
+  await page.keyboard.press("c");
+  await page.clock.runFor(1300);
+  await page.keyboard.press("c");
   await page.clock.runFor(80);
   expect(
-    await page.evaluate(() => (window as any).__animGame.player.activeBuff),
-  ).toBeGreaterThan(0);
+    await page.evaluate(() => (window as any).__animGame.player.kit.form),
+  ).toBe("bear");
   expect(
     await page.evaluate(() =>
       [...(window as any).__animRenderer.frameCache.frames.keys()].some(
