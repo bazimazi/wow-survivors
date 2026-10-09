@@ -108,15 +108,15 @@ function cache(g: GameEngine) {
 }
 
 test("thirty unique additions have explicit sources, four-grade crafts and complete weapon fit with separate off-hand formulas and no new set pieces", () => {
-  assert.equal(GEAR.length, 353);
-  assert.equal(RECIPES.length, 127);
+  assert.equal(GEAR.length, 384);
+  assert.equal(RECIPES.length, 151);
   assert.equal(SLOTS.length, 16);
   assert.equal(OFFHAND_GEAR.length, 30);
   assert.equal(OFFHAND_RECIPES.length, 8);
   assert.equal(WARDROBE_CATALOG.length, 222);
   assert.equal(new Set(GEAR.map((g) => g.id)).size, GEAR.length);
   assert.equal(new Set(WARDROBE_CATALOG.map((g) => g.id)).size, 222);
-  assert.equal(GEAR.filter((g) => g.slot === "weapon").length, 91);
+  assert.equal(GEAR.filter((g) => g.slot === "weapon").length, 92);
   for (const g of GEAR.filter((g) => g.slot === "weapon"))
     assert.ok(g.weaponHands === 1 || g.weaponHands === 2);
   assert.equal(GEAR_MAP.starter_priest.weaponHands, 1);

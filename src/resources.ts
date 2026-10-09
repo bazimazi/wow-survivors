@@ -133,7 +133,11 @@ export const tierForSkill = (skill: number): ResourceTier =>
 export const tierForLevel = (level: number): ResourceTier =>
   level >= 20 ? 4 : level >= 10 ? 3 : level >= 5 ? 2 : 1;
 export const zoneResourceTier = (zone: string): ResourceTier =>
-  zone === "tirisfal" || zone === "duskwood" ? 4 : zone === "elwynn" ? 2 : 3;
+  ["tirisfal", "duskwood", "plaguelands", "scarlet"].includes(zone)
+    ? 4
+    : zone === "elwynn"
+      ? 2
+      : 3;
 export const distanceTier = (distance: number): ResourceTier =>
   distance < 700 ? 1 : distance < 1300 ? 2 : distance < 1900 ? 3 : 4;
 export function gradedCosts(

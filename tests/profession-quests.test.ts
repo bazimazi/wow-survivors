@@ -123,7 +123,7 @@ test("twelve original chains contain 48 projects and twelve permanent level-20 e
   assert.equal(PROFESSION_TRADES.length, 12);
   assert.equal(PROFESSION_PROJECTS.length, 4);
   assert.equal(PROFESSION_MASTERY_GEAR.length, 12);
-  assert.equal(GEAR.length, 353);
+  assert.equal(GEAR.length, 384);
   assert.equal(new Set(GEAR.map((g) => g.id)).size, GEAR.length);
   for (const trade of PROFESSION_TRADES) {
     assert.equal(PROFESSION_QUESTS[trade].projects.length, 4);

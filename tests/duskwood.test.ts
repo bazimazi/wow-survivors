@@ -129,7 +129,7 @@ test("old saves and unknown destinations cannot fabricate Duskwood access", () =
   assert.equal(zoneUnlocked(restored, "missing"), false);
   assert.equal(restored.version, 1);
 });
-test("the seven destinations retain their original order and thirteen equipment additions have unique sources", () => {
+test("the original seven destinations retain their order before two endgame destinations and thirteen equipment additions have unique sources", () => {
   assert.deepEqual(
     ZONES.map((z) => z.id),
     [
@@ -140,10 +140,12 @@ test("the seven destinations retain their original order and thirteen equipment 
       "ragefire",
       "shadowfang",
       "duskwood",
+      "scarlet",
+      "plaguelands",
     ],
   );
-  assert.equal(GEAR.length, 353);
-  assert.equal(RECIPES.length, 127);
+  assert.equal(GEAR.length, 384);
+  assert.equal(RECIPES.length, 151);
   assert.equal(DUSKWOOD_GEAR.length, 13);
   assert.equal(Object.keys(DUSKWOOD_SPRITES).length, 9);
   assert.equal(new Set(GEAR.map((g) => g.id)).size, GEAR.length);
@@ -511,7 +513,7 @@ test("low-level engine fixtures cannot drop undefined local elite rewards or equ
   s.heroes.mage.level = 20;
   assert.ok(equip(s, "watchkeeper_oath"));
 });
-test("repeated Duskwood trophies settle as duplicate gold without replacing another hero's equipment", () => {
+test("repeated Duskwood trophies settle as independent copies without replacing another hero's equipment", () => {
   const s = freshSave();
   s.heroes.warrior.level = 20;
   s.selectedClass = "warrior";
@@ -528,6 +530,6 @@ test("repeated Duskwood trophies settle as duplicate gold without replacing anot
     r = g.result();
   assert.ok(settleRun(s, r));
   assert.equal(s.inventory.filter((x) => x === "watchkeeper_oath").length, 1);
-  assert.equal(s.gold, gold + r.gold + 130);
+  assert.equal(s.gold, gold + r.gold);
   assert.equal(s.heroes.warrior.equipment.trinket, "watchkeeper_oath");
 });

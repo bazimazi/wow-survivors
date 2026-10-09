@@ -289,7 +289,7 @@ test("all classes receive usable level-10 dungeon gear from every stage across s
         if (stage < 2) g.continueDungeon("stride");
       }
     }
-  assert.equal(GEAR.length, 353);
+  assert.equal(GEAR.length, 384);
   assert.equal(new Set(GEAR.map((g) => g.id)).size, GEAR.length);
   assert.ok(
     DEADMINES_STAGES.flatMap((s) => s.loot).every(

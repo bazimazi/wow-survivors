@@ -112,7 +112,7 @@ test("legacy muted saves remain silent; native music controls, independent effec
   );
 });
 
-test("ten actual offline Web Audio compositions render finite non-silent waveforms", async ({
+test("twelve actual offline Web Audio compositions render finite non-silent waveforms", async ({
   page,
 }) => {
   await setup(page);
@@ -140,7 +140,7 @@ test("ten actual offline Web Audio compositions render finite non-silent wavefor
     }
     return rows;
   });
-  expect(reports).toHaveLength(10);
+  expect(reports).toHaveLength(12);
   for (const row of reports) {
     expect(row.finite).toBe(true);
     expect(row.peak).toBeGreaterThan(0.005);

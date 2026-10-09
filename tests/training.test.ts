@@ -340,8 +340,8 @@ test("Artisan recipes enforce the trained rank and supply storage rejects wasted
   assert.equal(s.professions.alchemy, 230);
 });
 test("new recipes have valid outputs, safe vendor refunds and unique content IDs", () => {
-  assert.equal(GEAR.length, 353);
-  assert.equal(RECIPES.length, 127);
+  assert.equal(GEAR.length, 384);
+  assert.equal(RECIPES.length, 151);
   assert.equal(new Set(GEAR.map((g) => g.id)).size, GEAR.length);
   assert.equal(new Set(RECIPES.map((r) => r.id)).size, RECIPES.length);
   for (const r of RECIPES.filter((r) => r.trainingRank)) {

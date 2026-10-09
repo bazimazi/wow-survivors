@@ -95,7 +95,7 @@ test("24 named resources preserve all six legacy keys and every recipe/formula c
       "Smallfish",
     ],
   );
-  assert.equal(RECIPES.length, 127);
+  assert.equal(RECIPES.length, 151);
   assert.equal(ENCHANTMENTS.length, 24);
   for (const r of [...RECIPES, ...ENCHANTMENTS]) {
     const costs = "cost" in r ? r.cost : r.costs;
@@ -393,9 +393,14 @@ test("cloth drops use elapsed time, zone and hero gates with no unrelated profes
 
 test("dungeon rooms preserve node identity and guardian rewards follow route and hero level", () => {
   for (const zone of ZONES.filter((z) => z.dungeon)) {
-    const g = make({ zone, characterLevel: 20 });
+    const g = make({ zone, characterLevel: 40 });
     for (let stage = 0; stage < g.dungeonRoute!.stages.length; stage++) {
-      const tier = zone.id === "shadowfang" ? 3 : Math.min(3, stage + 1);
+      const tier =
+        zone.id === "scarlet"
+          ? 4
+          : zone.id === "shadowfang"
+            ? 3
+            : Math.min(3, stage + 1);
       assert.equal(g.nodes.length, zone.id === "shadowfang" ? 0 : 8);
       assert.ok(g.nodes.every((n) => MATERIALS[n.kind].tier === tier));
       assert.ok(
@@ -412,6 +417,13 @@ test("dungeon rooms preserve node identity and guardian rewards follow route and
       boss.x = g.player.x;
       boss.y = g.player.y;
       assert.equal(g.useBomb(), true);
+      if (zone.id === "scarlet" && stage === 3) {
+        for (const guard of g.enemies.filter(
+          (actor) => actor.guard && !actor.dead,
+        ))
+          (g as any).damageEnemy(guard, 100000, "bomb", false);
+        (g as any).damageEnemy(boss, 100000, "bomb", false);
+      }
       for (const [id, amount] of Object.entries(g.dungeonStage!.materials)) {
         const key = materialFor(MATERIALS[id as Material].family, tier);
         assert.ok((g.materials[key] || 0) >= amount!);

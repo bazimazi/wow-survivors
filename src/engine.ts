@@ -1,6 +1,10 @@
 import { weaponAccuracy } from "./item-progression";
 import type { EquipmentSnapshot, WeaponPractice } from "./item-progression";
 import type { WeaponType } from "./weapon-training";
+import { resistanceMultiplier } from "./attributes";
+import type { DamageSchool, Resistances } from "./attributes";
+import { EPILOGUE_MAP, validJourneySnapshot } from "./final-journey";
+import type { JourneySnapshot } from "./final-journey";
 import {
   MATERIALS as RESOURCE_MAP,
   FAMILY_INFO,
@@ -106,6 +110,7 @@ export interface Projectile extends Vec {
   slow: number;
   hit: Set<number>;
   enemy?: boolean;
+  school?: DamageSchool;
 }
 export interface Pickup extends Vec {
   kind: "xp" | "gold" | "heal" | "chest";
@@ -141,6 +146,7 @@ export interface Node extends Vec {
   depleted: boolean;
 }
 export interface Hazard extends Telegraph {
+  school?: DamageSchool;
   warning: number;
   maxWarning?: number;
   life: number;
@@ -220,9 +226,12 @@ export type DeathAction =
       bear: boolean;
     };
 export interface EngineConfig {
+  partner?: PartnerConfig;
   classId: ClassId;
   zone: ZoneDef;
   stats: Stats;
+  resistances?: Partial<Resistances>;
+  journey?: JourneySnapshot[];
   spellBonuses?: Record<string, SpellBonus>;
   spellbook?: SpellbookProgress;
   professions: Partial<Record<ProfessionId, number>>;
@@ -242,6 +251,30 @@ export interface EngineConfig {
   onConsume?: (type: "potions" | "bombs") => boolean;
   equipment?: EquipmentSnapshot;
   onAmmunition?: () => boolean;
+}
+export interface PartnerConfig {
+  classId: ClassId;
+  stats: Stats;
+  characterLevel: number;
+  spellbook?: SpellbookProgress;
+  spellBonuses?: Record<string, SpellBonus>;
+  resistances?: Partial<Resistances>;
+  equipment?: EquipmentSnapshot;
+}
+export interface PartnerState {
+  config: PartnerConfig;
+  player: GameEngine["player"];
+  classDef: ClassDef;
+  stats: Stats;
+  prepared: string[];
+  spells: SpellState[];
+  equipment: EquipmentSnapshot;
+  weaponHits: Partial<Record<WeaponType, number>>;
+  healingEffects: Record<string, PeriodicEffect>;
+  buffs: GameEngine["timedBuffs"];
+  input: Vec;
+  revive: number;
+  pet?: Pet;
 }
 
 export class Random {
@@ -303,6 +336,12 @@ class SpatialGrid {
 }
 
 export class GameEngine {
+  private partnerActing = false;
+  partner: PartnerState | null = null;
+  revivePrimary = 0;
+  private commanderRevived = false;
+  private revivedCommander: Enemy | null = null;
+  timedBuffs: Record<string, { until: number; stats: Partial<Stats> }> = {};
   readonly preparedSpells: readonly string[];
   healingEffects: Record<string, PeriodicEffect> = {};
   healingBySpell: Record<string, number> = {};
@@ -387,7 +426,7 @@ export class GameEngine {
   private eliteCount = 0;
   private waveCount = 0;
   private grid = new SpatialGrid();
-  readonly equipment: EquipmentSnapshot;
+  equipment: EquipmentSnapshot;
   weaponHits: Partial<Record<WeaponType, number>> = {};
   shotReadyAt = 0;
   private config: EngineConfig;
@@ -520,6 +559,302 @@ export class GameEngine {
     }
     if (this.zone.dungeon) this.prepareDungeonRoom();
     for (let i = 0; i < 7; i++) this.spawnEnemy(360 + i * 20);
+    if (
+      config.partner &&
+      config.partner.classId !== config.classId &&
+      CLASS_MAP[config.partner.classId]
+    ) {
+      const buddy = config.partner,
+        def = CLASS_MAP[buddy.classId],
+        book = normalizeSpellbook(
+          buddy.classId,
+          buddy.characterLevel,
+          buddy.spellbook,
+          def.spells,
+        );
+      const validItems = [...new Set(buddy.equipment?.items || [])].filter(
+        (id) =>
+          Object.hasOwn(GEAR_MAP, id) &&
+          (!GEAR_MAP[id].classes ||
+            GEAR_MAP[id].classes!.includes(buddy.classId)) &&
+          buddy.characterLevel >= (GEAR_MAP[id].level || 1),
+      );
+      this.partner = {
+        config: { ...buddy },
+        classDef: def,
+        stats: { ...buddy.stats },
+        player: {
+          ...this.player,
+          x: 90,
+          maxHp: buddy.stats.health,
+          hp: buddy.stats.health,
+          resource: def.resource === "Rage" ? 30 : 100,
+        },
+        prepared: book.prepared,
+        spells: book.prepared
+          .filter(
+            (id) =>
+              id === def.spells[0] ||
+              (["hunter", "warlock"].includes(def.id) && id === def.spells[2]),
+          )
+          .map((id) => ({ id, rank: 1, timer: 0.2, orbitTimer: 0 })),
+        equipment: { ...buddy.equipment, items: validItems },
+        weaponHits: {},
+        healingEffects: {},
+        buffs: {},
+        input: { x: 0, y: 0 },
+        revive: 0,
+      };
+      const companion = this.partner.spells.find(
+        (spell) => SPELLS[spell.id].kind === "pet",
+      );
+      if (companion)
+        this.partner.pet = { x: 130, y: 0, spellId: companion.id, timer: 0.5 };
+    }
+  }
+  setPartnerInput(x: number, y: number) {
+    if (!this.partner) return;
+    const length = Math.hypot(x, y);
+    this.partner.input =
+      Number.isFinite(length) && length
+        ? { x: x / Math.max(1, length), y: y / Math.max(1, length) }
+        : { x: 0, y: 0 };
+  }
+  private withPartner<T>(action: () => T): T | undefined {
+    const buddy = this.partner;
+    if (!buddy) return undefined;
+    const original = {
+      player: this.player,
+      stats: this.stats,
+      classDef: this.classDef,
+      config: this.config,
+      spells: this.spells,
+      equipment: this.equipment,
+      weaponHits: this.weaponHits,
+      healingEffects: this.healingEffects,
+      timedBuffs: this.timedBuffs,
+      casts: this.trialCasts,
+      actives: this.trialActives,
+    };
+    const events: GameEvent[] = [];
+    this.partnerActing = true;
+    this.player = buddy.player;
+    this.stats = buddy.stats;
+    this.classDef = buddy.classDef;
+    this.spells = buddy.spells;
+    this.equipment = buddy.equipment;
+    this.weaponHits = buddy.weaponHits;
+    this.healingEffects = buddy.healingEffects;
+    this.timedBuffs = buddy.buffs;
+    this.config = {
+      ...original.config,
+      ...buddy.config,
+      partner: undefined,
+      trialChapter: undefined,
+      onEvent: (event) => events.push(event),
+    };
+    try {
+      return action();
+    } finally {
+      this.partnerActing = false;
+      this.player = original.player;
+      this.stats = original.stats;
+      this.classDef = original.classDef;
+      this.config = original.config;
+      this.spells = original.spells;
+      this.equipment = original.equipment;
+      this.weaponHits = original.weaponHits;
+      this.healingEffects = original.healingEffects;
+      this.timedBuffs = original.timedBuffs;
+      this.trialCasts = original.casts;
+      this.trialActives = original.actives;
+      for (const event of events) this.emit(event);
+    }
+  }
+  activatePartner(): boolean {
+    if (
+      !this.partner ||
+      this.partner.player.hp <= 0 ||
+      this.paused ||
+      this.choosing ||
+      this.checkpoint ||
+      this.shrineChoice ||
+      this.ended
+    )
+      return false;
+    return this.withPartner(() => this.activate()) || false;
+  }
+  private hurtActor(
+    actor: GameEngine["player"],
+    damage: number,
+    school: DamageSchool = "physical",
+  ) {
+    return actor === this.partner?.player
+      ? this.withPartner(() => this.hurtPlayer(damage, school))
+      : this.hurtPlayer(damage, school);
+  }
+  private tetherParty() {
+    const buddy = this.partner;
+    if (!buddy) return;
+    const a = this.player,
+      b = buddy.player;
+    const limit = Math.max(
+      120,
+      Math.min(480, Math.min(this.width, this.height) - 110),
+    );
+    const separation = Math.hypot(a.x - b.x, a.y - b.y);
+    if (separation <= limit) return;
+    // Fallen actors stay where they fell; the living ally remains within reach and view.
+    const anchor = b.hp <= 0 ? b : a,
+      mover = b.hp <= 0 ? a : b;
+    mover.x = anchor.x + ((mover.x - anchor.x) * limit) / separation;
+    mover.y = anchor.y + ((mover.y - anchor.y) * limit) / separation;
+  }
+  private updatePartner(dt: number) {
+    const buddy = this.partner;
+    if (!buddy) return;
+    const p = buddy.player,
+      primary = this.player;
+    this.tetherParty();
+    if (p.hp <= 0 || primary.hp <= 0) {
+      const close = distanceSq(p, primary) <= 90 ** 2;
+      if (p.hp <= 0 && primary.hp > 0) {
+        buddy.revive = close ? buddy.revive + dt : 0;
+        if (buddy.revive >= 3) {
+          p.hp = p.maxHp * 0.35;
+          p.invulnerable = 2;
+          buddy.revive = 0;
+          this.emit({
+            type: "pickup",
+            message: "Your partner is back on their feet.",
+          });
+        }
+      } else if (primary.hp <= 0 && p.hp > 0) {
+        this.revivePrimary = close ? this.revivePrimary + dt : 0;
+        if (this.revivePrimary >= 3) {
+          primary.hp = primary.maxHp * 0.35;
+          primary.invulnerable = 2;
+          this.revivePrimary = 0;
+          this.emit({
+            type: "pickup",
+            message: "Your partner helped you back into the fight.",
+          });
+        }
+      }
+    }
+    if (p.hp <= 0) return;
+    for (const key of [
+      "invulnerable",
+      "activeBuff",
+      "dashTimer",
+      "dashCooldown",
+      "activeCooldown",
+      "hurt",
+    ] as const)
+      p[key] = Math.max(0, p[key] - dt);
+    if (p.shieldTimer > 0 && (p.shieldTimer -= dt) <= 0) p.shield = 0;
+    p.hp = Math.min(p.maxHp, p.hp + buddy.stats.regen * dt);
+    if (buddy.classDef.resource !== "Rage")
+      p.resource = Math.min(
+        100,
+        p.resource +
+          (buddy.classDef.resource === "Energy"
+            ? 20
+            : 14 + buddy.stats.regen * 2) *
+            dt,
+      );
+    const speed = buddy.classDef.speed * (1 + buddy.stats.speed / 100),
+      bounds = this.movementBounds;
+    p.x = clamp(p.x + buddy.input.x * speed * dt, -bounds.x, bounds.x);
+    p.y = clamp(p.y + buddy.input.y * speed * dt, -bounds.y, bounds.y);
+    if (buddy.input.x || buddy.input.y)
+      p.facing = Math.atan2(buddy.input.y, buddy.input.x);
+    this.tetherParty();
+    const unlocked = buddy.prepared.slice(
+      0,
+      Math.min(4, 1 + Math.floor(this.level / 3)),
+    );
+    for (const id of unlocked)
+      if (!buddy.spells.some((spell) => spell.id === id)) {
+        buddy.spells.push({ id, rank: 1, timer: 0.2, orbitTimer: 0 });
+        if (SPELLS[id].kind === "pet" && !buddy.pet)
+          buddy.pet = { x: p.x + 55, y: p.y + 20, spellId: id, timer: 0.5 };
+      }
+    for (const spell of buddy.spells)
+      spell.rank = Math.min(5, 1 + Math.floor((this.level - 1) / 4));
+    if (buddy.pet) {
+      const pet = buddy.pet,
+        target = this.nearest(p, 500),
+        follow =
+          pet.spellId === "beast" && target
+            ? target
+            : { x: p.x + 55, y: p.y + 20 },
+        dx = follow.x - pet.x,
+        dy = follow.y - pet.y,
+        length = Math.hypot(dx, dy) || 1,
+        step = Math.min(length, 260 * dt);
+      pet.x += (dx / length) * step;
+      pet.y += (dy / length) * step;
+    }
+    this.withPartner(() => {
+      for (const [id, buff] of Object.entries(buddy.buffs))
+        if (this.time >= buff.until) {
+          for (const [key, value] of Object.entries(buff.stats))
+            buddy.stats[key as Stat] -= value!;
+          delete buddy.buffs[id];
+        }
+      for (const [id, effect] of Object.entries(buddy.healingEffects)) {
+        effect.timer -= dt;
+        if (effect.timer <= 0 && effect.ticksLeft > 0) {
+          this.healPlayer(effect.damage, id, false);
+          effect.ticksLeft--;
+          effect.timer += effect.interval;
+        }
+        if (effect.ticksLeft <= 0) delete buddy.healingEffects[id];
+      }
+      for (const state of buddy.spells) {
+        const def = SPELLS[state.id];
+        state.timer -= dt;
+        if (state.timer > 0) continue;
+        if (def.kind === "orbit") {
+          for (const point of this.orbitPositions(state))
+            for (const enemy of this.grid.near(point, 40))
+              if (distanceSq(point, enemy) < (enemy.radius + 20) ** 2)
+                this.damageEnemy(
+                  enemy,
+                  this.spellDamage(def, state.rank) * 0.42,
+                  def.id,
+                );
+          state.timer =
+            0.24 /
+            (1 +
+              (buddy.stats.haste +
+                (buddy.config.spellBonuses?.[def.id]?.haste || 0)) /
+                100);
+        } else if (def.kind === "pet" && buddy.pet) {
+          const pet = buddy.pet,
+            target = this.nearest(p, 500);
+          if (
+            target &&
+            (def.id !== "beast" || distanceSq(pet, target) < 100 ** 2)
+          ) {
+            if (def.id === "beast")
+              this.damageEnemy(
+                target,
+                this.spellDamage(def, state.rank),
+                def.id,
+              );
+            else this.shoot(pet, target, def, state.rank, 0);
+            this.action(pet, target, def);
+            state.timer = def.cooldown;
+          }
+        } else
+          state.timer = this.castSpell(def, state.rank)
+            ? def.cooldown / (1 + buddy.stats.haste / 100)
+            : 0.12;
+        if (this.ended || this.checkpoint) break;
+      }
+    });
   }
   get dungeonRoute() {
     return this.zone.dungeon ? dungeonRoute(this.zone.id) : undefined;
@@ -540,6 +875,14 @@ export class GameEngine {
   private prepareDungeonRoom() {
     this.player.x = 0;
     this.player.y = 0;
+    if (this.partner) {
+      this.partner.player.x = 90;
+      this.partner.player.y = 0;
+      this.partner.player.hp = Math.max(
+        this.partner.player.hp,
+        this.partner.player.maxHp * 0.5,
+      );
+    }
     if (this.zone.id === "shadowfang") {
       this.nodes = [];
       return;
@@ -548,8 +891,18 @@ export class GameEngine {
       id: this.dungeonStageIndex * 10 + i,
       kind:
         i < 5 || this.zone.id === "ragefire"
-          ? materialFor("ore", Math.min(3, this.dungeonStageIndex + 1))
-          : materialFor("fish", Math.min(3, this.dungeonStageIndex + 1)),
+          ? materialFor(
+              "ore",
+              this.zone.id === "scarlet"
+                ? 4
+                : Math.min(3, this.dungeonStageIndex + 1),
+            )
+          : materialFor(
+              "fish",
+              this.zone.id === "scarlet"
+                ? 4
+                : Math.min(3, this.dungeonStageIndex + 1),
+            ),
       x: (i % 2 ? 1 : -1) * (260 + Math.floor(i / 2) * 65),
       y: -310 + Math.floor(i / 2) * 190,
       depleted: false,
@@ -695,6 +1048,7 @@ export class GameEngine {
     return null;
   }
   toggleTravel(): boolean {
+    if (this.player.hp <= 0) return false;
     if (
       this.paused ||
       this.choosing ||
@@ -729,6 +1083,12 @@ export class GameEngine {
       return;
     dt = Math.min(dt, 0.05);
     this.time += dt;
+    for (const [id, buff] of Object.entries(this.timedBuffs))
+      if (this.time >= buff.until) {
+        for (const [key, value] of Object.entries(buff.stats))
+          this.stats[key as Stat] -= value!;
+        delete this.timedBuffs[id];
+      }
     if (this.config.food && this.time >= 60 && !this.foodQuestCounted) {
       this.foodQuestCounted = true;
       this.recordProfessionUse("meals");
@@ -756,13 +1116,14 @@ export class GameEngine {
       p.shieldTimer -= dt;
       if (p.shieldTimer <= 0) p.shield = 0;
     }
-    p.hp = Math.min(
-      p.maxHp,
-      p.hp +
-        (this.stats.regen +
-          (p.activeBuff > 0 && this.classDef.id === "druid" ? 5 : 0)) *
-          dt,
-    );
+    if (p.hp > 0)
+      p.hp = Math.min(
+        p.maxHp,
+        p.hp +
+          (this.stats.regen +
+            (p.activeBuff > 0 && this.classDef.id === "druid" ? 5 : 0)) *
+            dt,
+      );
     if (this.classDef.resource !== "Rage")
       p.resource = Math.min(
         100,
@@ -779,14 +1140,25 @@ export class GameEngine {
       (p.dashTimer > 0 ? 3.5 : 1) *
       (p.activeBuff > 0 && this.classDef.id === "rogue" ? 1.4 : 1);
     const bounds = this.movementBounds;
-    p.x = clamp(p.x + this.input.x * speed * dt, -bounds.x, bounds.x);
-    p.y = clamp(p.y + this.input.y * speed * dt, -bounds.y, bounds.y);
+    p.x = clamp(
+      p.x + (p.hp > 0 ? this.input.x : 0) * speed * dt,
+      -bounds.x,
+      bounds.x,
+    );
+    p.y = clamp(
+      p.y + (p.hp > 0 ? this.input.y : 0) * speed * dt,
+      -bounds.y,
+      bounds.y,
+    );
     if (this.input.x || this.input.y)
       p.facing = Math.atan2(this.input.y, this.input.x);
 
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0 && !this.boss) {
-      const spawnCount = Math.min(4, 1 + Math.floor(this.time / 100));
+      const spawnCount = Math.min(
+        4,
+        1 + Math.floor(this.time / 100) + (this.partner ? 1 : 0),
+      );
       for (let i = 0; i < spawnCount; i++) this.spawnEnemy();
       this.spawnTimer +=
         Math.max(0.28, 1.05 - this.time / 600) / this.zone.difficulty;
@@ -824,8 +1196,14 @@ export class GameEngine {
     for (const e of this.enemies) {
       if (e.dead) continue;
       e.flash = Math.max(0, e.flash - dt);
-      const dx = p.x - e.x,
-        dy = p.y - e.y,
+      const focus =
+        this.partner &&
+        this.partner.player.hp > 0 &&
+        (p.hp <= 0 || distanceSq(e, this.partner.player) < distanceSq(e, p))
+          ? this.partner.player
+          : p;
+      const dx = focus.x - e.x,
+        dy = focus.y - e.y,
         length = Math.hypot(dx, dy) || 1;
       if (
         e.frozenUntil <= this.time &&
@@ -850,8 +1228,8 @@ export class GameEngine {
       }
       if (
         length < e.radius + 14 &&
-        !p.invulnerable &&
-        this.hurtPlayer(e.damage)
+        !focus.invulnerable &&
+        this.hurtActor(focus, e.damage)
       )
         this.enemyAction(e, "contact");
       e.attackTimer -= dt;
@@ -891,6 +1269,12 @@ export class GameEngine {
             slow: 1,
             hit: new Set(),
             enemy: true,
+            school:
+              e.type === "defias"
+                ? "physical"
+                : e.type === "cultist"
+                  ? "fire"
+                  : "shadow",
           });
           this.enemyAction(e, "projectile", 0, undefined, Math.atan2(dy, dx));
         }
@@ -907,7 +1291,7 @@ export class GameEngine {
     }
     this.grid.rebuild(this.enemies);
     for (const state of this.spells) {
-      if (this.travelling) continue;
+      if (this.travelling || p.hp <= 0) continue;
       const def = SPELLS[state.id];
       if (def.kind === "orbit") {
         state.orbitTimer -= dt;
@@ -944,7 +1328,7 @@ export class GameEngine {
     for (const pet of this.pets) {
       const def = SPELLS[pet.spellId],
         state = this.spells.find((s) => s.id === pet.spellId)!;
-      const target = this.travelling ? null : this.nearest(p, 500);
+      const target = this.travelling || p.hp <= 0 ? null : this.nearest(p, 500);
       const follow =
         pet.spellId === "beast" && target
           ? target
@@ -1017,10 +1401,15 @@ export class GameEngine {
       shot.y += shot.vy * dt;
       shot.life -= dt;
       if (shot.enemy) {
-        if (distanceSq(shot, p) < (shot.radius + 14) ** 2) {
-          this.hurtPlayer(shot.damage);
-          shot.life = 0;
-        }
+        for (const actor of [p, ...(this.partner ? [this.partner.player] : [])])
+          if (
+            actor.hp > 0 &&
+            distanceSq(shot, actor) < (shot.radius + 14) ** 2
+          ) {
+            this.hurtActor(actor, shot.damage, shot.school || "shadow");
+            shot.life = 0;
+            break;
+          }
         continue;
       }
       for (const e of this.grid.near(shot, 45)) {
@@ -1089,7 +1478,14 @@ export class GameEngine {
               : "#ee9279",
           life: 0.4,
         });
-        if (telegraphContains(hazard, p)) this.hurtPlayer(hazard.damage);
+        if (telegraphContains(hazard, p))
+          this.hurtActor(p, hazard.damage, hazard.school || "physical");
+        if (this.partner && telegraphContains(hazard, this.partner.player))
+          this.hurtActor(
+            this.partner.player,
+            hazard.damage,
+            hazard.school || "physical",
+          );
         if (hazard.chargeId !== undefined && hazard.end) {
           const charger = this.enemies.find(
             (e) => e.id === hazard.chargeId && !e.dead,
@@ -1103,7 +1499,14 @@ export class GameEngine {
         hazard.tickTimer = (hazard.tickTimer ?? 0.8) - dt;
         if (hazard.tickTimer <= 0) {
           hazard.tickTimer += 0.8;
-          if (telegraphContains(hazard, p)) this.hurtPlayer(hazard.damage);
+          if (telegraphContains(hazard, p))
+            this.hurtActor(p, hazard.damage, hazard.school || "physical");
+          if (this.partner && telegraphContains(hazard, this.partner.player))
+            this.hurtActor(
+              this.partner.player,
+              hazard.damage,
+              hazard.school || "physical",
+            );
         }
       }
     }
@@ -1119,7 +1522,9 @@ export class GameEngine {
       t.y -= dt * 30;
     }
     this.texts = this.texts.filter((t) => t.life > 0);
-    if (p.hp <= 0) this.finish(false);
+    this.updatePartner(dt);
+    if (p.hp <= 0 && (!this.partner || this.partner.player.hp <= 0))
+      this.finish(false);
     if (!this.ended && !this.checkpoint && this.xp >= this.xpNeeded)
       this.openUpgrade();
   }
@@ -1236,7 +1641,13 @@ export class GameEngine {
     const previousHazards = this.hazards.length;
     const phase = this.bossState.phase,
       alternate = this.bossState.attackIndex++ % 2;
-    const p = this.player,
+    const p =
+        this.partner &&
+        this.partner.player.hp > 0 &&
+        (this.player.hp <= 0 ||
+          distanceSq(e, this.partner.player) < distanceSq(e, this.player))
+          ? this.partner.player
+          : this.player,
       aim = Math.atan2(p.y - e.y, p.x - e.x);
     const point = { x: p.x, y: p.y };
     let warning = 1.3;
@@ -1244,6 +1655,8 @@ export class GameEngine {
     if (this.dungeonStage) {
       if (this.zone.id === "ragefire")
         this.castRagefireAttack(e, phase, alternate, point, aim);
+      else if (this.zone.id === "scarlet")
+        this.castScarletAttack(e, phase, alternate, point, aim);
       else if (this.zone.id === "shadowfang")
         this.castShadowfangAttack(e, phase, alternate, point, aim);
       else this.castDungeonAttack(e, phase, alternate, point, aim);
@@ -1256,6 +1669,39 @@ export class GameEngine {
           aim,
         );
       return;
+    } else if (this.zone.id === "plaguelands") {
+      warning = alternate ? 1.8 : 1.35;
+      this.bossState.attackName = alternate
+        ? "Blight clouds · Leave the green circles"
+        : "Shadow storm · Move between the lanes";
+      if (alternate) {
+        for (let i = 0; i < (phase === 2 ? 5 : 3); i++)
+          this.warn({
+            x: point.x + Math.cos(i * 2.4) * (i ? 180 : 0),
+            y: point.y + Math.sin(i * 2.4) * (i ? 180 : 0),
+            radius: 95,
+            warning,
+            damage: e.damage,
+            linger: 5,
+            tickTimer: 0,
+            school: "nature",
+          });
+      } else {
+        for (let i = -2; i <= 2; i++)
+          this.warn({
+            x: e.x,
+            y: e.y,
+            shape: "line",
+            end: {
+              x: e.x + Math.cos(aim + i * 0.45) * 650,
+              y: e.y + Math.sin(aim + i * 0.45) * 650,
+            },
+            radius: 18,
+            warning,
+            damage: e.damage * 1.6,
+            school: "shadow",
+          });
+      }
     } else if (this.zone.id === "duskwood") {
       if (!alternate) {
         warning = 1.35;
@@ -1418,6 +1864,83 @@ export class GameEngine {
       this.enemyAction(e, "telegraph", warning, alternate, aim);
   }
 
+  private castScarletAttack(
+    e: Enemy,
+    phase: number,
+    alternate: number,
+    point: Vec,
+    aim: number,
+  ) {
+    const stage = this.dungeonStageIndex,
+      warning = alternate ? 1.7 : 1.4;
+    if (stage === 0) {
+      this.bossState.attackName = alternate
+        ? "Arcane Detonation · Leave the library circle"
+        : "Arcane lanes · Sidestep";
+      if (alternate)
+        this.warn({
+          x: e.x,
+          y: e.y,
+          radius: phase === 2 ? 260 : 220,
+          warning,
+          damage: e.damage * 1.8,
+          school: "arcane",
+        });
+      else
+        for (const offset of [-0.45, 0, 0.45])
+          this.warn({
+            x: e.x,
+            y: e.y,
+            shape: "line",
+            end: {
+              x: e.x + Math.cos(aim + offset) * 550,
+              y: e.y + Math.sin(aim + offset) * 550,
+            },
+            radius: 20,
+            warning,
+            damage: e.damage * 1.5,
+            school: "arcane",
+          });
+    } else if (stage === 1 && alternate) {
+      this.bossState.attackName = "Blades of Light · Stay outside the spin";
+      this.warn({
+        x: e.x,
+        y: e.y,
+        radius: 190,
+        warning,
+        damage: e.damage * 0.8,
+        linger: 4,
+        tickTimer: 0,
+      });
+    } else if (stage < 3 && !alternate) {
+      this.bossState.attackName = "Crusader charge · Sidestep the lane";
+      this.warn({
+        x: e.x,
+        y: e.y,
+        shape: "line",
+        end: { x: point.x, y: point.y },
+        radius: 38,
+        warning,
+        damage: e.damage * 1.6,
+        chargeId: e.id,
+      });
+    } else {
+      this.bossState.attackName =
+        stage === 3
+          ? "Cathedral judgment · Escape the marked circles"
+          : "Consecrated ground · Leave the circles";
+      for (let i = 0; i < (phase === 2 ? 4 : 2); i++)
+        this.warn({
+          x: point.x + Math.cos((i * Math.PI) / 2) * (i ? 140 : 0),
+          y: point.y + Math.sin((i * Math.PI) / 2) * (i ? 140 : 0),
+          radius: 95,
+          warning,
+          damage: e.damage * 1.3,
+        });
+    }
+    this.bossState.attackUntil = this.time + warning;
+    this.bossState.stillUntil = this.time + warning;
+  }
   private castShadowfangAttack(
     e: Enemy,
     phase: number,
@@ -1886,7 +2409,12 @@ export class GameEngine {
         l.progress = (3 - alive) / 3;
         if (!alive) this.rewardEncounter(l);
       } else if (l.kind === "ritual") {
-        if (distanceSq(l, this.player) <= 175 ** 2) {
+        if (
+          (this.player.hp > 0 && distanceSq(l, this.player) <= 175 ** 2) ||
+          (this.partner &&
+            this.partner.player.hp > 0 &&
+            distanceSq(l, this.partner.player) <= 175 ** 2)
+        ) {
           l.progress = Math.min(20, l.progress + dt);
           l.spawnTimer -= dt;
           if (l.spawnTimer <= 0) {
@@ -1925,12 +2453,11 @@ export class GameEngine {
           DUAL_WIELD_SOURCES[g.id] ||
           RANGED_SOURCES[g.id] ||
           TRAINED_WEAPON_SOURCES[g.id];
-        const local =
-          this.zone.id === "duskwood"
-            ? g.dropZones?.includes("duskwood")
-            : source
-              ? source.type === "world" && g.dropZones?.includes(this.zone.id)
-              : g.rarity === "uncommon";
+        const local = ["duskwood", "plaguelands"].includes(this.zone.id)
+          ? g.dropZones?.includes(this.zone.id)
+          : source
+            ? source.type === "world" && g.dropZones?.includes(this.zone.id)
+            : g.rarity === "uncommon";
         return (
           local &&
           !g.id.startsWith("starter_") &&
@@ -1946,7 +2473,11 @@ export class GameEngine {
         this.loot.push(item.id);
         reward += ", " + item.name;
       }
-    } else this.player.hp = Math.min(this.player.maxHp, this.player.hp + 25);
+    } else {
+      const recipient = this.player.hp > 0 ? this.player : this.partner?.player;
+      if (recipient && recipient.hp > 0)
+        recipient.hp = Math.min(recipient.maxHp, recipient.hp + 25);
+    }
     this.emit({ type: "encounter", message: l.name + " complete · " + reward });
   }
   private nearest(
@@ -1983,6 +2514,45 @@ export class GameEngine {
       (def.cost || 0) * (1 - clamp(bonus.costReduction || 0, 0, 85) / 100);
     if (this.player.resource < cost) return false;
     const damage = this.spellDamage(def, rank);
+    if (def.kind === "buff" && def.buff) {
+      if (this.timedBuffs[def.id] || !this.nearest(this.player, 500))
+        return false;
+      this.player.resource -= cost;
+      const stats = Object.fromEntries(
+        Object.entries(def.buff.stats || {}).map(([key, value]) => [
+          key,
+          value! * (1 + (rank - 1) * 0.15),
+        ]),
+      ) as Partial<Stats>;
+      for (const [key, value] of Object.entries(stats))
+        this.stats[key as Stat] += value!;
+      this.timedBuffs[def.id] = { until: this.time + def.buff.duration, stats };
+      if (def.buff.shield) {
+        this.player.shield = Math.max(
+          this.player.shield,
+          def.buff.shield * (1 + (rank - 1) * 0.2),
+        );
+        this.player.shieldTimer = Math.max(
+          this.player.shieldTimer,
+          def.buff.duration,
+        );
+      }
+      this.player.resource = Math.min(
+        100,
+        this.player.resource + (def.buff.resource || 0),
+      );
+      this.addEffect({
+        kind: "ring",
+        x: this.player.x,
+        y: this.player.y,
+        radius: 55,
+        color: def.color,
+        life: 0.4,
+      });
+      this.action(this.player, undefined, def);
+      this.emit({ type: "cast" });
+      return true;
+    }
     if (def.kind === "heal") {
       if (this.player.hp >= this.player.maxHp || this.healingEffects[def.id])
         return false;
@@ -2143,6 +2713,7 @@ export class GameEngine {
     };
   }
   private healPlayer(amount: number, source: string, critical = false) {
+    if (this.player.hp <= 0) return;
     const healed = Math.min(amount, this.player.maxHp - this.player.hp);
     if (healed <= 0) return;
     this.player.hp += healed;
@@ -2158,7 +2729,9 @@ export class GameEngine {
       });
   }
   private updatePeriodicEffects(dt: number) {
-    for (const [id, effect] of Object.entries(this.healingEffects)) {
+    for (const [id, effect] of Object.entries(
+      this.player.hp > 0 ? this.healingEffects : {},
+    )) {
       effect.timer -= dt;
       while (effect.timer <= 0 && effect.ticksLeft > 0) {
         this.healPlayer(effect.damage, id);
@@ -2212,17 +2785,21 @@ export class GameEngine {
       hit: new Set(),
     });
   }
-  orbitPositions(state: SpellState): Vec[] {
+  orbitPositions(
+    state: SpellState,
+    actor = this.player,
+    bonuses = this.config.spellBonuses,
+  ): Vec[] {
     const def = SPELLS[state.id],
       count = def.count + Math.floor(state.rank / 2),
       radius =
         (def.range + state.rank * 7) *
-        (1 + (this.config.spellBonuses?.[def.id]?.area || 0) / 100);
+        (1 + (bonuses?.[def.id]?.area || 0) / 100);
     return Array.from({ length: count }, (_, i) => {
       const a = this.time * 2.8 + (i * Math.PI * 2) / count;
       return {
-        x: this.player.x + Math.cos(a) * radius,
-        y: this.player.y + Math.sin(a) * radius,
+        x: actor.x + Math.cos(a) * radius,
+        y: actor.y + Math.sin(a) * radius,
       };
     });
   }
@@ -2232,13 +2809,17 @@ export class GameEngine {
     source: string,
     canCrit = true,
   ) {
+    if (!this.partnerActing && this.partner?.prepared.includes(source)) {
+      this.withPartner(() => this.damageEnemy(e, amount, source, canCrit));
+      return;
+    }
     if (e.dead || this.ended || this.checkpoint) return;
     const weapon =
       source === "equipment-strike"
         ? this.equipment.primary
         : source === "equipment-shot"
           ? this.shootingWeapon
-          : ["shot", "multishot"].includes(source)
+          : ["shot", "multishot", "aimedshot"].includes(source)
             ? this.shootingWeapon
             : canCrit &&
                 (SPELLS[source]?.kind === "melee" ||
@@ -2267,7 +2848,23 @@ export class GameEngine {
         canCrit &&
         this.rng.next() <
           Math.min(0.8, (this.stats.crit + (bonus.crit || 0)) / 100),
-      damage = amount * (critical ? 1.8 : 1);
+      rawDamage = amount * (critical ? 1.8 : 1);
+    let damage = rawDamage;
+    if (e.boss && this.zone.id === "scarlet" && this.dungeonStageIndex === 3) {
+      if (!this.commanderRevived && e.hp - damage <= e.maxHp / 2) {
+        this.commanderRevived = true;
+        this.revivedCommander = this.spawnEnemy(200, true, 0, false, "defias");
+        if (this.revivedCommander) {
+          this.revivedCommander.hp = this.revivedCommander.maxHp =
+            e.maxHp * 0.3;
+          this.revivedCommander.guard = true;
+        }
+        this.bossState.attackName =
+          "Arise, my champion · Defeat the resurrected commander";
+        damage = Math.max(0, Math.min(damage, e.hp - e.maxHp / 2));
+      } else if (this.revivedCommander && !this.revivedCommander.dead)
+        damage = Math.min(damage, Math.max(0, e.hp - 1));
+    }
     const dealt = Math.min(e.hp, damage);
     if (weapon && dealt > 0) {
       this.weaponHits[weapon.type] = (this.weaponHits[weapon.type] || 0) + 1;
@@ -2281,7 +2878,7 @@ export class GameEngine {
     }
     this.totalDamage += dealt;
     this.damageBySpell[source] = (this.damageBySpell[source] || 0) + dealt;
-    if (bonus.leech)
+    if (bonus.leech && this.player.hp > 0)
       this.player.hp = Math.min(
         this.player.maxHp,
         this.player.hp + (dealt * bonus.leech) / 100,
@@ -2344,7 +2941,7 @@ export class GameEngine {
         (this.zone.id !== "duskwood" || (this.config.characterLevel || 1) >= 20)
       ) {
         const pool = [
-          ...(this.zone.id === "duskwood"
+          ...(["duskwood", "plaguelands"].includes(this.zone.id)
             ? []
             : [
                 "forest_boots",
@@ -2370,7 +2967,7 @@ export class GameEngine {
               (id) =>
                 (!GEAR_MAP[id].classes ||
                   GEAR_MAP[id].classes!.includes(this.classDef.id)) &&
-                (this.zone.id !== "duskwood" ||
+                (!["duskwood", "plaguelands"].includes(this.zone.id) ||
                   (GEAR_MAP[id].level || 1) <=
                     (this.config.characterLevel || 1)) &&
                 (!GEAR_MAP[id].armor ||
@@ -2415,10 +3012,12 @@ export class GameEngine {
                 RESOURCE_MAP[id as Material].family,
                 Math.min(
                   tierForLevel(this.config.characterLevel || 1),
-                  this.zone.id === "shadowfang"
-                    ? 3
-                    : this.dungeonStageIndex + 1,
-                  3,
+                  this.zone.id === "scarlet"
+                    ? 4
+                    : this.zone.id === "shadowfang"
+                      ? 3
+                      : this.dungeonStageIndex + 1,
+                  this.zone.id === "scarlet" ? 4 : 3,
                 ),
               ),
               amount!,
@@ -2438,19 +3037,21 @@ export class GameEngine {
           return;
         }
         this.loot.push(
-          this.zone.id === "duskwood"
-            ? "watchkeeper_oath"
-            : this.zone.id === "elwynn"
-              ? "lionheart"
-              : this.zone.id === "westfall"
-                ? this.classDef.id === "hunter"
-                  ? "longbow"
-                  : ["mage", "priest", "warlock", "shaman", "druid"].includes(
-                        this.classDef.id,
-                      )
-                    ? "ember_staff"
-                    : "defias_blade"
-                : "mooncloth",
+          this.zone.id === "plaguelands"
+            ? `dawnward_${this.classDef.armor}_head`
+            : this.zone.id === "duskwood"
+              ? "watchkeeper_oath"
+              : this.zone.id === "elwynn"
+                ? "lionheart"
+                : this.zone.id === "westfall"
+                  ? this.classDef.id === "hunter"
+                    ? "longbow"
+                    : ["mage", "priest", "warlock", "shaman", "druid"].includes(
+                          this.classDef.id,
+                        )
+                      ? "ember_staff"
+                      : "defias_blade"
+                  : "mooncloth",
         );
         this.gold += 100;
         if (this.zone.id === "duskwood") this.hazards = [];
@@ -2458,15 +3059,18 @@ export class GameEngine {
       }
     }
   }
-  private hurtPlayer(damage: number) {
+  private hurtPlayer(damage: number, school: DamageSchool = "physical") {
     const p = this.player;
-    if (p.invulnerable || this.ended || this.checkpoint) return false;
+    if (p.hp <= 0 || p.invulnerable || this.ended || this.checkpoint)
+      return false;
     this.stopTravel();
     this.travel.lock = TRAVEL_RULES.damageLock;
     const armor =
       this.stats.armor +
       (p.activeBuff > 0 && this.classDef.id === "druid" ? 45 : 0);
     let taken = Math.max(1, damage * (100 / (100 + armor * 3)));
+    if (school !== "physical")
+      taken *= resistanceMultiplier(this.config.resistances?.[school] || 0);
     if (p.shield > 0) {
       const absorb = Math.min(p.shield, taken);
       p.shield -= absorb;
@@ -2493,10 +3097,28 @@ export class GameEngine {
     }
   }
   private collectPickups(dt: number) {
-    const p = this.player,
-      radius = 90 * (1 + this.stats.magnet / 100);
+    const actors = [
+      { player: this.player, stats: this.stats, classId: this.classDef.id },
+      ...(this.partner
+        ? [
+            {
+              player: this.partner.player,
+              stats: this.partner.stats,
+              classId: this.partner.classDef.id,
+            },
+          ]
+        : []),
+    ].filter((a) => a.player.hp > 0);
+    if (!actors.length) return;
     this.pickups = this.pickups.filter((item) => {
-      const dist = Math.sqrt(distanceSq(item, p));
+      const actor = actors.reduce((closest, next) =>
+          distanceSq(item, next.player) < distanceSq(item, closest.player)
+            ? next
+            : closest,
+        ),
+        p = actor.player;
+      const radius = 90 * (1 + actor.stats.magnet / 100),
+        dist = Math.sqrt(distanceSq(item, p));
       if (dist < radius && item.kind !== "chest") {
         const move = Math.min(dist, 360 * dt);
         item.x += ((p.x - item.x) / (dist || 1)) * move;
@@ -2504,7 +3126,7 @@ export class GameEngine {
       }
       if (dist > (item.kind === "chest" ? 35 : 20)) return true;
       if (item.kind === "xp")
-        this.xp += item.value * (this.classDef.id === "mage" ? 1.15 : 1);
+        this.xp += item.value * (actor.classId === "mage" ? 1.15 : 1);
       if (item.kind === "gold") this.gold += item.value;
       if (item.kind === "heal") p.hp = Math.min(p.maxHp, p.hp + item.value);
       if (item.kind === "chest" && item.loot) {
@@ -2518,7 +3140,7 @@ export class GameEngine {
     });
   }
   private gatherNodes() {
-    if (this.travelling) return;
+    if (this.travelling || this.player.hp <= 0) return;
     for (const n of this.nodes) {
       if (n.depleted || distanceSq(n, this.player) > 38 ** 2) continue;
       if (this.nodeRestriction(n)) continue;
@@ -2592,9 +3214,11 @@ export class GameEngine {
   }
   get lootResourceTier(): number {
     const stage = this.dungeonStage
-      ? this.zone.id === "shadowfang"
-        ? 3
-        : this.dungeonStageIndex + 1
+      ? this.zone.id === "scarlet"
+        ? 4
+        : this.zone.id === "shadowfang"
+          ? 3
+          : this.dungeonStageIndex + 1
       : 1 + Math.floor(this.time / 90);
     return Math.min(
       tierForLevel(this.config.characterLevel || 1),
@@ -2633,6 +3257,7 @@ export class GameEngine {
         (this.professionGains[profession] || 0) + 1;
   }
   activate(): boolean {
+    if (this.player.hp <= 0) return false;
     const p = this.player,
       cost = this.classDef.resource === "Rage" ? 25 : 20;
     if (
@@ -2710,6 +3335,7 @@ export class GameEngine {
     return true;
   }
   dash(): boolean {
+    if (this.player.hp <= 0) return false;
     if (
       this.paused ||
       this.choosing ||
@@ -2777,6 +3403,7 @@ export class GameEngine {
     return true;
   }
   attackEquipment(): boolean {
+    if (this.player.hp <= 0) return false;
     if (this.shootingWeapon) return this.shootEquipment();
     const weapon = this.equipment.primary;
     if (
@@ -2825,6 +3452,7 @@ export class GameEngine {
         );
   }
   usePotion(): boolean {
+    if (this.player.hp <= 0) return false;
     if (
       this.paused ||
       this.choosing ||
@@ -2850,6 +3478,7 @@ export class GameEngine {
     return true;
   }
   useBomb(): boolean {
+    if (this.player.hp <= 0) return false;
     if (
       this.paused ||
       this.choosing ||
@@ -2902,8 +3531,8 @@ export class GameEngine {
         evolution: rank === 5,
         description: current
           ? rank === 5
-            ? `Evolve ${def.name}. Greatly increased ${def.kind === "heal" ? "healing" : "damage"} and faster casts.`
-            : `Increase ${def.kind === "heal" ? "healing" : "damage"} by 30% and reduce cooldown.`
+            ? `Evolve ${def.name}. Greatly increased ${def.kind === "buff" ? "support bonuses" : def.kind === "heal" ? "healing" : "damage"} and faster casts.`
+            : `Increase ${def.kind === "buff" ? "support bonuses" : def.kind === "heal" ? "healing" : "damage"} by 30% and reduce cooldown.`
           : def.description,
       });
     }
@@ -2988,10 +3617,11 @@ export class GameEngine {
       this.stats[choice.stat] += choice.value;
       if (choice.stat === "health") {
         this.player.maxHp += choice.value;
-        this.player.hp = Math.min(
-          this.player.maxHp,
-          this.player.hp + choice.value,
-        );
+        if (this.player.hp > 0)
+          this.player.hp = Math.min(
+            this.player.maxHp,
+            this.player.hp + choice.value,
+          );
       }
     }
     this.xp -= this.xpNeeded;
@@ -3003,7 +3633,12 @@ export class GameEngine {
   }
   finish(victory: boolean) {
     if (this.ended) return;
-    if (victory && this.zone.id === "duskwood" && this.trialBosses < 1) return;
+    if (
+      victory &&
+      ["duskwood", "plaguelands"].includes(this.zone.id) &&
+      this.trialBosses < 1
+    )
+      return;
     if (
       victory &&
       this.zone.dungeon &&
@@ -3039,6 +3674,30 @@ export class GameEngine {
       ),
       materials: { ...this.materials },
       loot: [...this.loot],
+      ...(this.partner
+        ? {
+            party: {
+              classId: this.partner.classDef.id,
+              equipmentProof: {
+                items: [...this.partner.equipment.items],
+                weaponHits: { ...this.partner.weaponHits },
+                defeated: this.ended && this.partner.player.hp <= 0,
+              },
+            },
+          }
+        : {}),
+      ...(this.victory
+        ? {
+            journeyProof: (this.config.journey || [])
+              .filter(
+                (q) =>
+                  validJourneySnapshot(q) &&
+                  EPILOGUE_MAP[q.id].zone === this.zone.id,
+              )
+              .slice(0, 15)
+              .map((q) => ({ ...q })),
+          }
+        : {}),
       ...(this.config.equipment
         ? {
             equipmentProof: {

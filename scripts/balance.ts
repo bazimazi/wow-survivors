@@ -10,6 +10,10 @@ import {
   freshSave,
   heroStats,
   heroSpellBonuses,
+  heroResistances,
+  changeTalentMode,
+  talentTrees,
+  canLearnTalent,
   learnTalent,
   equip,
   trainDualWield,
@@ -39,12 +43,27 @@ import {
 // A simple, repeatable player policy: collect XP, keep personal space,
 // use the class ability when surrounded, and spend the starter healing supplies.
 // This measures progression pacing; it is not a substitute for human playtesting.
-const dungeon = process.argv.includes("--dungeon");
+const scarlet = process.argv.includes("--scarlet"),
+  plaguelands = process.argv.includes("--plaguelands");
+if (scarlet && plaguelands) throw Error("Choose one endgame destination");
+const endgame = scarlet || plaguelands;
+const cooperative = process.argv.includes("--local-coop");
+if (cooperative && !endgame)
+  throw Error("Local co-op diagnostics require an endgame destination");
+const dungeon = process.argv.includes("--dungeon") || scarlet;
 const shadowfang = process.argv.includes("--shadowfang");
 const entry = process.argv.includes("--entry");
 const duskwood = process.argv.includes("--duskwood");
 const cloudAware = process.argv.includes("--cloud-aware");
-const entryLevel = duskwood ? 20 : shadowfang ? 15 : 10;
+const entryLevel = scarlet
+  ? 25
+  : plaguelands
+    ? 40
+    : duskwood
+      ? 20
+      : shadowfang
+        ? 15
+        : 10;
 const spellbook = process.argv.includes("--spellbook");
 const weaponTypeArg = process.argv
   .find((arg) => arg.startsWith("--weapon-type="))
@@ -65,7 +84,7 @@ const necklaces = process.argv.includes("--necklaces") || offhands;
 const wristEnchant = process.argv.includes("--wrist-enchant");
 const accessories =
   process.argv.includes("--accessories") || necklaces || wristEnchant;
-const wardrobe = process.argv.includes("--wardrobe") || accessories;
+const wardrobe = process.argv.includes("--wardrobe") || accessories || endgame;
 const campaign = process.argv
   .find((arg) => arg.startsWith("--campaign="))
   ?.slice(11) as FactionId | undefined;
@@ -92,8 +111,13 @@ for (const c of CLASSES) {
     const save = freshSave();
     save.selectedClass = c.id;
     if (advanced) {
-      save.heroes[c.id].level =
-        (dungeon || duskwood) && entry ? entryLevel : 21;
+      save.heroes[c.id].level = endgame
+        ? entry
+          ? entryLevel
+          : 60
+        : (dungeon || duskwood) && entry
+          ? entryLevel
+          : 21;
       for (const n of c.trees[treeIndex].nodes)
         for (let i = 0; i < n.max; i++) learnTalent(save, n.id);
       // Spend the remaining seven points in a secondary path, as a player
@@ -374,25 +398,90 @@ for (const c of CLASSES) {
           throw Error("Invalid personal attunement");
       }
     }
+    if (endgame) {
+      changeTalentMode(save, "classic");
+      const trees = talentTrees(save),
+        ordered = [
+          trees[treeIndex],
+          ...trees.filter((_, index) => index !== treeIndex),
+        ].flatMap((t) => t.nodes);
+      for (const node of ordered)
+        while (canLearnTalent(save, c.id, node.id)) learnTalent(save, node.id);
+      if (save.heroes[c.id].level >= 40) {
+        const set = GEAR_SETS.find(
+          (item) => item.id === `dawnward_${c.armor}`,
+        )!;
+        save.professions[set.profession] = 300;
+        save.training[set.profession] = 4;
+        for (const slot of [
+          "head",
+          "chest",
+          "hands",
+          "boots",
+          "shoulders",
+          "legs",
+        ]) {
+          const id = `dawnward_${c.armor}_${slot}`;
+          if (!craft(save, `craft_${id}`) || !equip(save, id))
+            throw Error(`Invalid endgame craft: ${id}`);
+        }
+      }
+    }
+    const partnerId = c.id === "priest" ? "warrior" : "priest";
+    if (cooperative) {
+      const partner = save.heroes[partnerId];
+      partner.level = save.heroes[c.id].level;
+      // Use the same legally class-usable cloth support kit, without bypassing equip validation.
+      const primary = save.selectedClass;
+      save.selectedClass = partnerId;
+      changeTalentMode(save, "classic");
+      for (const node of talentTrees(save).flatMap((t) => t.nodes))
+        while (canLearnTalent(save, partnerId, node.id))
+          learnTalent(save, node.id);
+      for (const id of save.inventory)
+        if (id.startsWith("dawnward_cloth_")) equip(save, id);
+      save.selectedClass = primary;
+    }
     const stats = heroStats(save, c.id),
-      zone = dungeon
-        ? ZONES.find(
-            (z) =>
-              z.id ===
-              (shadowfang
-                ? "shadowfang"
-                : process.argv.includes("--ragefire")
-                  ? "ragefire"
-                  : "deadmines"),
-          )!
-        : duskwood
-          ? ZONES.find((z) => z.id === "duskwood")!
-          : ZONES[advanced ? 2 : 0];
+      zone = scarlet
+        ? ZONES.find((z) => z.id === "scarlet")!
+        : plaguelands
+          ? ZONES.find((z) => z.id === "plaguelands")!
+          : dungeon
+            ? ZONES.find(
+                (z) =>
+                  z.id ===
+                  (shadowfang
+                    ? "shadowfang"
+                    : process.argv.includes("--ragefire")
+                      ? "ragefire"
+                      : "deadmines"),
+              )!
+            : duskwood
+              ? ZONES.find((z) => z.id === "duskwood")!
+              : ZONES[advanced ? 2 : 0];
     const g = new GameEngine({
       classId: c.id,
       zone,
       stats,
       spellBonuses: heroSpellBonuses(save, c.id),
+      resistances: heroResistances(save, c.id),
+      ...(cooperative
+        ? {
+            partner: {
+              classId: partnerId,
+              stats: heroStats(save, partnerId),
+              spellbook: save.heroes[partnerId].spellbook,
+              spellBonuses: heroSpellBonuses(save, partnerId),
+              resistances: heroResistances(save, partnerId),
+              characterLevel: save.heroes[partnerId].level,
+              equipment: equipmentSnapshot({
+                ...save,
+                selectedClass: partnerId,
+              }),
+            },
+          }
+        : {}),
       ...(equipmentProgression
         ? {
             equipment: equipmentSnapshot(save),
@@ -406,7 +495,7 @@ for (const c of CLASSES) {
             spellbook: save.heroes[c.id].spellbook,
           }
         : {}),
-      ...(wardrobe || shadowfang || duskwood
+      ...(wardrobe || shadowfang || duskwood || endgame
         ? { characterLevel: save.heroes[c.id].level }
         : {}),
       professions: { herbalism: 1, skinning: 1 },
@@ -477,7 +566,9 @@ for (const c of CLASSES) {
         }
         if (
           g.boss &&
-          (dungeon ? !nearest || best > 400 ** 2 : g.pickups.length === 0)
+          (dungeon || endgame
+            ? !nearest || best > 400 ** 2
+            : g.pickups.length === 0)
         ) {
           const dx = g.boss.x - g.player.x,
             dy = g.boss.y - g.player.y,
@@ -533,6 +624,15 @@ for (const c of CLASSES) {
         if (threatened) g.dash();
       }
       if (equipmentProgression && i % 165 === 0) g.attackEquipment();
+      if (g.partner) {
+        const partner = g.partner.player;
+        if (g.player.hp <= 0 && partner.hp > 0)
+          g.setPartnerInput(g.player.x - partner.x, g.player.y - partner.y);
+        else if (partner.hp <= 0 && g.player.hp > 0) {
+          g.setInput(partner.x - g.player.x, partner.y - g.player.y);
+          g.setPartnerInput(0, 0);
+        } else g.setPartnerInput(g.input.x, g.input.y);
+      }
       g.update(1 / 60);
     }
     firstLevels.push(firstLevel);
@@ -562,6 +662,9 @@ for (const c of CLASSES) {
       ...(ranged ? { ranged: !!save.heroes[c.id].equipment.ranged } : {}),
       ...(dualWield ? { dualWield: save.heroes[c.id].dualWield } : {}),
       seed,
+      ...(endgame
+        ? { zone: zone.id, classic: save.heroes[c.id].talentMode, cooperative }
+        : {}),
       ...(wardrobe
         ? { equipment: save.heroes[c.id].equipment, campStats: stats }
         : {}),
@@ -626,11 +729,13 @@ for (const c of CLASSES) {
       ...(weaponType ? { weaponType } : {}),
       ...(ranged ? { ranged: rangedClass(c.id) } : {}),
       ...(dualWield ? { dualWield: dualWieldClass(c.id) } : {}),
-      profile: dungeon
-        ? `level-${entry ? entryLevel : 21} / ${entry ? entryLevel : 21}-point hybrid / ${weaponType === "polearm" && WEAPON_TRAINING.polearm.classes.includes(c.id) ? (rangedClass(c.id) ? "fifteen" : "fourteen") : ranged && rangedClass(c.id) ? "sixteen" : (dualWield && dualWieldClass(c.id)) || (offhands && !["rogue", "hunter"].includes(c.id)) ? "fifteen" : necklaces ? "fourteen" : accessories ? "thirteen" : wardrobe ? "ten" : "six"} equipped slots / ${shadowfang ? "Shadowfang Keep" : process.argv.includes("--ragefire") ? "Ragefire Chasm" : "Deadmines"}`
-        : advanced
-          ? `level-21 / 21-point hybrid / ${weaponType === "polearm" && WEAPON_TRAINING.polearm.classes.includes(c.id) ? (rangedClass(c.id) ? "fifteen" : "fourteen") : ranged && rangedClass(c.id) ? "sixteen" : (dualWield && dualWieldClass(c.id)) || (offhands && !["rogue", "hunter"].includes(c.id)) ? "fifteen" : necklaces ? "fourteen" : accessories ? "thirteen" : wardrobe ? "ten" : campaign ? "seven" : "six"} equipped slots / Tirisfal`
-          : "starter / Elwynn",
+      profile: endgame
+        ? `level-${entry ? entryLevel : 60} / ${entry ? entryLevel - 9 : 51}-point Classic / legal crafted equipment / ${scarlet ? "Scarlet Monastery" : "Eastern Plaguelands"}${cooperative ? " / local co-op" : ""}`
+        : dungeon
+          ? `level-${entry ? entryLevel : 21} / ${entry ? entryLevel : 21}-point hybrid / ${weaponType === "polearm" && WEAPON_TRAINING.polearm.classes.includes(c.id) ? (rangedClass(c.id) ? "fifteen" : "fourteen") : ranged && rangedClass(c.id) ? "sixteen" : (dualWield && dualWieldClass(c.id)) || (offhands && !["rogue", "hunter"].includes(c.id)) ? "fifteen" : necklaces ? "fourteen" : accessories ? "thirteen" : wardrobe ? "ten" : "six"} equipped slots / ${shadowfang ? "Shadowfang Keep" : process.argv.includes("--ragefire") ? "Ragefire Chasm" : "Deadmines"}`
+          : advanced
+            ? `level-21 / 21-point hybrid / ${weaponType === "polearm" && WEAPON_TRAINING.polearm.classes.includes(c.id) ? (rangedClass(c.id) ? "fifteen" : "fourteen") : ranged && rangedClass(c.id) ? "sixteen" : (dualWield && dualWieldClass(c.id)) || (offhands && !["rogue", "hunter"].includes(c.id)) ? "fifteen" : necklaces ? "fourteen" : accessories ? "thirteen" : wardrobe ? "ten" : campaign ? "seven" : "six"} equipped slots / Tirisfal`
+            : "starter / Elwynn",
       firstLevelSeconds: firstLevels.map((n) => Math.round(n)),
       outcomes,
     }),

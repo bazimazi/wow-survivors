@@ -8,8 +8,11 @@ import { MATERIALS, gradedCosts } from "./resources";
 export { MATERIALS } from "./resources";
 export type { Material } from "./resources";
 import type { Material } from "./resources";
+import { instanceCatalog } from "./item-instances";
+import type { Attributes, Resistances } from "./attributes";
 import { RAGEFIRE_GEAR } from "./ragefire";
 import { DUSKWOOD_GEAR, DUSKWOOD_ZONE } from "./duskwood";
+import { ENDGAME_GEAR, ENDGAME_RECIPES, ENDGAME_ZONES } from "./endgame";
 import { SHADOWFANG_GEAR } from "./shadowfang";
 import { CAMPAIGN_GEAR } from "./campaigns";
 import { PROFESSION_MASTERY_GEAR } from "./profession-quests";
@@ -47,7 +50,8 @@ export type SpellKind =
   | "pet"
   | "melee"
   | "dot"
-  | "heal";
+  | "heal"
+  | "buff";
 export type Stat =
   | "power"
   | "health"
@@ -144,6 +148,12 @@ export interface SpellDef {
   singleTarget?: boolean;
   freeze?: number;
   executeBelow?: number;
+  buff?: {
+    duration: number;
+    stats?: Partial<Stats>;
+    shield?: number;
+    resource?: number;
+  };
 }
 export interface TalentDef {
   id: string;
@@ -156,6 +166,7 @@ export interface TalentDef {
   required: number;
   spellIds?: string[];
   bonus?: SpellBonus;
+  grantsTechnique?: string;
 }
 export interface SpellBonus {
   power?: number;
@@ -1479,6 +1490,8 @@ export interface GearDef {
   armor?: ClassDef["armor"];
   classes?: ClassId[];
   stats: Partial<Stats>;
+  attributes?: Partial<Attributes>;
+  resistances?: Partial<Resistances>;
   description: string;
   value: number;
   level?: number;
@@ -1760,7 +1773,7 @@ export const GEAR: GearDef[] = [
   },
 ];
 GEAR.push(
-  ...GEAR_SETS.flatMap((set) =>
+  ...GEAR_SETS.filter((set) => !set.id.startsWith("dawnward_")).flatMap((set) =>
     (["hands", "head", "chest"] as Slot[]).map((slot, i) => ({
       id: `${set.id}_${slot}`,
       name: `${{ spellweave: "Spellwoven", pathfinder: "Pathfinder", ironwarden: "Ironwarden", oathsteel: "Oathsteel" }[set.id]} ${{ hands: "Gloves", head: "Crown", chest: "Vestments" }[slot as "hands" | "head" | "chest"]}`,
@@ -2344,6 +2357,26 @@ GEAR.push(
 );
 GEAR.push(...SHADOWFANG_GEAR, ...DUSKWOOD_GEAR);
 for (const set of GEAR_SETS) set.bonuses.push(WARDROBE_SET_BONUSES[set.id]);
+GEAR.push(...ENDGAME_GEAR);
+for (const armor of ["cloth", "leather", "mail", "plate"] as const)
+  GEAR_SETS.push({
+    id: `dawnward_${armor}`,
+    name: `Dawnward ${armor}`,
+    armor,
+    profession:
+      armor === "cloth"
+        ? "tailoring"
+        : armor === "leather"
+          ? "leatherworking"
+          : "blacksmithing",
+    material:
+      armor === "cloth" ? "cloth" : armor === "leather" ? "leather" : "ore",
+    bonuses: [
+      { pieces: 2, stats: { health: 30 } },
+      { pieces: 4, stats: { power: 10 } },
+      { pieces: 6, stats: { regen: 0.8, armor: 6 } },
+    ],
+  });
 // Explicit fit preserves item identity; wands and branches are not inferred from icons.
 const TWO_HANDED_WEAPONS = new Set([
   "starter_warrior",
@@ -2371,9 +2404,9 @@ for (const g of GEAR)
   if (LEGACY_WEAPON_TYPES[g.id]) g.weaponType = LEGACY_WEAPON_TYPES[g.id];
 for (const g of GEAR)
   if (LEGACY_RANGED[g.id]) g.rangedType = LEGACY_RANGED[g.id];
-export const GEAR_MAP = Object.fromEntries(
-  GEAR.map((g) => [g.id, g]),
-) as Record<string, GearDef>;
+export const GEAR_MAP = instanceCatalog(
+  Object.fromEntries(GEAR.map((g) => [g.id, g])) as Record<string, GearDef>,
+);
 export const RARITY_COLORS = {
   common: "#aaa99e",
   uncommon: "#9bc27d",
@@ -2599,7 +2632,7 @@ export const RECIPES: Recipe[] = [
   },
 ];
 RECIPES.push(
-  ...GEAR_SETS.flatMap((set) =>
+  ...GEAR_SETS.filter((set) => !set.id.startsWith("dawnward_")).flatMap((set) =>
     (["hands", "head", "chest"] as Slot[]).map((slot, i) => {
       const item = GEAR_MAP[`${set.id}_${slot}`];
       return {
@@ -3112,6 +3145,7 @@ RECIPES.push(
   ...RANGED_RECIPES,
   ...TRAINED_WEAPON_RECIPES,
 );
+RECIPES.push(...ENDGAME_RECIPES);
 for (const recipe of RECIPES)
   recipe.cost = gradedCosts(recipe.cost, recipe.skill);
 export interface ZoneDef {
@@ -3233,7 +3267,7 @@ ZONES.push({
   reward: "Rare castle equipment",
   dungeon: true,
 });
-ZONES.push(DUSKWOOD_ZONE);
+ZONES.push(DUSKWOOD_ZONE, ...ENDGAME_ZONES);
 export interface QuestDef {
   zoneId?: string;
   id: string;

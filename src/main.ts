@@ -1,3 +1,7 @@
+import { renderEndgameGuide } from "./endgame-ui";
+import { renderFinalJourney, renderEpilogueReview } from "./final-journey-ui";
+import { journeySnapshots } from "./final-journey";
+import { acceptEpilogue, claimEpilogue, epilogueReady } from "./progression";
 import {
   renderItemState,
   renderEquipmentWorkshop,
@@ -182,6 +186,9 @@ import type {
 } from "./content";
 import {
   availableTalents,
+  talentTrees,
+  talentRequirement,
+  changeTalentMode,
   canCraft,
   canEquip,
   canLearnTalent,
@@ -196,6 +203,8 @@ import {
   swapWeaponHands,
   forgetProfession,
   heroStats,
+  heroAttributes,
+  heroResistances,
   heroSpellBonuses,
   equipRestriction,
   equippedSets,
@@ -288,6 +297,12 @@ let page: Page = pageFromUrl(),
 let outpostFaction: FactionId =
   FACTIONS.find((f) => f.zoneId === save.selectedZone)?.id || "timbermaw";
 let bagSlot: Slot | "all" = "all";
+let partnerClass: ClassId | "" = "";
+function partyRestriction(zone: string) {
+  return partnerClass && partnerClass !== save.selectedClass
+    ? expeditionRestriction({ ...save, selectedClass: partnerClass }, zone)
+    : null;
+}
 const wardrobeFilters: WardrobeFilters = {
   open: false,
   slot: "all",
@@ -381,10 +396,11 @@ function header() {
   return `<header class="site-header"><a class="brand" href="#" data-action="nav" data-id="camp" aria-label="Wow Survivors home">${logo}<div><span class="brand-top">WOW</span><span class="brand-bottom">SURVIVORS</span></div></a><nav aria-label="Main navigation">${nav.map(([id, i, label]) => `<button class="nav-link ${page === id ? "active" : ""}" data-action="nav" data-id="${id}">${icon(i, 17)}<span>${label}</span>${id === "professions" && guildReady ? `<b class="nav-count" aria-hidden="true">${guildReady}</b>` : id === "journal" && ready ? `<b class="nav-count" aria-hidden="true">${ready}</b>` : id === "outposts" && outpostReady ? `<b class="nav-count" aria-hidden="true">${outpostReady}</b>` : ""}</button>`).join("")}</nav><div class="header-tools"><div class="gold-balance" title="Gold">${icon("coin", 18)}<span>${save.gold.toLocaleString()}</span><small>G</small></div>${button("settings", icon("gear", 20), "icon-button", 'aria-label="Settings" title="Settings"')}</div></header>`;
 }
 function footer() {
-  return `<footer class="site-footer"><span><i class="status-dot"></i> A world of adventure. One survivor.</span><span>WOW SURVIVORS <i>·</i> <span class="muted">EARLY ACCESS 0.30</span></span>${button("controls", `${icon("info", 14)} How to play`, "text-button")}</footer>`;
+  return `<footer class="site-footer"><span><i class="status-dot"></i> A world of adventure. Your journey.</span><span>WOW SURVIVORS <i>·</i> <span class="muted">RELEASE 1.0</span></span>${button("controls", `${icon("info", 14)} How to play`, "text-button")}</footer>`;
 }
 function render() {
   if (game) return;
+  if (partnerClass === save.selectedClass) partnerClass = "";
   const restoreFocus = controllerMode ? captureControllerFocus(app) : null;
   document.body.classList.remove("in-game");
   app.innerHTML = `${header()}<main class="main-content">${{ camp: renderCamp, talents: renderTalents, armory: renderArmory, professions: renderProfessions, journal: renderJournal, outposts: renderOutpostsPage, stable: renderStablePage, spellbook: renderSpellbookPage }[page]()}</main>${footer()}`;
@@ -397,7 +413,16 @@ function renderCamp() {
     stats = heroStats(save),
     z = ZONES.find((z) => z.id === save.selectedZone)!;
   return `<section class="welcome-row"><div><div class="eyebrow"><span class="tiny-line"></span> YOUR NEXT CHAPTER</div><h1>Azeroth awaits<span class="gold-text">.</span></h1><p>Choose your path. Face the horde. Become a legend.</p></div><div class="camp-summary"><div>${icon("sword", 18)}<span><b>${save.totals.kills.toLocaleString()}</b> enemies defeated</span></div><div>${icon("crown", 18)}<span><b>${save.totals.wins}</b> expeditions completed</span></div></div></section>
-  <div class="camp-layout"><div class="camp-main"><section class="world-card zone-${z.id}" aria-label="Selected expedition"><div class="world-image"></div><div class="world-overlay"></div><div class="world-top"><span class="world-label">${icon("map", 15)} ${z.id === "ragefire" ? "KALIMDOR" : "EASTERN KINGDOMS"}</span><span class="zone-badge"><i></i> ${z.dungeon ? "DUNGEON" : z.id === "elwynn" ? "RECOMMENDED" : z.id === "westfall" ? "CHALLENGING" : "DANGEROUS"}</span></div><div class="world-content"><div class="world-kicker">${z.subtitle}</div><h2>${z.name}</h2><p>${z.description}</p><div class="world-meta"><span>${icon("shield", 15)} ${z.difficulty === 1 ? "Normal" : z.difficulty < 1.5 ? "Veteran" : "Heroic"}</span><span>${icon("whirl", 15)} ${z.dungeon ? `${dungeonRoute(z.id)!.stages.length} stages · ${time(z.duration)} + boss fights` : `${Math.round(z.duration / 60)} minute expedition`}</span><span>${icon("target", 15)} Solo survival</span></div>${button("begin", `Begin ${z.dungeon ? "Dungeon" : "Expedition"} ${icon("arrow", 19)}`, "button primary expedition-button", expeditionRestriction(save, z.id) ? `disabled title="${expeditionRestriction(save, z.id)}"` : "")}<small class="world-hint">${expeditionRestriction(save, z.id) || (z.dungeon ? "Rare boss loot. Recover between stages. One final victory." : "Your abilities attack automatically. You make the next move.")}</small></div><div class="world-coordinates"><span>ELWYNN & BEYOND</span><i>01 — ${String(ZONES.length).padStart(2, "0")}</i></div></section>
+  <div class="camp-layout"><div class="camp-main"><section class="world-card zone-${z.id}" aria-label="Selected expedition"><div class="world-image"></div><div class="world-overlay"></div><div class="world-top"><span class="world-label">${icon("map", 15)} ${z.id === "ragefire" ? "KALIMDOR" : "EASTERN KINGDOMS"}</span><span class="zone-badge"><i></i> ${z.dungeon ? "DUNGEON" : z.id === "elwynn" ? "RECOMMENDED" : z.id === "westfall" ? "CHALLENGING" : "DANGEROUS"}</span></div><div class="world-content"><div class="world-kicker">${z.subtitle}</div><h2>${z.name}</h2><p>${z.description}</p><div class="world-meta"><span>${icon("shield", 15)} ${z.difficulty === 1 ? "Normal" : z.difficulty < 1.5 ? "Veteran" : "Heroic"}</span><span>${icon("whirl", 15)} ${z.dungeon ? `${dungeonRoute(z.id)!.stages.length} stages · ${time(z.duration)} + boss fights` : `${Math.round(z.duration / 60)} minute expedition`}</span><span>${icon("target", 15)} ${partnerClass ? "Local co-op" : "Solo survival"}</span></div><label class="coop-selector">Journey mode<select id="coop-hero"><option value="">Solo expedition</option>${CLASSES.filter(
+    (hero) => hero.id !== c.id,
+  )
+    .map(
+      (hero) =>
+        `<option value="${hero.id}" ${partnerClass === hero.id ? "selected" : ""}>Local co-op · ${hero.name} · Lv. ${save.heroes[hero.id].level}</option>`,
+    )
+    .join(
+      "",
+    )}</select></label>${partnerClass && partnerClass !== c.id ? `<p class="coop-intro">P1: WASD + Space. P2: arrows + Enter. Stand near a fallen ally for three seconds to revive them. Both heroes earn character XP; supplies and treasure are shared. ${partyRestriction(z.id) || ""}</p>` : ""}${button("begin", `Begin ${z.dungeon ? "Dungeon" : "Expedition"} ${icon("arrow", 19)}`, "button primary expedition-button", expeditionRestriction(save, z.id) || partyRestriction(z.id) ? `disabled title="${expeditionRestriction(save, z.id) || partyRestriction(z.id)}"` : "")}<small class="world-hint">${expeditionRestriction(save, z.id) || (z.dungeon ? "Rare boss loot. Recover between stages. One final victory." : "Your abilities attack automatically. You make the next move.")}</small></div><div class="world-coordinates"><span>ELWYNN & BEYOND</span><i>01 — ${String(ZONES.length).padStart(2, "0")}</i></div></section>
   <div class="zone-strip" aria-label="Choose expedition">${ZONES.map(
     (zone, i) => {
       const unlocked = zoneUnlocked(save, zone.id);
@@ -489,24 +514,25 @@ function renderGearSet(id: string): string {
 function renderTalents() {
   const c = CLASS_MAP[save.selectedClass],
     h = save.heroes[c.id],
-    stats = heroStats(save);
-  return `${pageTitle("CHARACTER PROGRESSION", "Shape your legend.", "Three paths. Your build. Talent bonuses carry into every expedition.")}<div class="progression-banner">${portrait(c.portrait)}<div><b>${c.name} <span class="muted">· Level ${h.level}</span></b><span>${spentTalents(h)} points invested · 21 points available by level 21 · 42 possible ranks.</span></div><span class="point-count">${icon("spark", 21)} ${availableTalents(h)} <small>available</small></span>${button("respec", "Reset talents", "button quiet", `${!spentTalents(h) ? "disabled" : ""}`)}</div><div class="talent-trees">${c.trees
+    stats = heroStats(save),
+    classic = h.talentMode === "classic";
+  return `${pageTitle("CHARACTER PROGRESSION", "Shape your legend.", "Three paths. Your build. Talent bonuses carry into every expedition.")}<div class="progression-banner">${portrait(c.portrait)}<div><b>${c.name} <span class="muted">· Level ${h.level}</span></b><span>${spentTalents(h)} points invested · ${classic ? "51 points available by level 60 · talents begin at level 10" : "21 points available by level 21 · 42 possible ranks"}.</span></div><span class="point-count">${icon("spark", 21)} ${availableTalents(h)} <small>available</small></span>${button("respec", "Reset talents", "button quiet", `${!spentTalents(h) ? "disabled" : ""}`)}</div><div class="save-actions"><button class="button quiet" data-action="review-talent-mode" data-id="${classic ? "survivor" : "classic"}" ${!classic && h.level < 10 ? "disabled" : ""}>${classic ? "Switch to Survivor talents" : "Switch to Classic talents · level 10"}</button><p class="page-note">${classic ? "Vanilla names, rank caps, rows and prerequisites. Effects are adapted for this survival game." : "A compact path with a point from level 1. The Classic path offers the complete tree structure."}</p></div><div class="talent-trees">${talentTrees(
+    save,
+  )
     .map((t) => {
       const spent = t.nodes.reduce((a, n) => a + (h.talents[n.id] || 0), 0);
       return `<section class="talent-tree" style="--tree-color:${t.color}"><div class="tree-header">${icon(c.id, 25)}<div><h2>${t.name}</h2><span>${spent} points invested</span></div></div><div class="tree-nodes">${t.nodes
         .map((n, i) => {
           const rank = h.talents[n.id] || 0,
             allowed = canLearnTalent(save, c.id, n.id),
-            prev = t.nodes
-              .slice(0, i)
-              .reduce((a, n) => a + (h.talents[n.id] || 0), 0);
-          return `<div class="talent-node ${rank ? "learned" : ""} ${prev < n.required ? "gated" : ""}"><div class="talent-node-top"><span class="talent-icon">${icon(n.icon, 27)}</span><div><h3>${n.name}</h3><span>${rank} / ${n.max} ranks</span></div><div class="rank-pips">${Array.from({ length: n.max }, (_, j) => `<i class="${j < rank ? "filled" : ""}"></i>`).join("")}</div></div><p>${n.description}</p>${button("talent", rank === n.max ? `${icon("check", 15)} Fully trained` : prev < n.required ? `${icon("lock", 14)} Requires ${n.required} points above` : availableTalents(h) <= 0 ? "Earn a talent point" : "+ Train talent", "button quiet", `data-id="${n.id}" ${!allowed ? "disabled" : ""}`)}</div>`;
+            requirement = talentRequirement(save, c.id, n.id);
+          return `<div class="talent-node ${rank ? "learned" : ""} ${requirement ? "gated" : ""}"><div class="talent-node-top"><span class="talent-icon">${icon(n.icon, 27)}</span><div><h3>${n.name}</h3><span>${rank} / ${n.max} ranks</span></div><div class="rank-pips">${Array.from({ length: n.max }, (_, j) => `<i class="${j < rank ? "filled" : ""}"></i>`).join("")}</div></div>${classic ? `<small class="muted">Tier ${(n as import("./classic-talents").ClassicTalent).row} · ${n.required} points in earlier rows</small>` : ""}<p>${n.description}</p>${button("talent", rank === n.max ? `${icon("check", 15)} Fully trained` : requirement ? `${icon("lock", 14)} ${requirement}` : availableTalents(h) <= 0 ? "Earn a talent point" : "+ Train talent", "button quiet", `data-id="${n.id}" ${!allowed ? "disabled" : ""}`)}</div>`;
         })
         .join("")}</div></section>`;
     })
     .join(
       "",
-    )}</div><div class="stat-summary"><span>YOUR CURRENT BONUSES</span>${(["power", "haste", "crit", "armor", "regen"] as Stat[]).map((k) => `<div><small>${STAT_LABELS[k]}</small><b>${statValue(k, stats[k])}</b></div>`).join("")}</div>${renderSpellSpecialization()}<p class="page-note">Choose a specialization: your 21-point budget cannot fill all three trees. One talent point is granted at level 1. Character levels and talent choices persist between expeditions. You can reset talents for free to try another build.</p>`;
+    )}</div><div class="stat-summary"><span>YOUR CURRENT BONUSES</span>${(["power", "haste", "crit", "armor", "regen"] as Stat[]).map((k) => `<div><small>${STAT_LABELS[k]}</small><b>${statValue(k, stats[k])}</b></div>`).join("")}</div>${renderSpellSpecialization()}<p class="page-note">${classic ? "One point per level from 10 to 60. The 51-point budget cannot fill all three trees." : "Choose a specialization: your 21-point budget cannot fill all three trees. One talent point is granted at level 1."} Character levels and talent choices persist between expeditions. You can reset talents for free to try another build.</p>`;
 }
 function renderArmory() {
   const c = CLASS_MAP[save.selectedClass],
@@ -537,7 +563,16 @@ function renderArmory() {
     )
     .join(
       "",
-    )}</div><div class="equipped-set-bonuses">${activeSets.map((s) => renderGearSet(s.definition.id)).join("")}</div><div class="passive-note">${icon("info", 17)}<p>Armor reduces incoming damage. Lighter armor is usable; weapons remain class restricted. Off-hands require a one-handed weapon. Equipping a two-handed primary removes this hero’s off-hand. Ranged equipment works independently of both hands.</p></div></aside><section class="bag-panel"><div class="section-heading"><h2>Your satchel <span class="muted">${items.length}</span></h2><div class="segmented"><button data-action="bag-filter" data-id="usable" class="${bagFilter === "usable" ? "active" : ""}">Usable</button><button data-action="bag-filter" data-id="all" class="${bagFilter === "all" ? "active" : ""}">All items</button></div></div><div class="bag-slot-toolbar"><label for="bag-slot">Equipment slot</label><select id="bag-slot"><option value="all">All slots</option>${SLOTS.map((slot) => `<option value="${slot}" ${bagSlot === slot ? "selected" : ""}>${SLOT_LABELS[slot]}</option>`).join("")}</select></div>${!items.length ? `<p class="bag-empty">No owned items match these filters. Explore the acquisition guide below or choose another slot.</p>` : ""}<div class="gear-grid">${items
+    )}</div><div class="loadout-stats" aria-label="Attributes and resistances">${Object.entries(
+    { ...heroAttributes(save), ...heroResistances(save) },
+  )
+    .map(
+      ([key, value]) =>
+        `<div><span>${key}${["fire", "frost", "nature", "shadow", "arcane"].includes(key) ? " resistance" : ""}</span><b>${Number(value.toFixed(1))}</b></div>`,
+    )
+    .join(
+      "",
+    )}</div><p class="page-note">Strength and intellect add damage; agility adds critical chance and speed; stamina adds health; spirit adds recovery. Magical resistance reduces its school by up to 60%.</p><div class="equipped-set-bonuses">${activeSets.map((s) => renderGearSet(s.definition.id)).join("")}</div><div class="passive-note">${icon("info", 17)}<p>Armor reduces incoming damage. Lighter armor is usable; weapons remain class restricted. Off-hands require a one-handed weapon. Equipping a two-handed primary removes this hero’s off-hand. Ranged equipment works independently of both hands.</p></div></aside><section class="bag-panel"><div class="section-heading"><h2>Your satchel <span class="muted">${items.length} / 1000</span></h2><div class="segmented"><button data-action="bag-filter" data-id="usable" class="${bagFilter === "usable" ? "active" : ""}">Usable</button><button data-action="bag-filter" data-id="all" class="${bagFilter === "all" ? "active" : ""}">All items</button></div></div><div class="bag-slot-toolbar"><label for="bag-slot">Equipment slot</label><select id="bag-slot"><option value="all">All slots</option>${SLOTS.map((slot) => `<option value="${slot}" ${bagSlot === slot ? "selected" : ""}>${SLOT_LABELS[slot]}</option>`).join("")}</select></div>${!items.length ? `<p class="bag-empty">No owned items match these filters. Explore the acquisition guide below or choose another slot.</p>` : ""}<div class="gear-grid">${items
     .map((id) => {
       const g = GEAR_MAP[id],
         equipped = Object.values(h.equipment).includes(id),
@@ -588,7 +623,7 @@ function renderArmory() {
     })
     .join(
       "",
-    )}</div><p class="page-note">Elite enemies drop treasure chests. Final bosses award rare or epic equipment. Items already owned are converted into gold when an expedition ends.</p></section></div>${renderWardrobe(save, wardrobeFilters)}${renderEnchantingTable(save, enchantTarget)}`;
+    )}</div><p class="page-note">Elite enemies drop treasure chests. Final bosses award rare or epic equipment. Items already owned are converted into gold when an expedition ends.</p></section></div>${renderWardrobe(save, wardrobeFilters)}${renderEndgameGuide(save)}${renderEnchantingTable(save, enchantTarget)}`;
 }
 function renderCraftedItem(id: string): string {
   const item = GEAR_MAP[id];
@@ -644,7 +679,7 @@ function renderProfessions() {
         )
         .join(
           "",
-        )}${r.gold ? `<span class="${save.gold < r.gold ? "insufficient" : ""}">${icon("coin", 14)} ${r.gold} G</span>` : ""}</div>${button("craft", restriction || `Craft ${icon("arrow", 15)}`, "button quiet", `data-id="${r.id}" ${!affordable ? "disabled" : ""}`)}</article>`;
+        )}${r.gold ? `<span class="${save.gold < r.gold ? "insufficient" : ""}">${icon("coin", 14)} ${r.gold} G</span>` : ""}</div>${save.inventory.includes(r.output) && GEAR_MAP[r.output] ? button("craft-copy", save.inventory.length >= 1000 ? "Satchel full" : "Craft independent copy", "button quiet", `data-id="${r.id}" ${!affordable || save.inventory.length >= 1000 ? "disabled" : ""}`) : ""}${button("craft", restriction || `Craft ${icon("arrow", 15)}`, "button quiet", `data-id="${r.id}" ${!affordable ? "disabled" : ""}`)}</article>`;
     })
     .join(
       "",
@@ -668,7 +703,7 @@ function renderJournal() {
     )
     .join(
       "",
-    )}</div>${renderClassTrial(save)}<div class="section-heading"><h2>Quests & milestones</h2><span class="subtle-label">${save.claimedQuests.length} / ${QUESTS.length} COMPLETED</span></div><div class="quest-grid">${QUESTS.map(
+    )}</div>${renderFinalJourney(save)}${renderClassTrial(save)}<div class="section-heading"><h2>Quests & milestones</h2><span class="subtle-label">${save.claimedQuests.length} / ${QUESTS.length} COMPLETED</span></div><div class="quest-grid">${QUESTS.map(
     (q) => {
       const value = Math.min(q.goal, questProgress(save, q.id)),
         done = save.claimedQuests.includes(q.id),
@@ -691,7 +726,14 @@ function showModal(html: string, kind: string, css = "") {
   document.body.classList.toggle("has-checkpoint", kind === "checkpoint");
   refreshControllerHints();
   if (controllerMode) ensureControllerFocus(modalRoot);
+  const openedDialog = modalRoot.firstElementChild;
   requestAnimationFrame(() => {
+    if (
+      modalRoot.firstElementChild !== openedDialog ||
+      !modalKind ||
+      modalRoot.contains(document.activeElement)
+    )
+      return;
     if (controllerMode) {
       ensureControllerFocus(modalRoot);
       return;
@@ -782,7 +824,7 @@ function renderMusicSettings() {
   const levels = [
     ...new Set([0, 25, 50, 75, 100, save.settings.musicVolume]),
   ].sort((a, b) => a - b);
-  return `<section class="music-settings" aria-label="Original music"><label class="setting-row">${icon("volume", 22)}<span><b>Original music</b><small>Camp, expedition and encounter themes.</small></span><input type="checkbox" data-setting="music" ${save.settings.music ? "checked" : ""}/><span class="toggle"></span></label><div class="music-volume"><label for="music-volume">Music volume</label><select id="music-volume">${levels.map((level) => `<option value="${level}" ${level === save.settings.musicVolume ? "selected" : ""}>${level === 0 ? "Muted" : `${level}%`}</option>`).join("")}</select></div><p id="music-status" class="music-status" role="status">${music.status()}</p><p class="music-credit">Ten original themes, composed and synthesized locally. Music and sound effects have separate controls. Combat music rests during paused choices and when the game loses focus.</p></section>`;
+  return `<section class="music-settings" aria-label="Original music"><label class="setting-row">${icon("volume", 22)}<span><b>Original music</b><small>Camp, expedition and encounter themes.</small></span><input type="checkbox" data-setting="music" ${save.settings.music ? "checked" : ""}/><span class="toggle"></span></label><div class="music-volume"><label for="music-volume">Music volume</label><select id="music-volume">${levels.map((level) => `<option value="${level}" ${level === save.settings.musicVolume ? "selected" : ""}>${level === 0 ? "Muted" : `${level}%`}</option>`).join("")}</select></div><p id="music-status" class="music-status" role="status">${music.status()}</p><p class="music-credit">Twelve original themes, composed and synthesized locally. Music and sound effects have separate controls. Combat music rests during paused choices and when the game loses focus.</p></section>`;
 }
 function refreshMusic() {
   const scene = musicScene({
@@ -854,7 +896,7 @@ function showResult(result: RunRecord, reputationEarned: number) {
   sound.reward();
   const mats = Object.entries(result.materials);
   showModal(
-    `<div class="result-emblem ${result.victory ? "victory" : ""}">${icon(result.victory ? "crown" : "sword", 38)}</div><div class="eyebrow centered">${result.victory ? (result.zoneId === "deadmines" ? "THE BROTHERHOOD IS BROKEN" : result.zoneId === "ragefire" ? "THE SEARING BLADE IS SILENCED" : result.zoneId === "shadowfang" ? "THE MOONLIT CURSE IS BROKEN" : "THE FOREST WILL REMEMBER") : "THE ROAD DOES NOT END HERE"}</div><h2 id="modal-title">${result.victory ? "A legend begins." : "Until the next adventure."}</h2><p class="modal-intro centered">${CLASS_MAP[result.classId].name} · ${ZONES.find((z) => z.id === result.zoneId)!.name}</p><div class="result-stats"><div><b>${time(result.time)}</b><small>Survived</small></div><div><b>${result.kills}</b><small>Defeated</small></div><div><b>${result.level}</b><small>Run level</small></div></div><div class="result-rewards"><span>${icon("coin", 21)}<b>+${result.gold}</b> gold</span><span>${icon("spark", 21)}<b>+${result.xp}</b> character XP</span></div>${mats.length ? `<div class="result-materials">${mats.map(([m, n]) => `<span>${icon(MATERIALS[m as Material].icon, 16)} ${n} ${MATERIALS[m as Material].name}</span>`).join("")}</div>` : ""}${result.loot.length ? `<div class="result-loot">${result.loot.map((id) => `<span style="color:${RARITY_COLORS[GEAR_MAP[id].rarity]}">${icon(GEAR_MAP[id].icon, 23)} ${GEAR_MAP[id].name}</span>`).join("")}</div>` : ""}${dungeonRoute(result.zoneId) ? renderDungeonResult(result) : `<div class="result-exploration">${icon("compass", 19)}<b>${result.encounters || 0} / 6</b> landmarks completed</div>`}${renderEquipmentResult(save, result)}${renderFactionResult(save, result, reputationEarned)}${renderSkillCaps(save)}${renderTrialStatus(save)}${renderProfessionQuestStatus(save)}${renderCampaignStatus(save)}<p class="result-level">Your ${CLASS_MAP[result.classId].name} is now character level <b>${save.heroes[result.classId].level}</b>. ${availableTalents(save.heroes[result.classId])} talent points available.</p>${button("camp", `Return to camp ${icon("arrow", 18)}`, "button primary full-width")}`,
+    `<div class="result-emblem ${result.victory ? "victory" : ""}">${icon(result.victory ? "crown" : "sword", 38)}</div><div class="eyebrow centered">${result.victory ? (result.zoneId === "deadmines" ? "THE BROTHERHOOD IS BROKEN" : result.zoneId === "ragefire" ? "THE SEARING BLADE IS SILENCED" : result.zoneId === "shadowfang" ? "THE MOONLIT CURSE IS BROKEN" : "THE FOREST WILL REMEMBER") : "THE ROAD DOES NOT END HERE"}</div><h2 id="modal-title">${result.victory ? "A legend begins." : "Until the next adventure."}</h2><p class="modal-intro centered">${CLASS_MAP[result.classId].name} · ${ZONES.find((z) => z.id === result.zoneId)!.name}</p><div class="result-stats"><div><b>${time(result.time)}</b><small>Survived</small></div><div><b>${result.kills}</b><small>Defeated</small></div><div><b>${result.level}</b><small>Run level</small></div></div><div class="result-rewards"><span>${icon("coin", 21)}<b>+${result.gold}</b> gold</span><span>${icon("spark", 21)}<b>+${result.xp}</b> character XP</span></div>${mats.length ? `<div class="result-materials">${mats.map(([m, n]) => `<span>${icon(MATERIALS[m as Material].icon, 16)} ${n} ${MATERIALS[m as Material].name}</span>`).join("")}</div>` : ""}${result.loot.length ? `<div class="result-loot">${result.loot.map((id) => `<span style="color:${RARITY_COLORS[GEAR_MAP[id].rarity]}">${icon(GEAR_MAP[id].icon, 23)} ${GEAR_MAP[id].name}</span>`).join("")}</div>` : ""}${dungeonRoute(result.zoneId) ? renderDungeonResult(result) : `<div class="result-exploration">${icon("compass", 19)}<b>${result.encounters || 0} / 6</b> landmarks completed</div>`}${renderEquipmentResult(save, result)}${renderFactionResult(save, result, reputationEarned)}${renderSkillCaps(save)}${renderTrialStatus(save)}${renderProfessionQuestStatus(save)}${renderCampaignStatus(save)}${result.party ? `<p class="result-level">Your ${CLASS_MAP[result.party.classId].name} partner also earns ${result.xp} character XP. The party’s gold, treasure and materials are paid once.</p>` : ""}<p class="result-level">Your ${CLASS_MAP[result.classId].name} is now character level <b>${save.heroes[result.classId].level}</b>. ${availableTalents(save.heroes[result.classId])} talent points available.</p>${button("camp", `Return to camp ${icon("arrow", 18)}`, "button primary full-width")}`,
     "result",
     "result-modal",
   );
@@ -902,15 +944,33 @@ function handleGameEvent(event: GameEvent) {
 function startGame() {
   closeModal();
   const zone = ZONES.find((z) => z.id === save.selectedZone)!;
-  if (expeditionRestriction(save, zone.id)) return;
+  if (expeditionRestriction(save, zone.id) || partyRestriction(zone.id)) return;
   const food = save.supplies.food > 0;
   if (food) save.supplies.food--;
   writeSave();
   keys.clear();
   game = new GameEngine({
     classId: save.selectedClass,
+    ...(partnerClass && partnerClass !== save.selectedClass
+      ? {
+          partner: {
+            classId: partnerClass,
+            stats: heroStats(save, partnerClass),
+            characterLevel: save.heroes[partnerClass].level,
+            spellbook: save.heroes[partnerClass].spellbook,
+            spellBonuses: heroSpellBonuses(save, partnerClass),
+            resistances: heroResistances(save, partnerClass),
+            equipment: equipmentSnapshot({
+              ...save,
+              selectedClass: partnerClass,
+            }),
+          },
+        }
+      : {}),
     zone,
     stats: heroStats(save),
+    resistances: heroResistances(save),
+    journey: journeySnapshots(save),
     equipment: equipmentSnapshot(save),
     onAmmunition: () => {
       if (save.ammunition <= 0) return false;
@@ -948,7 +1008,7 @@ function startGame() {
     },
   });
   document.body.classList.add("in-game");
-  app.innerHTML = `<main class="game-shell ${zone.dungeon ? "dungeon-game" : ""}" data-zone="${zone.id}"><canvas id="game-canvas" aria-label="Wow Survivors survival battlefield"></canvas><div class="game-xp-track"><i id="run-xp-fill"></i></div><div class="game-top"><div class="player-hud">${portrait(game.classDef.portrait)}<div class="player-hud-info"><div><b>${game.classDef.name}</b><span id="run-level">LEVEL 1</span></div><div class="health-track"><i id="health-fill"></i><span id="health-text"></span></div><div class="resource-track"><i id="resource-fill" class="${game.classDef.resource.toLowerCase()}"></i><span id="resource-text"></span></div></div></div><div class="game-timer"><span>${zone.name}</span><b id="run-time">00:00</b><small id="run-objective">Survive ${Math.round(zone.duration / 60)} minutes, then defeat ${zone.boss}</small></div><div class="game-counters"><span>${icon("sword", 18)}<b id="run-kills">0</b></span><span>${icon("coin", 18)}<b id="run-gold">0</b></span>${button("pause", icon("pause", 21), "game-pause", 'aria-label="Pause expedition"')}</div></div><section class="boss-hud" id="boss-hud" hidden aria-label="Dungeon guardian or final boss"><div><b id="boss-name"></b><span id="boss-phase"></span></div><div class="boss-health-track"><i id="boss-health-fill"></i></div><p id="boss-attack"></p></section><aside class="world-hud" aria-label="Exploration"><div class="exploration-heading">${icon("compass", 16)}<b id="landmark-count">LANDMARKS 0 / 6</b><span id="blessing-count"></span><button class="fieldwork-toggle" id="fieldwork-toggle" data-action="fieldwork" aria-expanded="false" aria-controls="fieldwork-panel">Gather</button></div><div id="explore-panel"><div class="landmark-compass"><span id="compass-arrow">↑</span><div><b id="landmark-name"></b><small id="landmark-hint"></small></div></div><div id="encounter-status" hidden><div class="encounter-progress"><i id="encounter-fill"></i></div><small id="encounter-detail"></small></div><button data-action="interact" id="landmark-button" class="landmark-button" hidden><kbd>F</kbd><span id="landmark-interact"></span>${icon("arrow", 15)}</button><small id="landmark-preview" hidden></small></div>${renderFieldwork()}</aside><button data-action="travel" id="travel-button" class="travel-action" aria-label="Travel" aria-pressed="false">${icon("horse", 23)}<span><b id="travel-label">Travel</b><small id="travel-hint"></small></span><kbd>R</kbd><i id="travel-channel" class="travel-channel"></i></button>${game.shootingWeapon || game.equipment.primary ? `<button data-action="shoot" id="shoot-button" class="equipment-shoot"><span>${icon(game.shootingWeapon ? GEAR_MAP[game.shootingWeapon.item].icon : "sword", 20)} ${game.shootingWeapon ? "Shoot" : "Strike"} <kbd>T</kbd></span><small id="shot-status"></small></button>` : ""}<div class="game-bottom"><div class="spell-loadout" id="spell-loadout"></div><div class="game-actions"><button data-action="active" id="active-button" class="action-slot"><span class="action-symbol">${icon(game.classDef.id, 24)}</span><b>${game.classDef.active}</b><kbd>SPACE</kbd><i id="active-cooldown"></i></button><button data-action="dash" class="action-slot compact"><span class="action-symbol">${icon("boot", 23)}</span><b id="dash-text">Dash</b><kbd>SHIFT</kbd></button><button data-action="heal" class="action-slot compact"><span class="action-symbol">${icon("potion", 23)}</span><b id="potion-count">${save.supplies.potions}</b><kbd>Q</kbd></button><button data-action="bomb" class="action-slot compact"><span class="action-symbol">${icon("bomb", 23)}</span><b id="bomb-count">${save.supplies.bombs}</b><kbd>E</kbd></button></div></div><div class="game-tutorial" id="game-tutorial">${icon("info", 18)}<span><b>Keep moving.</b> Your spells attack automatically. Collect blue gems to grow stronger.</span><kbd>WASD</kbd></div><div class="touch-controls"><div class="touch-pad" id="touch-pad"><div id="touch-stick"></div></div><button data-action="active" aria-label="Class ability">${icon(game.classDef.id, 28)}</button></div></main>`;
+  app.innerHTML = `<main class="game-shell ${game.partner ? "coop-game" : ""} ${zone.dungeon ? "dungeon-game" : ""}" data-zone="${zone.id}"><canvas id="game-canvas" aria-label="Wow Survivors survival battlefield"></canvas><div class="game-xp-track"><i id="run-xp-fill"></i></div><div class="game-top"><div class="player-hud">${portrait(game.classDef.portrait)}<div class="player-hud-info"><div><b>${game.classDef.name}</b><span id="run-level">LEVEL 1</span></div><div class="health-track"><i id="health-fill"></i><span id="health-text"></span></div><div class="resource-track"><i id="resource-fill" class="${game.classDef.resource.toLowerCase()}"></i><span id="resource-text"></span></div></div></div><div class="game-timer"><span>${zone.name}</span><b id="run-time">00:00</b><small id="run-objective">Survive ${Math.round(zone.duration / 60)} minutes, then defeat ${zone.boss}</small></div><div class="game-counters"><span>${icon("sword", 18)}<b id="run-kills">0</b></span><span>${icon("coin", 18)}<b id="run-gold">0</b></span>${button("pause", icon("pause", 21), "game-pause", 'aria-label="Pause expedition"')}</div></div>${game.partner ? `<aside class="partner-hud" aria-label="Cooperative partner"><b>P2 · ${game.partner.classDef.name}</b><span id="partner-health"></span><small id="partner-status">Arrows move · Enter class ability</small><button class="button quiet" data-action="partner-active">P2 ability · Enter</button></aside>` : ""}<section class="boss-hud" id="boss-hud" hidden aria-label="Dungeon guardian or final boss"><div><b id="boss-name"></b><span id="boss-phase"></span></div><div class="boss-health-track"><i id="boss-health-fill"></i></div><p id="boss-attack"></p></section><aside class="world-hud" aria-label="Exploration"><div class="exploration-heading">${icon("compass", 16)}<b id="landmark-count">LANDMARKS 0 / 6</b><span id="blessing-count"></span><button class="fieldwork-toggle" id="fieldwork-toggle" data-action="fieldwork" aria-expanded="false" aria-controls="fieldwork-panel">Gather</button></div><div id="explore-panel"><div class="landmark-compass"><span id="compass-arrow">↑</span><div><b id="landmark-name"></b><small id="landmark-hint"></small></div></div><div id="encounter-status" hidden><div class="encounter-progress"><i id="encounter-fill"></i></div><small id="encounter-detail"></small></div><button data-action="interact" id="landmark-button" class="landmark-button" hidden><kbd>F</kbd><span id="landmark-interact"></span>${icon("arrow", 15)}</button><small id="landmark-preview" hidden></small></div>${renderFieldwork()}</aside><button data-action="travel" id="travel-button" class="travel-action" aria-label="Travel" aria-pressed="false">${icon("horse", 23)}<span><b id="travel-label">Travel</b><small id="travel-hint"></small></span><kbd>R</kbd><i id="travel-channel" class="travel-channel"></i></button>${game.shootingWeapon || game.equipment.primary ? `<button data-action="shoot" id="shoot-button" class="equipment-shoot"><span>${icon(game.shootingWeapon ? GEAR_MAP[game.shootingWeapon.item].icon : "sword", 20)} ${game.shootingWeapon ? "Shoot" : "Strike"} <kbd>T</kbd></span><small id="shot-status"></small></button>` : ""}<div class="game-bottom"><div class="spell-loadout" id="spell-loadout"></div><div class="game-actions"><button data-action="active" id="active-button" class="action-slot"><span class="action-symbol">${icon(game.classDef.id, 24)}</span><b>${game.classDef.active}</b><kbd>SPACE</kbd><i id="active-cooldown"></i></button><button data-action="dash" class="action-slot compact"><span class="action-symbol">${icon("boot", 23)}</span><b id="dash-text">Dash</b><kbd>SHIFT</kbd></button><button data-action="heal" class="action-slot compact"><span class="action-symbol">${icon("potion", 23)}</span><b id="potion-count">${save.supplies.potions}</b><kbd>Q</kbd></button><button data-action="bomb" class="action-slot compact"><span class="action-symbol">${icon("bomb", 23)}</span><b id="bomb-count">${save.supplies.bombs}</b><kbd>E</kbd></button></div></div><div class="game-tutorial" id="game-tutorial">${icon("info", 18)}<span><b>Keep moving.</b> Your spells attack automatically. Collect blue gems to grow stronger.</span><kbd>WASD</kbd></div><div class="touch-controls"><div class="touch-pad" id="touch-pad"><div id="touch-stick"></div></div><button data-action="active" aria-label="Class ability">${icon(game.classDef.id, 28)}</button></div></main>`;
   renderer = new GameRenderer(
     document.querySelector<HTMLCanvasElement>("#game-canvas")!,
     game,
@@ -976,6 +1036,20 @@ function updateHud() {
   if (!game) return;
   updateFieldwork(game);
   const p = game.player;
+  if (game.partner) {
+    const buddy = game.partner,
+      health = document.getElementById("partner-health"),
+      status = document.getElementById("partner-status");
+    if (health)
+      health.textContent = `${Math.max(0, Math.ceil(buddy.player.hp))} / ${Math.ceil(buddy.player.maxHp)} HP`;
+    if (status)
+      status.textContent =
+        buddy.player.hp <= 0
+          ? `Downed · revive ${Math.round((buddy.revive / 3) * 100)}% · stand within 90 units`
+          : p.hp <= 0
+            ? `P1 downed · revive ${Math.round((game.revivePrimary / 3) * 100)}%`
+            : `Arrows move · Enter ability · ${Math.ceil(buddy.player.activeCooldown)}s cooldown`;
+  }
   const shotStatus = document.getElementById("shot-status");
   if (shotStatus)
     shotStatus.textContent =
@@ -1571,11 +1645,58 @@ document.addEventListener("click", (e) => {
     if (modalKind === "settings" && game) resume();
     else closeModal();
   }
+  if (action === "accept-epilogue" && acceptEpilogue(save, id)) {
+    writeSave();
+    render();
+    toast(
+      "Promise accepted. Win the named expedition, then return to the Journal.",
+      "book",
+    );
+  }
+  if (action === "review-epilogue" && epilogueReady(save, id))
+    showModal(modalClose() + renderEpilogueReview(save, id), "epilogue");
+  if (
+    action === "claim-epilogue" &&
+    target.dataset.hero === save.selectedClass &&
+    claimEpilogue(save, id)
+  ) {
+    writeSave();
+    closeModal();
+    render();
+    toast("The promise is kept. Your conclusion is recorded.", "check");
+  }
+  if (action === "partner-active") {
+    game?.activatePartner();
+    updateHud();
+  }
   if (action === "talent") {
     if (learnTalent(save, id)) {
       writeSave();
       render();
       toast("Talent trained. Your next expedition is stronger.", "spark");
+    }
+  }
+  if (
+    action === "review-talent-mode" &&
+    (id === "classic" || id === "survivor")
+  ) {
+    const h = save.heroes[save.selectedClass];
+    if (id === "survivor" || h.level >= 10)
+      showModal(
+        `${modalClose()}<div class="eyebrow">TALENT PATH · FREE</div><h2 id="modal-title">Switch to ${id === "classic" ? "Classic" : "Survivor"} talents?</h2><p class="modal-intro">Your ${spentTalents(h)} invested points will be refunded and all current talent bonuses reset. ${id === "classic" ? "This path grants one point per character level from 10, up to 51 at level 60. Vanilla tree structure uses survivor combat bonuses." : "This path grants up to 21 points, starting at level 1."} Equipment and learned techniques stay with your hero.</p><div class="save-actions">${button("close-modal", "Keep current path", "button quiet")}${button("confirm-talent-mode", "Switch talent path", "button primary", `data-id="${id}" data-hero="${save.selectedClass}"`)}</div>`,
+        "talent-mode",
+      );
+  }
+  if (
+    action === "confirm-talent-mode" &&
+    target.dataset.hero === save.selectedClass &&
+    (id === "classic" || id === "survivor")
+  ) {
+    if (changeTalentMode(save, id)) {
+      writeSave();
+      closeModal();
+      render();
+      toast("Talent path changed. Your points are ready to invest.", "spark");
     }
   }
   if (action === "respec") {
@@ -1869,8 +1990,8 @@ document.addEventListener("click", (e) => {
     closeModal();
     render();
   }
-  if (action === "craft") {
-    const name = craft(save, id);
+  if (action === "craft" || action === "craft-copy") {
+    const name = craft(save, id, action === "craft-copy");
     if (name) {
       sound.reward();
       writeSave();
@@ -2010,6 +2131,13 @@ document.addEventListener("click", (e) => {
 });
 document.addEventListener("change", async (e) => {
   const select = e.target as HTMLSelectElement;
+  if (select.id === "coop-hero") {
+    partnerClass = Object.hasOwn(CLASS_MAP, select.value)
+      ? (select.value as ClassId)
+      : "";
+    render();
+    return;
+  }
   if (select.id === "bag-slot") {
     bagSlot = select.value as Slot | "all";
     render();
@@ -2107,6 +2235,7 @@ function resetMovement() {
   controllerMovement = { x: 0, y: 0 };
   controller.requireNeutral();
   game?.setInput(0, 0);
+  game?.setPartnerInput(0, 0);
 }
 function goBack() {
   if (game && !game.ended) {
@@ -2311,6 +2440,10 @@ document.addEventListener("keydown", (e) => {
   keys.add(e.key.toLowerCase());
   syncInput();
   if (e.repeat) return;
+  if (e.key === "Enter" && game.partner) {
+    e.preventDefault();
+    game.activatePartner();
+  }
   if (e.key === " ") game.activate();
   if (e.key === "Shift") game.dash();
   if (e.key.toLowerCase() === "q") game.usePotion();
@@ -2330,15 +2463,16 @@ function syncInput() {
   if (!game) return;
   if (modalKind || game.paused || game.ended) {
     game.setInput(0, 0);
+    game.setPartnerInput(0, 0);
     return;
   }
   const keyboard = {
     x:
-      Number(keys.has("d") || keys.has("arrowright")) -
-      Number(keys.has("a") || keys.has("arrowleft")),
+      Number(keys.has("d") || (!game.partner && keys.has("arrowright"))) -
+      Number(keys.has("a") || (!game.partner && keys.has("arrowleft"))),
     y:
-      Number(keys.has("s") || keys.has("arrowdown")) -
-      Number(keys.has("w") || keys.has("arrowup")),
+      Number(keys.has("s") || (!game.partner && keys.has("arrowdown"))) -
+      Number(keys.has("w") || (!game.partner && keys.has("arrowup"))),
   };
   const movement =
     touchMovement.x || touchMovement.y
@@ -2347,6 +2481,10 @@ function syncInput() {
         ? keyboard
         : controllerMovement;
   game.setInput(movement.x, movement.y);
+  game.setPartnerInput(
+    Number(keys.has("arrowright")) - Number(keys.has("arrowleft")),
+    Number(keys.has("arrowdown")) - Number(keys.has("arrowup")),
+  );
 }
 window.addEventListener("blur", () => {
   music.hold();

@@ -5,6 +5,8 @@ export type MusicCue =
   | "haunted"
   | "mine"
   | "ember"
+  | "cathedral"
+  | "blight"
   | "boss"
   | "recovery"
   | "victory"
@@ -57,6 +59,18 @@ export const MUSIC_SCORES: Record<MusicCue, MusicScore> = {
     melody: [67, 70, 0, 74, 73, 70, 67, 0, 65, 0, 66, 67, 70, 69, 65, 0],
     roots: [43, 39, 46, 41],
   },
+  cathedral: {
+    title: "Stone and Vows",
+    tempo: 78,
+    melody: [65, 0, 69, 72, 74, 72, 69, 0, 67, 0, 65, 64, 62, 64, 65, 0],
+    roots: [41, 46, 38, 45],
+  },
+  blight: {
+    title: "The Last Beacon",
+    tempo: 68,
+    melody: [71, 0, 74, 0, 76, 74, 71, 69, 67, 0, 69, 71, 66, 0, 64, 0],
+    roots: [40, 48, 45, 47],
+  },
   boss: {
     title: "Stand Your Ground",
     tempo: 120,
@@ -106,15 +120,19 @@ export function musicScene(state: MusicState) {
         ? "recovery"
         : state.boss
           ? "boss"
-          : state.zone === "elwynn"
-            ? "woodland"
-            : state.zone === "westfall"
-              ? "frontier"
-              : state.zone === "deadmines"
-                ? "mine"
-                : state.zone === "ragefire"
-                  ? "ember"
-                  : "haunted";
+          : state.zone === "scarlet"
+            ? "cathedral"
+            : state.zone === "plaguelands"
+              ? "blight"
+              : state.zone === "elwynn"
+                ? "woodland"
+                : state.zone === "westfall"
+                  ? "frontier"
+                  : state.zone === "deadmines"
+                    ? "mine"
+                    : state.zone === "ragefire"
+                      ? "ember"
+                      : "haunted";
   }
   return {
     cue,

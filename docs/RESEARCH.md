@@ -1,5 +1,13 @@
 # Wow Survivors — research and design decisions
 
+## Current implementation — release 1.0
+
+The finite survivor-game roadmap is completed through the [acceptance checklist](COMPLETION.md) and [release notes](RELEASE-1.0.md): all 27 Classic talent structures, further class techniques, independent rolled equipment copies, primary attributes and resistances, Scarlet Monastery and Eastern Plaguelands, faction/guild conclusions, directional hero art, twelve original music cues and optional local co-op. The sections below preserve earlier research and release-specific deferrals; statements about later work describe those historical releases.
+
+The [Blizzard Classic primer](https://news.blizzard.com/en-us/article/23090134/wow-classic-primer-for-new-players) establishes three trees and 51 points from levels 10–60. The structural facts were checked against [hseager's 2019 Classic talent data](https://github.com/hseager/Classic-WoW-Talent-Planner/blob/e47aece378dbb27e900898feb73bc9c8a4104b77/assets/data/talent-data.json): only names, ranks, positions and dependencies are represented locally; source descriptions, icons and implementation were excluded. Combat effects, free respec, retained technique learning, numerical attributes/resistances, item rolls, guardian schedules and local co-op rules are original survivor adaptations. The full tree structure is implemented; Vanilla spell effects and every original quest/raid are not reproduced.
+
+The original [Blizzard manual](https://assets.blz-contentstack.com/v3/assets/blt3452e3b114fab0cd/blt2e9295db02a222fc/6025bcbb6968b53d529edb2a/media_manual_classic_enUS.pdf) informs attribute and resistance relationships. The [publisher's 2006 Atlas index](https://ptgmedia.pearsoncmg.com/imprint_downloads/brady/connected/wowatlas/RegionalIndices_hr.pdf) supplies regional context for the northern road. The cathedral combines Library, Armory and Cathedral guardians into one original four-stage route; the frontier's Blight Herald and all Dawnward rewards are original designs.
+
 Initial research: October 2, 2026; dungeon, character progression and travel studies: October 3. Target: original / vanilla Classic fantasy, rather than expansion classes, retail progression or Season of Discovery runes.
 
 ## Duskwood study — October 4, 2026
@@ -52,7 +60,7 @@ Automatic attacks, orbiting Blade Flurry, combat-generated resources, and evolve
 
 ## Complete first playable release
 
-All seven original first-playable milestones below are implemented. The long-term scope remains an expansion roadmap; release 0.30 completes the current equipment foundation pass rather than the entire vanilla content catalog.
+All seven original first-playable milestones below are implemented. Release 1.0 also completes the finite expansion acceptance criteria above. The dated records below describe how the implementation grew.
 
 1. A polished camp with all nine playable heroes, zone selection and visible build stats.
 2. A complete expedition: start, movement, automatic attacks, telegraphed enemy attacks, XP collection, paused level-up choices, elites, loot, gathering, final boss, victory/death and saved rewards.

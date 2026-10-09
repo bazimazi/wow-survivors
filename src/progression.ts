@@ -7,9 +7,32 @@ import {
   settleEquipment,
   affixQuote,
   attuneItem,
+  itemRoll,
+  equipmentSnapshot,
 } from "./item-progression";
 import type { ItemState, EquipmentProof } from "./item-progression";
 import type { WeaponType } from "./weapon-training";
+import { CLASSIC_TREES, classicTalentBudget } from "./classic-talents";
+import type { TalentMode, ClassicTalent } from "./classic-talents";
+import {
+  INVENTORY_CAP,
+  baseGearId,
+  nextInstanceId,
+  rollSeed,
+} from "./item-instances";
+import {
+  emptyAttributes,
+  emptyResistances,
+  attributeBonuses,
+} from "./attributes";
+import type { Attribute, Resistances } from "./attributes";
+import {
+  EPILOGUES,
+  EPILOGUE_MAP,
+  normalizeJourney,
+  validJourneySnapshot,
+} from "./final-journey";
+import type { JourneyProgress, JourneySnapshot } from "./final-journey";
 import {
   materialFor,
   tierForLevel,
@@ -133,6 +156,7 @@ import type {
 export interface HeroProgress {
   level: number;
   xp: number;
+  talentMode: TalentMode;
   talents: Record<string, number>;
   equipment: Partial<Record<Slot, string>>;
   classTrial: ClassTrialProgress;
@@ -143,6 +167,7 @@ export interface HeroProgress {
   weaponSkills: Partial<Record<WeaponType, number>>;
 }
 export interface SaveData {
+  journey: JourneyProgress;
   version: 1;
   selectedClass: ClassId;
   selectedZone: string;
@@ -189,6 +214,8 @@ export interface SaveData {
   };
 }
 export interface RunRecord {
+  party?: { classId: ClassId; equipmentProof: EquipmentProof };
+  journeyProof?: JourneySnapshot[];
   id: string;
   classId: ClassId;
   zoneId: string;
@@ -301,6 +328,7 @@ export function freshSave(): SaveData {
       {
         level: 1,
         xp: 0,
+        talentMode: "survivor",
         talents: {},
         equipment: { weapon: `starter_${c.id}`, chest: c.armor },
         classTrial: freshTrial(),
@@ -321,6 +349,7 @@ export function freshSave(): SaveData {
   ) as Record<ClassId, HeroProgress>;
   return {
     version: 1,
+    journey: {},
     selectedClass: "mage",
     selectedZone: "elwynn",
     gold: 180,
@@ -406,13 +435,16 @@ export function validateSave(raw: unknown): SaveData {
     ? (data.selectedZone as string)
     : "elwynn";
   s.gold = finite(data.gold);
+  s.journey = normalizeJourney(data.journey);
   s.inventory = Array.isArray(data.inventory)
     ? [
         ...new Set(
-          data.inventory.filter(
-            (id): id is string =>
-              typeof id === "string" && Object.hasOwn(GEAR_MAP, id),
-          ),
+          data.inventory
+            .slice(0, INVENTORY_CAP)
+            .filter(
+              (id): id is string =>
+                typeof id === "string" && Object.hasOwn(GEAR_MAP, id),
+            ),
         ),
       ]
     : s.inventory;
@@ -422,6 +454,10 @@ export function validateSave(raw: unknown): SaveData {
   for (const c of CLASSES) {
     const h = obj(savedHeroes[c.id]);
     s.heroes[c.id].level = Math.max(1, finite(h.level, 1, 60));
+    s.heroes[c.id].talentMode =
+      h.talentMode === "classic" && s.heroes[c.id].level >= 10
+        ? "classic"
+        : "survivor";
     s.heroes[c.id].dualWield =
       h.dualWield === true &&
       dualWieldClass(c.id) &&
@@ -465,7 +501,7 @@ export function validateSave(raw: unknown): SaveData {
         );
     const savedTalents = obj(h.talents);
     // Rebuild trees in order so imports cannot bypass prerequisites or point budgets.
-    for (const t of c.trees)
+    for (const t of talentTrees(s, c.id))
       for (const n of t.nodes) {
         const count = finite(savedTalents[n.id], 0, n.max);
         for (let i = 0; i < count; i++)
@@ -473,6 +509,7 @@ export function validateSave(raw: unknown): SaveData {
             s.heroes[c.id].talents[n.id] =
               (s.heroes[c.id].talents[n.id] || 0) + 1;
       }
+    syncTalentTechniques(s, c.id);
     s.heroes[c.id].equipment = {};
     for (const slot of SLOTS) {
       const id = obj(h.equipment)[slot];
@@ -747,10 +784,56 @@ export function grantXp(s: SaveData, classId: ClassId, amount: number): number {
     gained++;
   }
   if (h.level === 60) h.xp = Math.min(h.xp, characterXpRequired(60) - 1);
+  syncTalentTechniques(s, classId);
   return gained;
 }
 export function talentBudget(h: HeroProgress): number {
-  return Math.min(21, h.level);
+  return h.talentMode === "classic"
+    ? classicTalentBudget(h.level)
+    : Math.min(21, h.level);
+}
+export function talentTrees(s: SaveData, classId = s.selectedClass) {
+  return s.heroes[classId].talentMode === "classic"
+    ? CLASSIC_TREES[classId]
+    : CLASS_MAP[classId].trees;
+}
+export function changeTalentMode(s: SaveData, mode: TalentMode): boolean {
+  const h = s.heroes[s.selectedClass];
+  if (
+    (mode !== "classic" && mode !== "survivor") ||
+    mode === h.talentMode ||
+    (mode === "classic" && h.level < 10)
+  )
+    return false;
+  h.talents = {};
+  h.talentMode = mode;
+  return true;
+}
+export function talentRequirement(
+  s: SaveData,
+  classId: ClassId,
+  talentId: string,
+): string | null {
+  const h = s.heroes[classId];
+  for (const t of talentTrees(s, classId)) {
+    const index = t.nodes.findIndex((n) => n.id === talentId);
+    if (index < 0) continue;
+    const node = t.nodes[index] as ClassicTalent;
+    const above = (
+      h.talentMode === "classic"
+        ? t.nodes.filter((n) => (n as ClassicTalent).row < node.row)
+        : t.nodes.slice(0, index)
+    ).reduce((sum, n) => sum + (h.talents[n.id] || 0), 0);
+    if (above < node.required) return `Requires ${node.required} points above`;
+    if (
+      h.talentMode === "classic" &&
+      node.requires &&
+      (h.talents[node.requires.id] || 0) < node.requires.rank
+    )
+      return `Requires ${t.nodes.find((n) => n.id === node.requires!.id)!.name} ${node.requires.rank}`;
+    return null;
+  }
+  return "Unknown talent";
 }
 export const spentTalents = (h: HeroProgress) =>
   Object.values(h.talents).reduce((a, b) => a + b, 0);
@@ -762,18 +845,14 @@ export function canLearnTalent(
   talentId: string,
 ): boolean {
   const h = s.heroes[classId];
-  const c = CLASS_MAP[classId];
-  for (const t of c.trees) {
+  for (const t of talentTrees(s, classId)) {
     const index = t.nodes.findIndex((n) => n.id === talentId);
     if (index < 0) continue;
     const node = t.nodes[index];
-    const treeSpent = t.nodes
-      .slice(0, index)
-      .reduce((sum, n) => sum + (h.talents[n.id] || 0), 0);
     return (
       availableTalents(h) > 0 &&
       (h.talents[node.id] || 0) < node.max &&
-      treeSpent >= node.required
+      !talentRequirement(s, classId, talentId)
     );
   }
   return false;
@@ -782,7 +861,22 @@ export function learnTalent(s: SaveData, id: string): boolean {
   const h = s.heroes[s.selectedClass];
   if (!canLearnTalent(s, s.selectedClass, id)) return false;
   h.talents[id] = (h.talents[id] || 0) + 1;
+  syncTalentTechniques(s, s.selectedClass);
   return true;
+}
+function syncTalentTechniques(s: SaveData, classId: ClassId) {
+  const h = s.heroes[classId];
+  for (const tree of talentTrees(s, classId))
+    for (const node of tree.nodes) {
+      const id = node.grantsTechnique;
+      if (
+        id &&
+        h.talents[node.id] &&
+        h.level >= TECHNIQUE_MAP[id].level &&
+        !h.spellbook.learned.includes(id)
+      )
+        h.spellbook.learned.push(id);
+    }
 }
 export function respec(s: SaveData): boolean {
   if (!spentTalents(s.heroes[s.selectedClass])) return false;
@@ -960,7 +1054,7 @@ export function heroStats(s: SaveData, classId = s.selectedClass): Stats {
   if (c.id === "rogue") stats.crit += 12;
   if (c.id === "shaman") stats.crit += 8;
   if (["warrior", "rogue", "paladin"].includes(c.id)) stats.magnet += 25;
-  for (const t of c.trees)
+  for (const t of talentTrees(s, classId))
     for (const n of t.nodes)
       if (!n.spellIds) stats[n.stat] += n.value * (h.talents[n.id] || 0);
   const validNewWeapon = (itemId: string, position: string) => {
@@ -1005,7 +1099,71 @@ export function heroStats(s: SaveData, classId = s.selectedClass): Stats {
       if (set.pieces >= bonus.pieces)
         for (const [stat, value] of Object.entries(bonus.stats))
           stats[stat as keyof Stats] += value!;
+  for (const [stat, value] of Object.entries(
+    attributeBonuses(heroAttributes(s, classId)),
+  ))
+    stats[stat as keyof Stats] += value!;
   return stats;
+}
+export function heroAttributes(s: SaveData, classId = s.selectedClass) {
+  const result = emptyAttributes(),
+    h = s.heroes[classId];
+  const valid = new Set(
+    equipmentSnapshot({ ...s, selectedClass: classId }).items,
+  );
+  for (const [slot, id] of Object.entries(h.equipment)) {
+    if (!valid.has(id) || !itemCondition(s, id)) continue;
+    const factor = slot === "offhand" ? offhandMultiplier(classId, h) : 1;
+    for (const attributes of [
+      GEAR_MAP[id]?.attributes,
+      itemRoll(s, id)?.attributes,
+    ])
+      for (const [key, value] of Object.entries(attributes || {}))
+        result[key as Attribute] += value! * factor;
+  }
+  return result;
+}
+export function heroResistances(
+  s: SaveData,
+  classId = s.selectedClass,
+): Resistances {
+  const result = emptyResistances(),
+    h = s.heroes[classId];
+  const valid = new Set(
+    equipmentSnapshot({ ...s, selectedClass: classId }).items,
+  );
+  for (const [slot, id] of Object.entries(h.equipment)) {
+    if (!valid.has(id) || !itemCondition(s, id)) continue;
+    const factor = slot === "offhand" ? offhandMultiplier(classId, h) : 1;
+    for (const resistances of [
+      GEAR_MAP[id]?.resistances,
+      itemRoll(s, id)?.resistances,
+    ])
+      for (const [key, value] of Object.entries(resistances || {}))
+        result[key as keyof Resistances] += value! * factor;
+  }
+  return result;
+}
+export function canStoreGear(s: SaveData, id: string): boolean {
+  return s.inventory.includes(id) || s.inventory.length < INVENTORY_CAP;
+}
+export function awardGear(
+  s: SaveData,
+  id: string,
+  context: string,
+): string | null {
+  const base = baseGearId(id);
+  if (!Object.hasOwn(GEAR_MAP, base) || s.inventory.length >= INVENTORY_CAP)
+    return null;
+  if (!s.inventory.includes(base)) {
+    s.inventory.push(base);
+    return base;
+  }
+  const copy = nextInstanceId(s.inventory, base);
+  if (!copy) return null;
+  s.inventory.push(copy);
+  s.itemStates[copy] = { condition: 100, roll: rollSeed(`${context}:${copy}`) };
+  return copy;
 }
 export function classTechniqueRestriction(
   s: SaveData,
@@ -1066,7 +1224,7 @@ export function heroSpellBonuses(
   classId = s.selectedClass,
 ): Record<string, SpellBonus> {
   const result: Record<string, SpellBonus> = {};
-  for (const t of CLASS_MAP[classId].trees)
+  for (const t of talentTrees(s, classId))
     for (const node of t.nodes) {
       const rank = s.heroes[classId].talents[node.id] || 0;
       if (!rank || !node.spellIds) continue;
@@ -1253,6 +1411,8 @@ export function craftRestriction(s: SaveData, id: string): string | null {
       r.specialization
   )
     return `Requires ${SPECIALIZATIONS.find((p) => p.id === r.specialization)!.name}`;
+  if (GEAR_MAP[r.output] && !canStoreGear(s, r.output))
+    return "Satchel full · sell or disenchant an item";
   if (r.requiresPattern && !s.learnedRecipes.includes(r.id))
     return "Learn quartermaster pattern";
   if (r.reputation && s.reputation[r.reputation.faction] < r.reputation.points)
@@ -1274,9 +1434,24 @@ export function craftRestriction(s: SaveData, id: string): string | null {
 export function canCraft(s: SaveData, id: string): boolean {
   return craftRestriction(s, id) === null;
 }
-export function craft(s: SaveData, id: string): string | null {
+export function craft(
+  s: SaveData,
+  id: string,
+  keepCopy = false,
+): string | null {
   const r = RECIPES.find((r) => r.id === id);
   if (!r || !canCraft(s, id)) return null;
+  if (
+    Object.hasOwn(GEAR_MAP, r.output) &&
+    !s.inventory.includes(r.output) &&
+    s.inventory.length >= INVENTORY_CAP
+  )
+    return null;
+  if (
+    keepCopy &&
+    (!Object.hasOwn(GEAR_MAP, r.output) || s.inventory.length >= INVENTORY_CAP)
+  )
+    return null;
   for (const [m, count] of Object.entries(r.cost))
     s.materials[m as Material] -= count!;
   s.gold -= r.gold;
@@ -1285,6 +1460,7 @@ export function craft(s: SaveData, id: string): string | null {
       999,
       s.supplies[r.output as keyof SaveData["supplies"]] + r.quantity,
     );
+  else if (keepCopy) awardGear(s, r.output, `craft:${s.totals.crafts}`);
   else if (!s.inventory.includes(r.output)) s.inventory.push(r.output);
   else s.gold += Math.floor(GEAR_MAP[r.output].value / 2); // Duplicate crafts turn into vendor value.
   grantProfessionSkill(s, r.profession, recipeSkillGain(r, recipeSkill(s, r)));
@@ -1346,12 +1522,29 @@ export function settleRun(
     run.dungeonBosses !== dungeonRoute(run.zoneId)!.stages.length
   )
     return false;
-  settleEquipment(s, run);
+  const worn = new Map<string, number>();
+  settleEquipment(s, run, worn);
   s.history.unshift(run);
   advanceClassTrial(s, run);
   s.history = s.history.slice(0, 20);
   s.gold += run.gold;
   grantXp(s, run.classId, run.xp);
+  if (
+    run.party &&
+    Object.hasOwn(CLASS_MAP, run.party.classId) &&
+    run.party.classId !== run.classId
+  ) {
+    grantXp(s, run.party.classId, run.xp);
+    settleEquipment(
+      s,
+      {
+        ...run,
+        classId: run.party.classId,
+        equipmentProof: run.party.equipmentProof,
+      },
+      worn,
+    );
+  }
   s.totals.kills += run.kills;
   s.totals.bestTime = Math.max(s.totals.bestTime, Math.floor(run.time));
   s.totals.runs++;
@@ -1387,9 +1580,72 @@ export function settleRun(
     s.totals.gathered += count!;
   }
   for (const item of run.loot) {
-    if (!s.inventory.includes(item)) s.inventory.push(item);
-    else s.gold += Math.floor(GEAR_MAP[item].value / 2);
+    if (!awardGear(s, item, run.id))
+      s.gold += Math.floor((GEAR_MAP[item]?.value || 0) / 2);
   }
+  if (run.victory)
+    for (const proof of (run.journeyProof || []).slice(0, EPILOGUES.length)) {
+      if (!validJourneySnapshot(proof)) continue;
+      const entry = s.journey[proof.id],
+        quest = EPILOGUE_MAP[proof.id];
+      if (
+        entry &&
+        !entry.claimed &&
+        entry.attempt === proof.attempt &&
+        quest.zone === run.zoneId
+      )
+        entry.complete = true;
+    }
+  return true;
+}
+export function epilogueRestriction(s: SaveData, id: string): string | null {
+  const q = Object.hasOwn(EPILOGUE_MAP, id) ? EPILOGUE_MAP[id] : null;
+  if (!q) return "Unknown conclusion";
+  if (s.journey[id]?.claimed) return "Conclusion completed";
+  if (q.gear && !canStoreGear(s, q.gear))
+    return "Satchel full · sell or disenchant an item";
+  if (s.heroes[s.selectedClass].level < 40)
+    return "Requires character level 40";
+  if (q.faction && s.campaigns[q.faction].chapter < 4)
+    return "Complete this faction's four campaign chapters";
+  if (
+    q.trade &&
+    (s.professionQuests[q.trade].chapter < 4 ||
+      tradeSkill(s, q.trade) < 225 ||
+      trainingInfo(s, q.trade).rank < 4)
+  )
+    return "Complete this trade's mastery projects and retain Artisan skill";
+  return null;
+}
+export function acceptEpilogue(s: SaveData, id: string): boolean {
+  if (epilogueRestriction(s, id) || s.journey[id]?.attempt) return false;
+  s.journey[id] = {
+    attempt: crypto.randomUUID(),
+    complete: false,
+    claimed: false,
+  };
+  return true;
+}
+export function epilogueReady(s: SaveData, id: string): boolean {
+  const q = EPILOGUE_MAP[id];
+  return (
+    !!q &&
+    (!q.gear ||
+      s.inventory.includes(q.gear) ||
+      s.inventory.length < INVENTORY_CAP) &&
+    !epilogueRestriction(s, id) &&
+    !!s.journey[id]?.complete &&
+    (!q.material || s.materials[q.material] >= q.count)
+  );
+}
+export function claimEpilogue(s: SaveData, id: string): boolean {
+  if (!epilogueReady(s, id)) return false;
+  const q = EPILOGUE_MAP[id];
+  if (q.material) s.materials[q.material] -= q.count;
+  if (q.gear && !s.inventory.includes(q.gear)) s.inventory.push(q.gear);
+  s.gold += q.gold;
+  grantXp(s, s.selectedClass, q.xp);
+  s.journey[id] = { attempt: null, complete: false, claimed: true };
   return true;
 }
 
@@ -1420,6 +1676,7 @@ export function campaignReady(s: SaveData, faction: FactionId): boolean {
   return (
     !!q?.attempt &&
     !!chapter &&
+    (!chapter.gear || canStoreGear(s, chapter.gear)) &&
     Object.entries(chapter.goals).every(
       ([metric, goal]) => q.progress[metric as keyof CampaignCounts] >= goal!,
     )
@@ -1559,6 +1816,8 @@ export function professionQuestClaimRestriction(
     )
   )
     return "Complete the project objectives.";
+  if (quest.chapter === 3 && !canStoreGear(s, masteryGearId(trade)))
+    return "Satchel full · sell or disenchant an item.";
   if (quest.chapter === 3 && tradeSkill(s, trade) < 300)
     return "Reach skill 300 to earn your mastery reward.";
   const material = professionDelivery(trade, quest.chapter);
@@ -1707,6 +1966,7 @@ export function classTrialReady(
   return (
     trial.active &&
     trial.chapter < TRIAL_CHAPTERS.length &&
+    (trial.chapter !== 2 || canStoreGear(s, trialRelicId(classId))) &&
     Object.entries(TRIAL_CHAPTERS[trial.chapter].goals).every(
       ([metric, goal]) => (trial.progress[metric as TrialMetric] || 0) >= goal,
     )
@@ -1903,6 +2163,8 @@ export function offerRestriction(s: SaveData, id: string): string | null {
   if (offer.campaign && s.campaigns[offer.campaign].chapter !== 4)
     return "Complete all four campaign chapters";
   if (offer.gearId) {
+    if (!canStoreGear(s, offer.gearId))
+      return "Satchel full · sell or disenchant an item";
     const restriction = equipRestriction(s, offer.gearId);
     if (restriction) return restriction;
   }

@@ -285,7 +285,7 @@ test("old saves retain core preparation and malformed imported trainer entries a
   await seed(page, raw);
   await page.goto("/#spellbook");
   await expect(page.locator(".spellbook-slot")).toHaveCount(4);
-  await expect(page.locator(".spellbook-mentor")).toContainText("0 / 2");
+  await expect(page.locator(".spellbook-mentor")).toContainText("0 / 5");
   await page.locator("#hero-switch").selectOption("hunter");
   const h = (await saved(page)).heroes.hunter;
   expect(h.spellbook.learned).toEqual(["volley"]);
@@ -307,7 +307,7 @@ test("spellbook cards, eight destinations and review dialogs fit six viewport wi
   for (const width of [360, 390, 760, 800, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await expect(page.locator(".nav-link")).toHaveCount(8);
-    await expect(page.locator(".spellbook-card")).toHaveCount(6);
+    await expect(page.locator(".spellbook-card")).toHaveCount(9);
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBe(width);

@@ -72,7 +72,7 @@ test("dungeon preview explains the unlock, selected-hero entry level, stages and
   s.heroes.warrior.level = 10;
   await seed(page, s);
   await page.goto("/");
-  await expect(page.locator(".zone-option")).toHaveCount(7);
+  await expect(page.locator(".zone-option")).toHaveCount(9);
   await expect(
     page.getByRole("button", { name: "Begin Dungeon" }),
   ).toBeDisabled();

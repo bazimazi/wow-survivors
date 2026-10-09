@@ -103,7 +103,7 @@ test("every creature contacts with a strike and every existing guardian pattern 
       creatureCombatStyle(cue(enemy(g, type), "projectile")),
       type === "defias" ? "shoot" : "cast",
     );
-  assert.equal(guardians.length, 15);
+  assert.equal(guardians.length, 20);
   const styles = new Set();
   for (const guardian of guardians)
     for (const pattern of [0, 1]) {

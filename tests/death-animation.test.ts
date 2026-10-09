@@ -60,8 +60,19 @@ function spawn(g: GameEngine, type = "wolf", boss = false) {
   if (boss) g.boss = e;
   return e;
 }
-const kill = (g: GameEngine, e: GameEngine["enemies"][number]) =>
+const kill = (g: GameEngine, e: GameEngine["enemies"][number]) => {
   (g as any).damageEnemy(e, 1000, "melee", false);
+  if (
+    e.boss &&
+    !e.dead &&
+    g.zone.id === "scarlet" &&
+    g.dungeonStageIndex === 3
+  ) {
+    for (const guard of g.enemies.filter((actor) => actor.guard && !actor.dead))
+      (g as any).damageEnemy(guard, 10000, "melee", false);
+    (g as any).damageEnemy(e, 10000, "melee", false);
+  }
+};
 
 test("death keys are separate from walk/combat and all eight rigs keep finite padded non-folding geometry", () => {
   assert.equal(DEATH_KEYS.length, 6);
@@ -216,8 +227,8 @@ const guardians = [
     route.stages.map((s, stage) => ({ zone: route.id, stage, type: s.enemy })),
   ),
 ];
-test("all fifteen guardian deaths precede room cleanup, checkpoint/victory events and rewards", () => {
-  assert.equal(guardians.length, 15);
+test("all twenty guardian deaths precede room cleanup, checkpoint/victory events and rewards", () => {
+  assert.equal(guardians.length, 20);
   for (const guardian of guardians) {
     const order: string[] = [],
       g = make(
@@ -237,12 +248,18 @@ test("all fifteen guardian deaths precede room cleanup, checkpoint/victory event
     const e = spawn(g, guardian.type, true);
     kill(g, e);
     assert.equal(order[0], "enemy");
-    assert.equal(order.length, 2);
+    assert.equal(
+      order.length,
+      guardian.zone === "scarlet" && guardian.stage === 3 ? 3 : 2,
+    );
     assert.ok(g.ended || g.checkpoint);
     assert.ok(g.gold > 0 && g.loot.length > 0);
     if (g.dungeonRoute) assert.equal(g.enemies.length, 0);
     kill(g, e);
-    assert.equal(order.length, 2);
+    assert.equal(
+      order.length,
+      guardian.zone === "scarlet" && guardian.stage === 3 ? 3 : 2,
+    );
   }
 });
 
@@ -324,6 +341,9 @@ test("lethal observation leaves RNG, rewards, existing events and every guardian
       });
     assert.equal(state(plain), state(observed));
     assert.deepEqual(plainEvents, observedEvents);
-    assert.equal(snapshots.length, 21);
+    assert.equal(
+      snapshots.length,
+      guardian.zone === "scarlet" && guardian.stage === 3 ? 22 : 21,
+    );
   }
 });

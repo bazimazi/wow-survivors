@@ -3863,3 +3863,128 @@ kbd {
     width: 39px;
   }
 }
+
+.final-journey {
+  margin: 24px 0;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.final-journey summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 12px 0;
+}
+.final-journey .quest-grid {
+  margin-top: 16px;
+}
+
+.coop-selector {
+  display: flex;
+  gap: 8px;
+  flex-direction: column;
+  max-width: 380px;
+  margin: 12px 0;
+}
+.coop-selector select {
+  min-height: 44px;
+  width: 100%;
+  background: #242923;
+  color: #e8debc;
+  border: 1px solid #82734a;
+  border-radius: 6px;
+  padding: 8px;
+}
+.coop-intro {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.partner-hud {
+  position: absolute;
+  top: 112px;
+  right: 26px;
+  display: grid;
+  gap: 4px;
+  padding: 10px 14px;
+  border: 1px solid #799ca9;
+  background: #18272ee8;
+  color: #c5e4ee;
+  border-radius: 10px;
+  max-width: 320px;
+}
+.partner-hud small {
+  font-size: 11px;
+}
+.partner-hud button {
+  min-height: 44px;
+  font-size: 11px;
+}
+@media (min-width: 761px) and (max-width: 1000px) {
+  .partner-hud {
+    top: 230px;
+    right: 16px;
+    max-width: 240px;
+  }
+}
+@media (max-width: 760px) {
+  .partner-hud {
+    top: 132px;
+    left: 12px;
+    right: 12px;
+    max-width: none;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 8px;
+    padding: 6px 10px;
+  }
+  .partner-hud b,
+  .partner-hud span,
+  .partner-hud small {
+    grid-column: 1;
+  }
+  .partner-hud b,
+  .partner-hud span {
+    font-size: 12px;
+  }
+  .partner-hud small {
+    font-size: 9px;
+  }
+  .partner-hud button {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    min-height: 44px;
+    width: 90px;
+  }
+  .coop-game .world-hud {
+    top: 205px;
+  }
+  .coop-game .boss-hud {
+    top: 205px;
+  }
+  .coop-game.has-boss .world-hud {
+    top: 205px;
+    padding: 6px;
+  }
+  .coop-game.has-boss #explore-panel {
+    display: none;
+  }
+  .coop-game.has-boss .boss-hud {
+    top: 265px;
+    padding: 6px 10px;
+  }
+  .coop-game.has-boss .boss-hud p {
+    margin: 4px 0 0;
+  }
+  .coop-game.has-boss .boss-health-track {
+    margin-top: 6px;
+  }
+}
+.zone-scarlet .world-image {
+  background-image: url("/art/shadowfang.svg");
+  filter: sepia(0.6);
+}
+.zone-plaguelands .world-image {
+  background-image: url("/art/duskwood-camp.svg");
+  filter: sepia(0.3) hue-rotate(25deg);
+}

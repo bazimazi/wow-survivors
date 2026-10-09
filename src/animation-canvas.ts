@@ -93,6 +93,39 @@ export function heroCrop(
         : {}),
   };
 }
+export function backHeroCrop(
+  index: number,
+  width: number,
+  height: number,
+): SpriteCrop {
+  const column = index % 3,
+    row = Math.floor(index / 3);
+  const top = row === 0 ? 0 : row === 1 ? 428 : column === 1 ? 800 : 824;
+  const bottom = row === 0 ? 428 : row === 1 ? 828 : 1254;
+  return {
+    x:
+      ((index === 1
+        ? 440
+        : index === 5
+          ? 858
+          : index === 7
+            ? 432
+            : column * 418) *
+        width) /
+      1254,
+    y: (top * height) / 1254,
+    width:
+      ((index === 1 ? 380 : index === 5 ? 396 : index === 7 ? 404 : 418) *
+        width) /
+      1254,
+    height: ((bottom - top) * height) / 1254,
+    ...(index === 4
+      ? { cutout: { x: 0.67, y: 0.92, width: 0.33, height: 0.08 } }
+      : index === 7
+        ? { cutout: { x: 0, y: 0, width: 0.73, height: 28 / (bottom - top) } }
+        : {}),
+  };
+}
 
 /** Rasterize an authored texture rig once; the game then draws a single cached image. */
 export function createAnimationFrame(

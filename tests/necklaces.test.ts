@@ -88,12 +88,12 @@ function cache(g: GameEngine) {
 }
 
 test("eleven universal necklaces have unique local/guardian sources and keep jewelry outside crafting, sets and formulas", () => {
-  assert.equal(GEAR.length, 353);
+  assert.equal(GEAR.length, 384);
   assert.equal(SLOTS.length, 16);
   assert.equal(WARDROBE_CATALOG.length, 222);
   assert.equal(NECKLACE_GEAR.length, 11);
   assert.equal(new Set(GEAR.map((g) => g.id)).size, GEAR.length);
-  assert.equal(RECIPES.length, 127);
+  assert.equal(RECIPES.length, 151);
   for (const g of NECKLACE_GEAR) {
     assert.equal(g.slot, "neck");
     assert.equal(g.armor, undefined);

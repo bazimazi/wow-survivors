@@ -85,8 +85,8 @@ function field(zone: string, classId: ClassId, seed: number, level = 21) {
   return g;
 }
 test("twenty-two ranged rewards have explicit class/source/grade identities and eight existing weapons retain their legacy fit", () => {
-  assert.equal(GEAR.length, 353);
-  assert.equal(RECIPES.length, 127);
+  assert.equal(GEAR.length, 384);
+  assert.equal(RECIPES.length, 151);
   assert.equal(SLOTS.length, 16);
   assert.equal(WARDROBE_CATALOG.length, 222);
   assert.equal(ENCHANTMENTS.length, 24);

@@ -196,8 +196,8 @@ test("partial and full settlement keep secured loot, isolate Journal credit and 
   assert.equal(settleRun(loaded, record()), false);
 });
 test("sixteen original rare rewards cover all ten original slots, remain guardian-only and extend the guide by five exact sources", () => {
-  assert.equal(GEAR.length, 353);
-  assert.equal(RECIPES.length, 127);
+  assert.equal(GEAR.length, 384);
+  assert.equal(RECIPES.length, 151);
   assert.equal(SHADOWFANG_GEAR.length, 16);
   assert.equal(WARDROBE_CATALOG.length, 222);
   assert.deepEqual(

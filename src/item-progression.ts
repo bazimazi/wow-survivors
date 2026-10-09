@@ -5,11 +5,13 @@ import { weaponTrainingAllows, WEAPON_TYPE_LABELS } from "./weapon-training";
 import type { WeaponType } from "./weapon-training";
 import { gearFitsSlot, offhandMultiplier, rangedMultiplier } from "./equipment";
 import { materialFor, tierForLevel } from "./resources";
+import { rolledProperties } from "./attributes";
 
 export interface ItemState {
   condition: number;
   owner?: ClassId;
   affix?: AffixId;
+  roll?: number;
 }
 export const AFFIXES = {
   force: { name: "of Force", stats: { power: 3 } },
@@ -109,6 +111,11 @@ export function normalizeItemStates(
       condition: protectedItem(id) ? 100 : bounded(data.condition, 100, 100),
       ...(owner ? { owner } : {}),
       ...(affix ? { affix } : {}),
+      ...(id.includes("~") &&
+      typeof data.roll === "number" &&
+      Number.isFinite(data.roll)
+        ? { roll: bounded(data.roll, 0, 4294967295) }
+        : {}),
     };
   }
   return states;
@@ -122,16 +129,27 @@ export function protectedItem(id: string) {
 export const itemCondition = (s: SaveData, id: string) =>
   protectedItem(id) ? 100 : bounded(s.itemStates?.[id]?.condition, 100, 100);
 export const itemOwner = (s: SaveData, id: string) => s.itemStates?.[id]?.owner;
-export function itemAffixStats(s: SaveData, id: string): Partial<Stats> {
-  const affix = s.itemStates?.[id]?.affix;
-  if (!affix || !Object.hasOwn(AFFIXES, affix)) return {};
-  const scale = itemTier(id);
+export function attunementStats(id: string, affix: AffixId): Partial<Stats> {
   return Object.fromEntries(
     Object.entries(AFFIXES[affix].stats).map(([key, value]) => [
       key,
-      value * scale,
+      value * itemTier(id),
     ]),
   );
+}
+export function itemAffixStats(s: SaveData, id: string): Partial<Stats> {
+  const affix = s.itemStates?.[id]?.affix;
+  const result = itemRoll(s, id)?.stats || {};
+  if (!affix || !Object.hasOwn(AFFIXES, affix)) return result;
+  for (const [key, value] of Object.entries(attunementStats(id, affix)))
+    result[key as keyof Stats] = (result[key as keyof Stats] || 0) + value;
+  return result;
+}
+export function itemRoll(s: SaveData, id: string) {
+  const seed = s.itemStates?.[id]?.roll;
+  return id.includes("~") && typeof seed === "number"
+    ? rolledProperties(seed, itemTier(id))
+    : null;
 }
 export function equipmentSnapshot(s: SaveData): EquipmentSnapshot {
   const classId = s.selectedClass,
@@ -181,7 +199,11 @@ export function weaponAccuracy(weapon: WeaponPractice, hits = 0): number {
     )
   );
 }
-export function settleEquipment(s: SaveData, run: RunRecord) {
+export function settleEquipment(
+  s: SaveData,
+  run: RunRecord,
+  worn = new Map<string, number>(),
+) {
   const proof = run.equipmentProof;
   if (!proof || !Array.isArray(proof.items)) return;
   const h = s.heroes[run.classId];
@@ -199,9 +221,11 @@ export function settleEquipment(s: SaveData, run: RunRecord) {
   );
   for (const id of items) {
     if (protectedItem(id) || !wear) continue;
+    const additional = Math.max(0, wear - (worn.get(id) || 0));
+    worn.set(id, Math.max(wear, worn.get(id) || 0));
     s.itemStates[id] = {
       ...s.itemStates[id],
-      condition: Math.max(0, itemCondition(s, id) - wear),
+      condition: Math.max(0, itemCondition(s, id) - additional),
     };
   }
   for (const type of knownWeaponTypes(s, run.classId)) {
@@ -296,6 +320,7 @@ export function attuneItem(s: SaveData, id: string, affix: string): boolean {
   s.gold -= quote.gold;
   s.materials[quote.dust] -= quote.count;
   s.itemStates[id] = {
+    ...s.itemStates[id],
     condition: itemCondition(s, id),
     owner: s.selectedClass,
     affix: affix as AffixId,

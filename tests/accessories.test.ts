@@ -63,8 +63,8 @@ test("twenty-four additions have unique source identities, eight graded recipes 
   assert.equal(SLOTS.length, 16);
   assert.equal(ACCESSORY_GEAR.length, 24);
   assert.equal(ACCESSORY_RECIPES.length, 8);
-  assert.equal(GEAR.length, 353);
-  assert.equal(RECIPES.length, 127);
+  assert.equal(GEAR.length, 384);
+  assert.equal(RECIPES.length, 151);
   assert.equal(WARDROBE_CATALOG.length, 222);
   assert.equal(new Set(GEAR.map((g) => g.id)).size, GEAR.length);
   for (const g of ACCESSORY_GEAR) {
@@ -254,7 +254,7 @@ test("eight real bracer crafts charge exact gold and graded materials, require t
     assert.deepEqual(wrong, stock);
   }
 });
-test("rings in either position on any hero block sale/disenchant; settlement duplicates remain once-only refunds", () => {
+test("rings in either position on any hero block sale/disenchant; settlement duplicates become independent once-only copies", () => {
   const s = ready();
   s.professions.enchanting = 100;
   equip(s, rings[0], "finger2");
@@ -282,9 +282,9 @@ test("rings in either position on any hero block sale/disenchant; settlement dup
   };
   const gold = s.gold;
   assert.ok(settleRun(s, run));
-  assert.equal(s.gold, gold + 2 * Math.floor(GEAR_MAP[rings[1]].value / 2));
+  assert.equal(s.gold, gold);
   assert.equal(settleRun(s, run), false);
-  assert.equal(s.gold, gold + 2 * Math.floor(GEAR_MAP[rings[1]].value / 2));
+  assert.equal(s.gold, gold);
 });
 function field(
   zone: string,
@@ -365,7 +365,7 @@ test("actual guarded caches and elite kills reach all eight new world items and 
 });
 test("real guardian victories reach all eight rings only in their declared rooms with no mid-run equipment changes", () => {
   const seen = new Set<string>();
-  for (const route of DUNGEONS)
+  for (const route of DUNGEONS.filter((route) => route.id !== "scarlet"))
     for (let seed = 1; seed <= 45; seed++) {
       const g = field(route.id, seed * 7919);
       for (let stage = 0; stage < route.stages.length; stage++) {

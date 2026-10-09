@@ -1,5 +1,6 @@
 import { RESOURCE_TIERS } from "./resources";
 import { MATERIALS, SPELLS } from "./content";
+import type { ClassDef } from "./content";
 import type {
   Enemy,
   Vec,
@@ -22,6 +23,7 @@ import type { ActorPose, AnimationRig } from "./animation";
 import {
   createAnimationFrame,
   heroCrop,
+  backHeroCrop,
   creatureCrop,
   FRAME_CONTENT,
   FRAME_PADDING,
@@ -76,6 +78,7 @@ export class GameRenderer {
   private reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   private worldAtlas = new Image();
   private heroAtlas = new Image();
+  private heroBackAtlas = new Image();
   private companionAtlas = new Image();
   private travelAtlas = new Image();
   private ragefireAtlas = new Image();
@@ -95,6 +98,7 @@ export class GameRenderer {
     this.ctx = canvas.getContext("2d", { alpha: false })!;
     this.worldAtlas.src = "/art/world-sprites.png";
     this.heroAtlas.src = "/art/hero-sprites.png";
+    this.heroBackAtlas.src = "/art/hero-backs.png";
     this.companionAtlas.src = "/art/companions.png";
     this.travelAtlas.src = "/art/travel-sprites.png";
     this.ragefireAtlas.src = "/art/ragefire-sprites.png";
@@ -107,6 +111,7 @@ export class GameRenderer {
     await Promise.allSettled([
       this.worldAtlas.decode(),
       this.heroAtlas.decode(),
+      this.heroBackAtlas.decode(),
       this.companionAtlas.decode(),
       this.travelAtlas.decode(),
       this.ragefireAtlas.decode(),
@@ -181,14 +186,16 @@ export class GameRenderer {
           atlas.naturalWidth,
           atlas.naturalHeight,
         )
-      : atlas === this.heroAtlas
-        ? heroCrop(index, atlas.naturalWidth, atlas.naturalHeight)
-        : {
-            x: (index % columns) * cellWidth,
-            y: (Math.floor(index / columns) * atlas.naturalHeight) / 2,
-            width: cellWidth,
-            height: atlas.naturalHeight / 2,
-          };
+      : atlas === this.heroBackAtlas
+        ? backHeroCrop(index, atlas.naturalWidth, atlas.naturalHeight)
+        : atlas === this.heroAtlas
+          ? heroCrop(index, atlas.naturalWidth, atlas.naturalHeight)
+          : {
+              x: (index % columns) * cellWidth,
+              y: (Math.floor(index / columns) * atlas.naturalHeight) / 2,
+              width: cellWidth,
+              height: atlas.naturalHeight / 2,
+            };
     const measured =
       creatureAtlas === "shadowfang" || creatureAtlas === "duskwood";
     const drawWidth = measured ? (size * crop.width) / cellWidth : size,
@@ -458,8 +465,16 @@ export class GameRenderer {
       dy = Math.cos(g.time * 145) * p.hurt * 8;
     }
     c.translate(
-      Math.round(this.width / 2 - p.x + dx),
-      Math.round(this.height / 2 - p.y + dy),
+      Math.round(
+        this.width / 2 -
+          (g.partner ? (p.x + g.partner.player.x) / 2 : p.x) +
+          dx,
+      ),
+      Math.round(
+        this.height / 2 -
+          (g.partner ? (p.y + g.partner.player.y) / 2 : p.y) +
+          dy,
+      ),
     );
     this.terrain();
     for (const a of g.areas) {
@@ -703,23 +718,131 @@ export class GameRenderer {
     const defeated = this.deathAnimator.hero;
     actors.push({
       y: p.y,
-      draw: () => (defeated ? this.death(defeated) : this.player()),
+      draw: () =>
+        defeated
+          ? this.death(defeated)
+          : p.hp <= 0 && g.partner
+            ? this.player(
+                deathVisual(
+                  0.75,
+                  ["mage", "priest", "warlock", "druid"].includes(g.classDef.id)
+                    ? "robe"
+                    : "biped",
+                  Math.cos(p.facing) < -0.2,
+                  true,
+                ),
+              )
+            : this.player(),
     });
+    if (g.partner) {
+      const buddy = g.partner;
+      actors.push({
+        y: buddy.player.y,
+        draw: () => {
+          c.save();
+          if (buddy.player.hp <= 0) c.globalAlpha = 0.45;
+          this.player(
+            buddy.player.hp <= 0
+              ? deathVisual(
+                  0.75,
+                  ["mage", "priest", "warlock", "druid"].includes(
+                    buddy.classDef.id,
+                  )
+                    ? "robe"
+                    : "biped",
+                  Math.cos(buddy.player.facing) < -0.2,
+                  true,
+                )
+              : undefined,
+            buddy.player,
+            false,
+            buddy.classDef,
+          );
+          c.restore();
+          c.save();
+          c.font = "600 12px sans-serif";
+          c.textAlign = "center";
+          c.fillStyle = "#a7d2eb";
+          c.fillText(
+            buddy.player.hp <= 0
+              ? `P2 DOWN · ${Math.round((buddy.revive / 3) * 100)}%`
+              : "P2",
+            buddy.player.x,
+            buddy.player.y - 85,
+          );
+          c.restore();
+        },
+      });
+      if (buddy.pet)
+        actors.push({
+          y: buddy.pet.y,
+          draw: () =>
+            this.sprite(
+              this.companionAtlas,
+              buddy.pet!.spellId === "beast"
+                ? 0
+                : buddy.pet!.spellId === "imp"
+                  ? 1
+                  : 3,
+              2,
+              buddy.pet!.x,
+              buddy.pet!.y,
+              58,
+              false,
+              {
+                pose: this.characterPose(buddy.pet!, 44, false),
+                rig:
+                  buddy.pet!.spellId === "beast"
+                    ? "quadruped"
+                    : buddy.pet!.spellId === "imp"
+                      ? "biped"
+                      : "totem",
+              },
+            ),
+        });
+    }
     this.props(actors);
     actors.sort((a, b) => a.y - b.y);
     for (const actor of actors) actor.draw();
-    for (const state of g.spells)
-      if (!g.travelling && SPELLS[state.id].kind === "orbit")
-        for (const pos of g.orbitPositions(state)) {
-          c.save();
-          c.translate(pos.x, pos.y);
-          c.rotate(g.time * 2);
-          c.fillStyle = SPELLS[state.id].color;
-          c.fillRect(-3, -12, 6, 23);
-          c.fillStyle = "#f7ecd1";
-          c.fillRect(-1, -10, 2, 17);
-          c.restore();
-        }
+    const orbitActors = [
+      {
+        player: g.player,
+        spells: g.spells,
+        bonuses: undefined,
+        travelling: g.travelling,
+      },
+      ...(g.partner
+        ? [
+            {
+              player: g.partner.player,
+              spells: g.partner.spells,
+              bonuses: g.partner.config.spellBonuses,
+              travelling: false,
+            },
+          ]
+        : []),
+    ];
+    for (const actor of orbitActors)
+      for (const state of actor.spells)
+        if (
+          actor.player.hp > 0 &&
+          !actor.travelling &&
+          SPELLS[state.id].kind === "orbit"
+        )
+          for (const pos of g.orbitPositions(
+            state,
+            actor.player,
+            actor.bonuses,
+          )) {
+            c.save();
+            c.translate(pos.x, pos.y);
+            c.rotate(g.time * 2);
+            c.fillStyle = SPELLS[state.id].color;
+            c.fillRect(-3, -12, 6, 23);
+            c.fillStyle = "#f7ecd1";
+            c.fillRect(-1, -10, 2, 17);
+            c.restore();
+          }
     for (const shot of g.projectiles) {
       if (!this.visible(shot, 20)) continue;
       c.strokeStyle = shot.color;
@@ -812,10 +935,16 @@ export class GameRenderer {
     c.fillRect(0, 0, this.width, this.height);
     this.minimap();
   }
+  private cameraCenter() {
+    const p = this.game.player,
+      partner = this.game.partner?.player;
+    return partner ? { x: (p.x + partner.x) / 2, y: (p.y + partner.y) / 2 } : p;
+  }
   private visible(pos: Vec, margin = 50) {
+    const center = this.cameraCenter();
     return (
-      Math.abs(pos.x - this.game.player.x) < this.width / 2 + margin &&
-      Math.abs(pos.y - this.game.player.y) < this.height / 2 + margin
+      Math.abs(pos.x - center.x) < this.width / 2 + margin &&
+      Math.abs(pos.y - center.y) < this.height / 2 + margin
     );
   }
   private terrain() {
@@ -824,7 +953,7 @@ export class GameRenderer {
       return;
     }
     const c = this.ctx,
-      p = this.game.player,
+      p = this.cameraCenter(),
       colors = this.game.zone.palette;
     c.fillStyle = this.ground || colors[0];
     c.fillRect(
@@ -880,7 +1009,7 @@ export class GameRenderer {
   }
   private props(actors: { y: number; draw: () => void }[]) {
     if (this.game.dungeonStage) return;
-    const p = this.game.player,
+    const p = this.cameraCenter(),
       minX = Math.floor((p.x - this.width / 2 - 100) / 180),
       maxX = Math.ceil((p.x + this.width / 2 + 100) / 180),
       minY = Math.floor((p.y - this.height / 2 - 100) / 180),
@@ -988,6 +1117,7 @@ export class GameRenderer {
     death?: DeathVisual,
     snapshot = this.game.player,
     bear = false,
+    classDef: ClassDef = this.game.classDef,
   ) {
     const c = this.ctx,
       p = snapshot,
@@ -996,10 +1126,11 @@ export class GameRenderer {
       death ||
       this.characterPose(
         p,
-        g.travel.active ? 76 : 44,
+        snapshot === g.player && g.travel.active ? 76 : 44,
         Math.cos(p.facing) < -0.2,
       );
-    if (!death) this.shadow(p.x, p.y, g.travel.active ? 30 : 19);
+    if (!death)
+      this.shadow(p.x, p.y, snapshot === g.player && g.travel.active ? 30 : 19);
     c.save();
     c.translate(Math.round(p.x), Math.round(p.y));
     if (!death && p.invulnerable > 0 && Math.floor(g.time * 12) % 2)
@@ -1011,7 +1142,7 @@ export class GameRenderer {
       c.ellipse(0, -15, 29, 35, 0, 0, Math.PI * 2);
       c.stroke();
     }
-    if (!death && g.travel.channel > 0) {
+    if (!death && snapshot === g.player && g.travel.channel > 0) {
       c.strokeStyle = "#d8bd83aa";
       c.lineWidth = 2;
       c.beginPath();
@@ -1020,6 +1151,7 @@ export class GameRenderer {
     }
     if (
       !death &&
+      snapshot === g.player &&
       g.travel.active &&
       g.travelOption &&
       this.travelAtlas.complete &&
@@ -1060,18 +1192,21 @@ export class GameRenderer {
         this.heroAtlas.complete &&
         this.heroAtlas.naturalWidth
       ) {
-        const crop = heroCrop(
-          g.classDef.portrait,
-          this.heroAtlas.naturalWidth,
-          this.heroAtlas.naturalHeight,
-        );
+        const back =
+            Math.sin(p.facing) < -0.35 && this.heroBackAtlas.naturalWidth,
+          atlas = back ? this.heroBackAtlas : this.heroAtlas,
+          crop = (back ? backHeroCrop : heroCrop)(
+            classDef.portrait,
+            atlas.naturalWidth,
+            atlas.naturalHeight,
+          );
         c.save();
         if (mirror) c.scale(-1, 1);
         c.imageSmoothingEnabled = true;
         // Crop the standing sprite to its upper body for a seated rider.
         c.translate(-4.5, 0);
         this.drawCrop(
-          this.heroAtlas,
+          atlas,
           {
             ...crop,
             height: crop.height * 0.73,
@@ -1094,7 +1229,7 @@ export class GameRenderer {
       c.restore();
       return;
     }
-    if (death ? bear : g.classDef.id === "druid" && p.activeBuff > 0) {
+    if (death ? bear : classDef.id === "druid" && p.activeBuff > 0) {
       if (
         this.sprite(this.companionAtlas, 2, 2, 0, 0, 83, pose.mirror, {
           pose,
@@ -1110,8 +1245,10 @@ export class GameRenderer {
     }
     if (
       this.sprite(
-        this.heroAtlas,
-        g.classDef.portrait,
+        Math.sin(p.facing) < -0.35 && this.heroBackAtlas.naturalWidth
+          ? this.heroBackAtlas
+          : this.heroAtlas,
+        classDef.portrait,
         3,
         0,
         0,
@@ -1119,7 +1256,7 @@ export class GameRenderer {
         pose.mirror,
         {
           pose,
-          rig: ["mage", "priest", "warlock", "druid"].includes(g.classDef.id)
+          rig: ["mage", "priest", "warlock", "druid"].includes(classDef.id)
             ? "robe"
             : "biped",
         },
@@ -1133,11 +1270,11 @@ export class GameRenderer {
     const move = WALK_KEYS[pose.frame]?.left
       ? WALK_KEYS[pose.frame].left * 3
       : 0;
-    const skin = ["shaman"].includes(g.classDef.id)
+    const skin = ["shaman"].includes(classDef.id)
       ? "#91ab70"
-      : g.classDef.id === "druid"
+      : classDef.id === "druid"
         ? "#b396bf"
-        : g.classDef.id === "warlock"
+        : classDef.id === "warlock"
           ? "#a7aea0"
           : "#d8bb97";
     c.fillStyle = "#342f26";
@@ -1145,7 +1282,7 @@ export class GameRenderer {
     c.fillRect(3, -2 - move, 7, 9);
     c.fillStyle = "#24353a";
     c.fillRect(-11, -29, 22, 28);
-    c.fillStyle = g.classDef.color;
+    c.fillStyle = classDef.color;
     c.fillRect(-11, -29, 22, 19);
     c.fillRect(-15, -26, 6, 13);
     c.fillRect(9, -26, 6, 13);
@@ -1157,13 +1294,13 @@ export class GameRenderer {
     c.fillRect(-8, -40, 16, 14);
     c.fillStyle = "#433b32";
     c.fillRect(-9, -42, 18, 5);
-    if (["mage", "warlock", "priest", "rogue"].includes(g.classDef.id)) {
-      c.fillStyle = g.classDef.color;
+    if (["mage", "warlock", "priest", "rogue"].includes(classDef.id)) {
+      c.fillStyle = classDef.color;
       c.fillRect(-11, -44, 22, 6);
       c.fillRect(-11, -38, 4, 14);
       c.fillRect(7, -38, 4, 14);
     }
-    if (g.classDef.id === "druid") {
+    if (classDef.id === "druid") {
       c.fillStyle = "#bcb283";
       c.fillRect(-11, -49, 3, 10);
       c.fillRect(8, -49, 3, 10);
@@ -1175,13 +1312,13 @@ export class GameRenderer {
     c.fillRect(3, -35, 3, 2);
     c.fillStyle = "#a1885a";
     c.fillRect(16, -33, 3, 32);
-    c.fillStyle = g.classDef.color;
-    if (["warrior", "paladin", "rogue"].includes(g.classDef.id)) {
+    c.fillStyle = classDef.color;
+    if (["warrior", "paladin", "rogue"].includes(classDef.id)) {
       c.fillStyle = "#d4d9c7";
       c.fillRect(15, -40, 6, 25);
       c.fillStyle = "#c1a673";
       c.fillRect(12, -16, 12, 3);
-    } else if (g.classDef.id === "hunter") {
+    } else if (classDef.id === "hunter") {
       c.strokeStyle = "#cfbe8b";
       c.lineWidth = 3;
       c.beginPath();
@@ -1567,7 +1704,8 @@ export class GameRenderer {
       g = this.game,
       x = this.width - 78,
       y = this.height - 125,
-      r = 52;
+      r = 52,
+      center = this.cameraCenter();
     if (this.width < 650) return;
     c.save();
     c.beginPath();
@@ -1578,8 +1716,8 @@ export class GameRenderer {
     const drawDot = (pos: Vec, color: string, size: number) => {
       c.fillStyle = color;
       c.fillRect(
-        x + (pos.x - g.player.x) * 0.045 - size / 2,
-        y + (pos.y - g.player.y) * 0.045 - size / 2,
+        x + (pos.x - center.x) * 0.045 - size / 2,
+        y + (pos.y - center.y) * 0.045 - size / 2,
         size,
         size,
       );
@@ -1613,6 +1751,7 @@ export class GameRenderer {
     for (const item of g.pickups)
       if (item.kind === "chest") drawDot(item, "#f2d58c", 4);
     drawDot(g.player, "#e6d8ad", 5);
+    if (g.partner) drawDot(g.partner.player, "#91cde1", 5);
     c.restore();
     c.strokeStyle = "#bfa77377";
     c.lineWidth = 1;

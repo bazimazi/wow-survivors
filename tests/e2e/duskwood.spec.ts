@@ -71,7 +71,7 @@ test("Duskwood preview shows selected-hero entry requirements, six landmarks and
   s.heroes.warrior.level = 20;
   await seed(page, s);
   await page.goto("/");
-  await expect(page.locator(".zone-option")).toHaveCount(7);
+  await expect(page.locator(".zone-option")).toHaveCount(9);
   await expect(
     page.getByRole("button", { name: "Begin Expedition" }),
   ).toBeDisabled();
@@ -318,7 +318,7 @@ test("seven-destination camp and Duskwood guide fit six viewport widths", async 
   page.on("pageerror", (e) => errors.push(e.message));
   for (const width of [360, 390, 760, 800, 1024, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
-    await expect(page.locator(".zone-option")).toHaveCount(7);
+    await expect(page.locator(".zone-option")).toHaveCount(9);
     await expect(page.locator(".duskwood-landmarks li")).toHaveCount(6);
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),

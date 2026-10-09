@@ -96,7 +96,7 @@ function engine(s = freshSave(), chapter = 0) {
 test("every class has a distinct trial and eligible exclusive relic with no normal drop source", () => {
   assert.equal(Object.keys(CLASS_TRIALS).length, 9);
   assert.equal(new Set(Object.values(CLASS_TRIALS).map((t) => t.name)).size, 9);
-  assert.equal(GEAR.length, 353);
+  assert.equal(GEAR.length, 384);
   for (const c of CLASSES) {
     const s = freshSave(),
       id = trialRelicId(c.id);

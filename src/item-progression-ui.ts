@@ -6,7 +6,8 @@ import {
   affixQuote,
   itemCondition,
   itemOwner,
-  itemAffixStats,
+  itemRoll,
+  attunementStats,
   knownWeaponTypes,
   weaponSkillCap,
   weaponAccuracy,
@@ -25,9 +26,27 @@ export function renderItemState(s: SaveData, id: string): string {
   const condition = itemCondition(s, id),
     owner = itemOwner(s, id),
     affix = s.itemStates[id]?.affix;
-  return `<div class="item-state ${!condition ? "negative" : ""}"><span>Condition ${condition} / 100${condition ? "" : " · Broken · bonuses inactive"}</span>${owner ? `<span>Soulbound to ${CLASS_MAP[owner].name}</span>` : ""}${
+  const roll = itemRoll(s, id),
+    gear = GEAR_MAP[id];
+  const properties = (values: object, resistance = false) =>
+    Object.entries(values)
+      .map(
+        ([key, value]) => `+${value} ${key}${resistance ? " resistance" : ""}`,
+      )
+      .join(" · ");
+  return `<div class="item-state ${!condition ? "negative" : ""}"><span>Condition ${condition} / 100${condition ? "" : " · Broken · bonuses inactive"}</span>${gear.attributes ? `<span>${properties(gear.attributes)}</span>` : ""}${gear.resistances ? `<span>${properties(gear.resistances, true)}</span>` : ""}${
+    roll
+      ? `<span>Independent roll · ${Object.entries(roll.stats)
+          .map(([k, v]) => bonusLabel(k, v!))
+          .join(
+            " · ",
+          )} · ${properties(roll.attributes)} · ${properties(roll.resistances, true)}</span>`
+      : ""
+  }${owner ? `<span>Soulbound to ${CLASS_MAP[owner].name}</span>` : ""}${
     affix
-      ? `<span>${AFFIXES[affix].name} · ${Object.entries(itemAffixStats(s, id))
+      ? `<span>${AFFIXES[affix].name} · ${Object.entries(
+          attunementStats(id, affix),
+        )
           .map(([k, v]) => bonusLabel(k, v!))
           .join(" · ")}</span>`
       : ""
@@ -55,20 +74,9 @@ export function renderAttunementReview(s: SaveData, id: string) {
     Object.keys(AFFIXES) as AffixId[]
   )
     .map((affix) => {
-      const quote = affixQuote(s, id, affix),
-        candidate: SaveData = {
-          ...s,
-          itemStates: {
-            ...s.itemStates,
-            [id]: {
-              condition: itemCondition(s, id),
-              owner: s.selectedClass,
-              affix,
-            },
-          },
-        };
+      const quote = affixQuote(s, id, affix);
       return `<article data-affix="${affix}"><h3>${AFFIXES[affix].name}</h3><p>${Object.entries(
-        itemAffixStats(candidate, id),
+        attunementStats(id, affix),
       )
         .map(([key, value]) => bonusLabel(key, value!))
         .join(

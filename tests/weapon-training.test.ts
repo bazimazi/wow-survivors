@@ -86,9 +86,9 @@ function field(zone: string, classId: ClassId, seed: number, level = 21) {
   return g;
 }
 
-test("all 135 weapons have explicit families; 66 trained rewards retain handedness, classes and exact sources", () => {
-  assert.equal(GEAR.length, 353);
-  assert.equal(RECIPES.length, 127);
+test("all 136 weapons have explicit families; 66 trained rewards retain handedness, classes and exact sources", () => {
+  assert.equal(GEAR.length, 384);
+  assert.equal(RECIPES.length, 151);
   assert.equal(WARDROBE_CATALOG.length, 222);
   assert.equal(ENCHANTMENTS.length, 24);
   assert.equal(TRAINED_WEAPON_GEAR.length, 66);
@@ -97,7 +97,7 @@ test("all 135 weapons have explicit families; 66 trained rewards retain handedne
   const weapons = GEAR.filter(
     (g) => g.slot === "weapon" || g.slot === "ranged",
   );
-  assert.equal(weapons.length, 135);
+  assert.equal(weapons.length, 136);
   assert.ok(weapons.every((g) => g.weaponType));
   assert.equal(GEAR_MAP.starter_priest.weaponType, "wand");
   assert.equal(GEAR_MAP.starter_druid.weaponType, "staff");
@@ -129,6 +129,7 @@ test("missing training fields preserve every old class-eligible weapon, its stat
     for (const g of GEAR.filter(
       (g) =>
         g.slot === "weapon" &&
+        (g.level || 1) <= s.heroes[c.id].level &&
         !advancedWeaponType(g.weaponType) &&
         canEquip(c.id, g.id),
     )) {

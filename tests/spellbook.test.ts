@@ -93,9 +93,9 @@ function near(actual: number, expected: number) {
   );
 }
 
-test("all nine classes have two complete, distinct trainer techniques and keep their original four", () => {
-  assert.equal(Object.keys(SPELLS).length, 54);
-  assert.equal(new Set(CLASS_TECHNIQUES.map((t) => t.spell.id)).size, 18);
+test("all nine classes have five complete, distinct trainer techniques and keep their original four", () => {
+  assert.equal(Object.keys(SPELLS).length, 81);
+  assert.equal(new Set(CLASS_TECHNIQUES.map((t) => t.spell.id)).size, 45);
   for (const c of CLASSES) {
     const choices = CLASS_TECHNIQUES.filter((t) => t.classId === c.id);
     assert.deepEqual(
@@ -103,6 +103,9 @@ test("all nine classes have two complete, distinct trainer techniques and keep t
       [
         [5, 40],
         [12, 120],
+        [20, 240],
+        [30, 360],
+        [40, 480],
       ],
     );
     assert.equal(c.spells.length, 4);
@@ -301,7 +304,7 @@ test("engine default and under-level spellbooks retain the original four and sta
   }
 });
 test("every trainer ability deals real damage or healing at ranks one and five", () => {
-  for (const t of CLASS_TECHNIQUES)
+  for (const t of CLASS_TECHNIQUES.filter((t) => t.spell.kind !== "buff"))
     for (const rank of [1, 5]) {
       const { g, e } = make(t.classId, t.spell.id);
       g.spells[0].rank = rank;
@@ -386,7 +389,14 @@ test("healing techniques work without enemies, clamp overhealing, and wait at fu
     g.spells[0].timer = 0;
     g.update(1 / 60);
     g.spells[0].timer = 100;
-    advance(g, 9);
+    advance(
+      g,
+      Math.max(
+        9,
+        (t.spell.periodic?.ticks || 0) * (t.spell.periodic?.interval || 0) +
+          0.1,
+      ),
+    );
     assert.equal(g.player.hp, g.player.maxHp);
     near(g.totalHealing, 2);
     assert.deepEqual(g.professionProof, []);
@@ -694,7 +704,7 @@ test("trainer rank-five upgrades evolve once and do not replace the core ability
       zone: ZONES[0],
       stats,
       professions: {},
-      characterLevel: 21,
+      characterLevel: Math.max(21, t.level),
       spellbook: book,
       trialChapter: 1,
       seed: 1,

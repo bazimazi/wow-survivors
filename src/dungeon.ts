@@ -7,6 +7,7 @@ import { dualWieldDungeonLoot } from "./dual-wield";
 import { rangedDungeonLoot } from "./ranged";
 import { trainedWeaponDungeonLoot } from "./weapon-training";
 import { SHADOWFANG_STAGES } from "./shadowfang";
+import { SCARLET_STAGES } from "./endgame";
 
 export interface DungeonStage {
   id: string;
@@ -210,6 +211,15 @@ export const DUNGEONS: DungeonRoute[] = [
     victoryText: "Arugal's hold on the haunted castle is broken.",
   },
 ];
+DUNGEONS.push({
+  id: "scarlet",
+  name: "Scarlet Monastery",
+  stages: SCARLET_STAGES,
+  prerequisite: "duskwood",
+  minLevel: 25,
+  victoryText:
+    "The northern cathedral falls silent. A road into the Plaguelands opens.",
+});
 for (const route of DUNGEONS)
   route.stages.forEach((stage, index) =>
     stage.loot.push(

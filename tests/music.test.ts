@@ -11,12 +11,12 @@ import type { MusicCue } from "../src/music";
 import { MusicPlayer, MAX_MUSIC_VOICES } from "../src/music-player";
 import { freshSave, validateSave } from "../src/progression";
 
-test("ten original scores form bounded, deterministic, finite four-bar arrangements", () => {
-  assert.equal(Object.keys(MUSIC_SCORES).length, 10);
+test("twelve original scores form bounded, deterministic, finite four-bar arrangements", () => {
+  assert.equal(Object.keys(MUSIC_SCORES).length, 12);
   assert.equal(
     new Set(Object.values(MUSIC_SCORES).map((s) => JSON.stringify(s.melody)))
       .size,
-    10,
+    12,
   );
   const before = JSON.stringify(MUSIC_SCORES);
   for (const cue of Object.keys(MUSIC_SCORES) as MusicCue[]) {
@@ -45,6 +45,8 @@ test("scene selection covers all destinations, guardians, recovery and paused re
     deadmines: "mine",
     ragefire: "ember",
     shadowfang: "haunted",
+    scarlet: "cathedral",
+    plaguelands: "blight",
   };
   assert.equal(musicScene({ focused: true }).cue, "camp");
   for (const [zone, cue] of Object.entries(destinations)) {

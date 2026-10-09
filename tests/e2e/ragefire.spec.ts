@@ -143,7 +143,7 @@ test("Ragefire preview uses an independent unlock, hero gate, continent and four
   s.heroes.warrior.level = 10;
   await seed(page, s);
   await page.goto("/");
-  await expect(page.locator(".zone-option")).toHaveCount(7);
+  await expect(page.locator(".zone-option")).toHaveCount(9);
   await expect(page.locator(".world-label")).toContainText("KALIMDOR");
   await expect(
     page.getByRole("button", { name: "Begin Dungeon" }),

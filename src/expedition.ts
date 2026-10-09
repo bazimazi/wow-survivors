@@ -140,6 +140,14 @@ const NAMES: Record<string, string[]> = {
     "Restless Spirit Circle",
   ],
 };
+NAMES.plaguelands = [
+  "Dawn's Beacon",
+  "Blighted Supply Cache",
+  "Purification Circle",
+  "Last Wayshrine",
+  "Lost Caravan",
+  "Hope's Vigil",
+];
 export function createLandmarks(zone: string): Landmark[] {
   const positions = [
     [340, 180],
@@ -171,6 +179,7 @@ export function createLandmarks(zone: string): Landmark[] {
   }));
 }
 export const ZONE_MATERIALS: Record<string, Material[]> = {
+  plaguelands: ["cloth", "herbs", "dust"],
   duskwood: ["cloth", "herbs", "dust"],
   elwynn: ["herbs", "leather", "ore"],
   westfall: ["ore", "cloth", "leather"],
@@ -180,6 +189,13 @@ export const BOSS_IDENTITIES: Record<
   string,
   { enemy: string; baseHealth: number; title: string; tactic: string }
 > = {
+  plaguelands: {
+    enemy: "wraith",
+    baseHealth: 95,
+    title: "Voice of the blighted wilderness",
+    tactic:
+      "Move between the shadow lanes. Escape the spreading nature clouds.",
+  },
   duskwood: {
     enemy: "stitches",
     baseHealth: 46,

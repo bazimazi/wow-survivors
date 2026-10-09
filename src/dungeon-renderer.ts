@@ -10,6 +10,10 @@ export function drawDungeonFloor(
   width: number,
   height: number,
 ) {
+  if (g.zone.id === "scarlet") {
+    drawScarletFloor(c, g);
+    return;
+  }
   if (g.zone.id === "shadowfang") {
     drawShadowfangFloor(c, g, width, height);
     return;
@@ -140,6 +144,50 @@ export function drawDungeonFloor(
       c.fillStyle = "#f5d9a0";
       c.fillRect(x - 2, y - 5, 4, 10);
     }
+}
+function drawScarletFloor(c: CanvasRenderingContext2D, g: GameEngine) {
+  const b = g.dungeonStage!.bounds;
+  c.save();
+  c.fillStyle = "#292426";
+  c.fillRect(-b.x - 400, -b.y - 400, b.x * 2 + 800, b.y * 2 + 800);
+  c.beginPath();
+  c.rect(-b.x, -b.y, b.x * 2, b.y * 2);
+  c.clip();
+  for (let y = -b.y; y < b.y; y += 64)
+    for (let x = -b.x; x < b.x; x += 64) {
+      c.fillStyle =
+        (Math.floor(x / 64) + Math.floor(y / 64)) % 2 ? "#62594e" : "#716556";
+      c.fillRect(x, y, 62, 62);
+    }
+  c.fillStyle = "#773b39";
+  c.fillRect(-90, -b.y, 180, b.y * 2);
+  c.strokeStyle = "#b99460";
+  c.lineWidth = 3;
+  c.strokeRect(-82, -b.y, 164, b.y * 2);
+  for (const side of [-1, 1])
+    for (let y = -b.y + 80; y < b.y; y += 180) {
+      c.fillStyle = "#a69c83";
+      c.fillRect(side * (b.x - 70) - 24, y, 48, 85);
+      c.fillStyle = "#ccb992";
+      c.fillRect(side * (b.x - 70) - 29, y, 58, 12);
+      if (g.dungeonStageIndex === 0) {
+        c.fillStyle = "#4c3831";
+        c.fillRect(side * (b.x - 135) - 30, y + 10, 60, 70);
+        for (let i = 0; i < 6; i++) {
+          c.fillStyle = ["#796e50", "#9d674b", "#68696f"][i % 3];
+          c.fillRect(side * (b.x - 135) - 25 + i * 8, y + 18, 6, 42);
+        }
+      }
+    }
+  c.fillStyle = "#b9a47c";
+  c.fillRect(-145, -b.y + 30, 290, 65);
+  c.fillStyle = "#e0c88f";
+  c.fillRect(-160, -b.y + 23, 320, 12);
+  c.fillStyle = "#d5b67b";
+  c.font = "20px serif";
+  c.textAlign = "center";
+  c.fillText(g.dungeonStage!.name, 0, -b.y + 140);
+  c.restore();
 }
 
 function drawRagefireFloor(

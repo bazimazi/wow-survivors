@@ -204,7 +204,7 @@ test("all 45 creature/hero/Bear crops have six distinct padded death poses and s
     );
 });
 
-test("actual lethal hits snapshot all creatures and fifteen guardians independently of removal and room cleanup", async ({
+test("actual lethal hits snapshot all creatures and twenty guardians independently of removal and room cleanup", async ({
   page,
 }) => {
   await setup(page);
@@ -285,6 +285,12 @@ test("actual lethal hits snapshot all creatures and fifteen guardians independen
       engine.boss = e;
       e.hp = 1;
       (engine as any).damageEnemy(e, 1000, "melee", false);
+      if (!e.dead) {
+        const guard = engine.enemies.find((a) => a.guard && a !== e)!;
+        (engine as any).damageEnemy(guard, 1e9, "melee", false);
+        renderer.deathAnimator.clear();
+        (engine as any).damageEnemy(e, 1e9, "melee", false);
+      }
       renderer.render();
       if (
         !(engine.checkpoint || engine.ended) ||
@@ -299,7 +305,7 @@ test("actual lethal hits snapshot all creatures and fifteen guardians independen
     }
     return { creatures, guardians };
   });
-  expect(result).toEqual({ creatures: 37, guardians: 15 });
+  expect(result).toEqual({ creatures: 37, guardians: 20 });
 });
 
 test("nine real hero defeats and Bear Form fall behind immediate results; healthy returns remain neutral", async ({

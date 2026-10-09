@@ -79,8 +79,8 @@ function pair(classId: ClassId = "warrior") {
   return s;
 }
 test("eleven blades have unique explicit sources, four matching-grade recipes, one-handed class fit and no new formulas or sets", () => {
-  assert.equal(GEAR.length, 353);
-  assert.equal(RECIPES.length, 127);
+  assert.equal(GEAR.length, 384);
+  assert.equal(RECIPES.length, 151);
   assert.equal(SLOTS.length, 16);
   assert.equal(WARDROBE_CATALOG.length, 222);
   assert.equal(DUAL_WIELD_GEAR.length, 11);

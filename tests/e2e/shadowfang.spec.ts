@@ -80,7 +80,7 @@ test("Shadowfang preview checks the selected hero gate and displays all thirty-t
   s.heroes.warrior.level = 15;
   await seed(page, s);
   await page.goto("/");
-  await expect(page.locator(".zone-option")).toHaveCount(7);
+  await expect(page.locator(".zone-option")).toHaveCount(9);
   await expect(page.locator(".world-label")).toContainText("EASTERN KINGDOMS");
   await expect(
     page.getByRole("button", { name: "Begin Dungeon" }),

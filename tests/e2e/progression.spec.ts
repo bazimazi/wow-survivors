@@ -130,7 +130,7 @@ test("expanded equipment and recipe catalog remain usable on a narrow screen", a
   ).toBe(true);
   await page.getByRole("button", { name: "Professions", exact: true }).click();
   await page.locator("#recipe-filter").selectOption("all");
-  await expect(page.locator(".recipe-card")).toHaveCount(127);
+  await expect(page.locator(".recipe-card")).toHaveCount(151);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
