@@ -1,0 +1,294 @@
+/* A fixed game viewport. Long collections use one reader with page turns. */
+:where(html, body, body *) {
+  scrollbar-width: none !important;
+}
+:where(html, body, body *)::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+body::before {
+  z-index: 0;
+}
+#app {
+  position: relative;
+  z-index: 1;
+}
+body:not(.in-game) #app {
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+body:not(.in-game) .site-header {
+  position: relative;
+  flex-shrink: 0;
+}
+body:not(.in-game) .main-content {
+  width: calc(100% - 24px);
+  margin: 10px auto 0;
+  padding: 22px;
+  min-height: 0;
+  border: 1px solid #b7995b45;
+  background: linear-gradient(110deg, #091118e6, #101b20c9);
+  box-shadow:
+    inset 0 0 0 3px #05090d66,
+    0 8px 40px #0006;
+}
+.game-reader {
+  overflow: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  overscroll-behavior: contain;
+}
+.game-reader::-webkit-scrollbar,
+.combat-briefing details::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.combat-briefing details {
+  scrollbar-width: none;
+}
+body:not(.in-game) .site-footer {
+  margin: 0;
+  min-height: 52px;
+  padding: 6px 18px;
+  gap: 14px;
+  background: linear-gradient(#1b2228f5, #0c1118f5);
+}
+.site-footer > span {
+  display: none;
+}
+.site-footer > .text-button {
+  margin-left: auto;
+}
+.game-page-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.game-page-nav[hidden] {
+  display: none;
+}
+.game-page-arrow {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border: 1px solid #b598624f;
+  border-radius: 2px;
+  background: linear-gradient(#293136, #10191e);
+  color: #f1d293;
+  font: 27px var(--serif);
+  box-shadow: inset 0 1px 0 #ffe7ac18;
+}
+.game-page-arrow:disabled {
+  opacity: 0.3;
+}
+.game-page-arrow:not(:disabled):hover {
+  border-color: #e5c583;
+  background: #323a38;
+}
+.game-page-count {
+  min-width: 52px;
+  text-align: center;
+  font: 12px var(--serif);
+  color: #d7c29b;
+}
+.game-chapter-select {
+  width: 210px;
+  height: 36px;
+  margin-left: 12px;
+  border: 1px solid #ad94635c;
+  background: #111b21;
+  color: #d3c7ae;
+  padding: 5px 9px;
+  font-size: 11px;
+}
+.modal.game-dialog {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  max-height: calc(100dvh - 40px);
+}
+.dialog-content {
+  min-height: 0;
+  max-height: calc(100dvh - 110px);
+  padding: 32px;
+  flex: 0 1 auto;
+}
+.game-dialog > .modal-close {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  margin: 0;
+  float: none;
+}
+.dialog-content #modal-title {
+  padding-right: 24px;
+}
+.dialog-page-footer {
+  flex: 0 0 auto;
+  background: #121c23;
+  border-top: 1px solid #b7995b40;
+}
+.dialog-page-footer:has(.game-page-nav[hidden]) {
+  display: none;
+}
+.dialog-page-footer .game-page-nav {
+  padding: 7px;
+}
+.in-game::before {
+  display: none;
+}
+.in-game .combat-briefing .adventure-hud,
+.in-game .combat-briefing .class-kit-hud {
+  box-shadow: none;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  background: linear-gradient(90deg, #091118b8, #09111818);
+}
+.high-contrast.in-game .combat-briefing .adventure-hud,
+.high-contrast.in-game .combat-briefing .class-kit-hud {
+  background: #060d14;
+  border: 1px solid #f5d79a;
+}
+.in-game .class-kit-hud details:not([open]) summary {
+  font-size: 0;
+  min-height: 24px;
+}
+.in-game .class-kit-hud details:not([open]) summary::before {
+  content: "Combat technique";
+  font-size: 10px;
+}
+.in-game .class-kit-hud details:not([open]) summary span {
+  font-size: 7px;
+}
+@media (max-width: 760px) {
+  body:not(.in-game) .main-content {
+    width: calc(100% - 12px);
+    margin-top: 6px;
+    padding: 14px 10px;
+  }
+  body:not(.in-game) .site-footer {
+    min-height: 52px;
+    padding: 5px 10px;
+    gap: 4px;
+  }
+  .game-page-nav {
+    gap: 4px;
+  }
+  .game-chapter-select {
+    width: 135px;
+    margin-left: 4px;
+    font-size: 10px;
+  }
+  .game-page-count {
+    min-width: 42px;
+    font-size: 10px;
+  }
+  .site-footer > .text-button {
+    font-size: 0;
+    min-width: 28px;
+  }
+  .site-footer > .text-button .icon {
+    width: 20px;
+    height: 20px;
+  }
+  .dialog-content {
+    padding: 24px 18px;
+  }
+  .game-page-arrow {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+.has-modal .main-content.game-reader {
+  overflow: hidden;
+}
+.controller-input:not(.in-game) .site-footer {
+  padding-bottom: 50px;
+}
+.controller-input .modal.game-dialog {
+  max-height: calc(100dvh - 130px);
+}
+.controller-input .dialog-content {
+  max-height: calc(100dvh - 200px);
+}
+@media (max-width: 760px) {
+  .controller-input:not(.in-game) .site-footer {
+    padding-bottom: 68px;
+  }
+}
+@media (pointer: coarse) {
+  .game-page-arrow {
+    width: 44px;
+    height: 44px;
+  }
+}
+@media (max-width: 420px) {
+  .game-chapter-select {
+    width: 110px;
+  }
+}
+
+.game-picker {
+  position: fixed;
+  z-index: 180;
+  padding: 7px;
+  border: 1px solid #d4b377;
+  background: linear-gradient(140deg, #263038, #101820);
+  box-shadow:
+    inset 0 0 0 3px #0b1118,
+    0 14px 45px #000b;
+  border-radius: 3px;
+}
+.game-picker-option {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 0;
+  border-left: 2px solid transparent;
+  text-align: left;
+  color: #d9d5c6;
+  background: transparent;
+  font-family: var(--serif);
+  font-size: 12px;
+}
+.game-picker-option[aria-selected="true"] {
+  color: #ffdfa2;
+  border-left-color: #edc578;
+  background: #c6a36818;
+}
+.game-picker-option:not(:disabled):is(:hover, :focus-visible) {
+  background: #b59a6433;
+}
+.game-picker-option:disabled {
+  color: #77807f;
+}
+.game-picker-pages {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  padding-top: 5px;
+  border-top: 1px solid #ae966540;
+  color: #d5bf99;
+  font-size: 11px;
+}
+.game-picker-pages button {
+  width: 44px;
+  height: 44px;
+  color: #e9cd8c;
+  background: #101a22;
+  border: 1px solid #ad91564d;
+}

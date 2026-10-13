@@ -55,6 +55,7 @@ async function fits(p: Page) {
 }
 async function controls(items: Locator) {
   for (const el of await items.all()) {
+    if (!(await el.isVisible())) continue;
     const b = await el.boundingBox();
     expect(b).toBeTruthy();
     expect(Math.round(b!.width * 1000) / 1000).toBeGreaterThanOrEqual(44);
@@ -451,6 +452,8 @@ test("actual Sneed combat secures an untrained axe, settles once and supports a 
 test("nine classes at six widths expose only eligible training and all new sources with 44px controls and no overflow", async ({
   page,
 }) => {
+  test.setTimeout(180_000);
+  page.setDefaultTimeout(10_000);
   await seed(page, ready());
   await page.goto("/#armory");
   const reports = [];

@@ -1,6 +1,12 @@
 /** Standard Gamepad API button positions; labels describe Xbox / PlayStation. */
 export const CONTROLLER_BINDINGS = [
   {
+    button: 6,
+    action: "battle-art",
+    label: "LT / L2",
+    description: "Hold Battle Art / previous menu control; right stick aims",
+  },
+  {
     button: 7,
     action: "shoot",
     label: "RT / R2",

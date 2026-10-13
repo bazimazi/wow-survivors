@@ -55,6 +55,13 @@ export interface ActorPose {
   frame: number;
   phase: number;
   mirror: boolean;
+  /** Adjacent native pose blend for the renderer; cached source frames stay bounded. */
+  nextFrame?: number;
+  blend?: number;
+  gaitFrame?: number;
+  /** Blend the painted gait into the neutral illustration on starts and stops. */
+  strideWeight?: number;
+  settleFrame?: number;
 }
 interface Motion extends ActorPose {
   x: number;
@@ -93,6 +100,7 @@ export class ActorAnimator {
           ? ((phaseOffset % 1) + 1) % 1
           : 0,
       mirror: previous?.mirror ?? mirror,
+      strideWeight: 0,
     };
     if (previous && enabled) {
       const elapsed = time - previous.time;
@@ -102,12 +110,25 @@ export class ActorAnimator {
       if (frozen || elapsed === 0) {
         next.frame = previous.frame;
         next.phase = previous.phase;
+        next.strideWeight = previous.strideWeight;
+        next.settleFrame = previous.settleFrame;
       } else if (
         elapsed > 0 &&
         elapsed <= 0.25 &&
         distance <= Math.max(100, stride * 3)
       ) {
         next.phase = previous.phase;
+        const moving = distance > 0.025;
+        const target = moving ? 1 : 0;
+        next.strideWeight =
+          (previous.strideWeight || 0) +
+          (target - (previous.strideWeight || 0)) *
+            (1 - Math.exp(-elapsed / (moving ? 0.055 : 0.065)));
+        if (!moving && next.strideWeight > 0.015)
+          next.settleFrame =
+            previous.frame >= 0 ? previous.frame : previous.settleFrame;
+        if (next.strideWeight < 0.015) next.strideWeight = 0;
+        if (next.strideWeight > 0.985) next.strideWeight = 1;
         if (distance > 0.025) {
           next.phase = (previous.phase + distance / stride) % 1;
           next.frame = Math.floor(next.phase * WALK_KEYS.length);
@@ -116,7 +137,13 @@ export class ActorAnimator {
       }
     }
     this.actors.set(actor, next);
-    return { frame: next.frame, phase: next.phase, mirror: next.mirror };
+    return {
+      frame: next.frame,
+      phase: next.phase,
+      mirror: next.mirror,
+      strideWeight: next.strideWeight,
+      settleFrame: next.settleFrame,
+    };
   }
 }
 
@@ -257,6 +284,9 @@ export class QueuedFrameCache<T> {
   }
   get pendingSize() {
     return this.pending.size;
+  }
+  peek(key: string): T | null {
+    return this.frames.peek(key);
   }
   beginFrame() {
     this.frames.beginFrame();

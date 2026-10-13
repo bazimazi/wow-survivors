@@ -56,14 +56,15 @@ async function setup(
       response,
       body: body.replace(
         marker,
-        `${marker}\nwindow.__animRenderer=renderer;window.__animGame=game;`,
+        `${marker}\nwindow.__animRenderer=renderer;const observeDraw=renderer.ctx.drawImage.bind(renderer.ctx);renderer.ctx.drawImage=(...args)=>{if(args[0] instanceof HTMLCanvasElement && args[0].dataset.heroMotion)window.__motionSeen=true;return observeDraw(...args);};window.__animGame=game;`,
       ),
     });
   });
-  if (!native)
+  if (!native) {
     await page.clock.install({ time: new Date("2026-10-05T00:00:00Z") });
+    await page.clock.pauseAt(new Date("2026-10-05T00:00:01Z"));
+  }
   await page.goto("/");
-  if (!native) await page.clock.pauseAt(new Date("2026-10-05T00:00:01Z"));
 }
 async function begin(page: Page, native = false) {
   await page
@@ -85,6 +86,7 @@ const pose = (page: Page) =>
       y: g.player.y,
       time: g.time,
       cache: r.frameCache.size,
+      painted: r.liveSkins.has(g.player) || !!(window as any).__motionSeen,
       enabled: r.motionEnabled,
     };
   });
@@ -94,7 +96,7 @@ test("all 22 original sprite crops render bounded distinct native Canvas gait fr
 }) => {
   await setup(page);
   const result = await page.evaluate(async () => {
-    const { createAnimationFrame, heroCrop } =
+    const { createAnimationFrame, heroCrop, FRAME_SIZE } =
       await import("/src/animation-canvas.ts");
     const groups = [
       {
@@ -197,17 +199,22 @@ test("all 22 original sprite crops render bounded distinct native Canvas gait fr
               group.rigs[index],
               frame,
             ),
-            data = image.getContext("2d")!.getImageData(0, 0, 144, 144).data;
+            data = image
+              .getContext("2d")!
+              .getImageData(0, 0, FRAME_SIZE, FRAME_SIZE).data;
           frames.push(data);
           let hash = 2166136261;
           for (let offset = 0; offset < data.length; offset++)
             hash = Math.imul(hash ^ data[offset], 16777619);
           hashes.push(hash);
-          for (let y = 0; y < 144; y++)
-            for (let x = 0; x < 144; x++)
+          for (let y = 0; y < FRAME_SIZE; y++)
+            for (let x = 0; x < FRAME_SIZE; x++)
               if (
-                (x < 2 || y < 2 || x >= 142 || y >= 142) &&
-                data[(y * 144 + x) * 4 + 3] > 0
+                (x < 2 ||
+                  y < 2 ||
+                  x >= FRAME_SIZE - 2 ||
+                  y >= FRAME_SIZE - 2) &&
+                data[(y * FRAME_SIZE + x) * 4 + 3] > 0
               )
                 edgeAlpha++;
           c.drawImage(image, 110 + frame * 116, 40 + index * 134, 116, 116);
@@ -220,9 +227,9 @@ test("all 22 original sprite crops render bounded distinct native Canvas gait fr
         }
         let feet = 0,
           upper = 0;
-        for (let y = 0; y < 144; y++)
-          for (let x = 0; x < 144; x++) {
-            const offset = (y * 144 + x) * 4;
+        for (let y = 0; y < FRAME_SIZE; y++)
+          for (let x = 0; x < FRAME_SIZE; x++) {
+            const offset = (y * FRAME_SIZE + x) * 4;
             if (
               frames[0]
                 .slice(offset, offset + 4)
@@ -368,7 +375,7 @@ test("live device reduced-motion preference keeps walking static without changin
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.clock.runFor(180);
   expect((await pose(page)).frame).toBeGreaterThanOrEqual(0);
-  expect((await pose(page)).cache).toBeGreaterThan(0);
+  expect((await pose(page)).painted).toBe(true);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.clock.runFor(40);
   expect((await pose(page)).frame).toBe(-1);
@@ -408,11 +415,14 @@ test("real wolf, imp and totem following and Bear Form use their separate locomo
     await page.evaluate(() => (window as any).__animGame.player.kit.form),
   ).toBe("bear");
   expect(
-    await page.evaluate(() =>
-      [...(window as any).__animRenderer.frameCache.frames.keys()].some(
-        (k: any) => k.includes("companions.png") && k.includes("quadruped"),
-      ),
-    ),
+    await page.evaluate(() => {
+      const r = (window as any).__animRenderer,
+        g = (window as any).__animGame;
+      return (
+        r.liveSkins.get(g.player)?.key.includes("companions.png") &&
+        g.pets.every((pet: any) => r.liveSkins.has(pet))
+      );
+    }),
   ).toBe(true);
   await page.keyboard.up("d");
 });
@@ -433,11 +443,28 @@ for (const hero of ["warrior", "druid", "shaman"] as const)
     expect((await pose(page)).frame).toBeGreaterThanOrEqual(0);
     expect(
       await page.evaluate(() =>
-        [...(window as any).__animRenderer.frameCache.frames.keys()].some(
-          (k: any) => k.includes("travel-sprites.png"),
-        ),
+        [
+          (window as any).__animRenderer.liveSkins.get(
+            (window as any).__animGame.player,
+          )?.key || "",
+        ].some((k: any) => k.includes("travel-sprites.png")),
       ),
     ).toBe(true);
+    if (hero === "warrior") {
+      const first = await page.evaluate(() => {
+        const r = (window as any).__animRenderer,
+          actor = (window as any).__animGame.player;
+        return r.liveSkins.get(r.riderActors.get(actor)).image.toDataURL();
+      });
+      await page.clock.runFor(150);
+      expect(
+        await page.evaluate(() => {
+          const r = (window as any).__animRenderer,
+            actor = (window as any).__animGame.player;
+          return r.liveSkins.get(r.riderActors.get(actor)).image.toDataURL();
+        }),
+      ).not.toBe(first);
+    }
     await page.keyboard.press("Escape");
     const held = await pose(page);
     await page.clock.runFor(450);
@@ -550,6 +577,7 @@ test("cached animation remains read-only and bounded in a 400-enemy scene; missi
       readOnly: before === snapshot(),
       count: g.enemies.length,
       cache: r.frameCache.size,
+      painted: r.liveSkins.has(g.player) || !!(window as any).__motionSeen,
       averageMs: times.reduce((a, b) => a + b, 0) / times.length,
       p95Ms: times[Math.floor(times.length * 0.95)],
       finite: g.enemies.every(
@@ -560,7 +588,7 @@ test("cached animation remains read-only and bounded in a 400-enemy scene; missi
   expect(report.readOnly).toBe(true);
   expect(report.count).toBe(400);
   expect(report.finite).toBe(true);
-  expect(report.cache).toBeGreaterThan(0);
+  expect(report.painted).toBe(true);
   expect(report.cache).toBeLessThanOrEqual(192);
   expect(report.averageMs).toBeGreaterThan(0);
   expect(report.averageMs).toBeLessThan(30);

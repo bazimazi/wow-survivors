@@ -171,12 +171,12 @@ test("settings checkboxes, modal containment, right-stick scrolling and back wor
   await expect(checkbox).toBeChecked();
   expect((await saved(page)).settings.sound).toBe(true);
   await page.evaluate(() => {
-    const modal = document.querySelector(".modal")!;
+    const modal = document.querySelector(".dialog-content")!;
     modal.scrollTop = 0;
   });
   await axes(page, 0, 0, 1, 500);
   expect(
-    await page.locator(".modal").evaluate((el) => el.scrollTop),
+    await page.locator(".dialog-content").evaluate((el) => el.scrollTop),
   ).toBeGreaterThan(0);
   await axes(page, 0);
   for (let i = 0; i < 10; i++) {
@@ -366,7 +366,7 @@ test("disconnect and focus loss freeze combat until release and explicit resume;
     "Until the next adventure",
   );
   await press(page, 0);
-  await expect(page.locator(".world-card")).toBeVisible();
+  await expect(page.locator(".departure-mission")).toBeVisible();
   expect((await saved(page)).totals.runs).toBe(1);
 });
 
@@ -439,6 +439,8 @@ test("controller reviews require a separate confirmation and expandable guides k
 }) => {
   await setup(page, "deadmines");
   await connect(page);
+  await page.getByRole("button", { name: "Camp services" }).focus();
+  await press(page, 0);
   const summary = page.locator(".dungeon-loot-guide summary");
   await summary.focus();
   await press(page, 0);
@@ -448,6 +450,7 @@ test("controller reviews require a separate confirmation and expandable guides k
     "open",
     "",
   );
+  await press(page, 1);
   await press(page, 5);
   await press(page, 5);
   await expect(page.locator(".nav-link.active")).toHaveAttribute(
@@ -479,13 +482,20 @@ test("controller camp, focused settings and combat hints fit six viewport widths
 }) => {
   await setup(page);
   await connect(page);
-  for (const width of [360, 390, 760, 800, 1024, 1440]) {
+  for (const width of [320, 360, 390, 760, 800, 1024, 1440]) {
     await page.setViewportSize({ width, height: width < 600 ? 844 : 1000 });
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
+    const hint = (await page.locator("#controller-hint").boundingBox())!;
+    for (const control of await page
+      .locator(".game-page-nav > *:visible")
+      .all()) {
+      const box = (await control.boundingBox())!;
+      expect(box.y + box.height).toBeLessThanOrEqual(hint.y);
+    }
     await page.getByRole("button", { name: "Settings", exact: true }).focus();
     await press(page, 0);
     await expect(page.locator("#controller-status")).toBeVisible();
@@ -495,6 +505,8 @@ test("controller camp, focused settings and combat hints fit six viewport widths
     expect(rect!.y).toBeGreaterThanOrEqual(0);
     expect(rect!.x).toBeGreaterThanOrEqual(0);
     expect(rect!.x + rect!.width).toBeLessThanOrEqual(width);
+    const dialogHint = (await page.locator("#controller-hint").boundingBox())!;
+    expect(rect!.y + rect!.height).toBeLessThanOrEqual(dialogHint.y);
     await page.screenshot({
       path: `output/screenshots/controller-settings-${width}.png`,
       animations: "disabled",
@@ -516,4 +528,37 @@ test("controller camp, focused settings and combat hints fit six viewport widths
       animations: "disabled",
     });
   }
+});
+
+test("controller focus stays inside a pointer-opened choice panel and Back closes it before the settings dialog", async ({
+  page,
+}) => {
+  await setup(page);
+  await connect(page);
+  await page.getByRole("button", { name: "Spellbook", exact: true }).click();
+  await press(page, 8);
+  const hero = page.locator("#hero-switch");
+  await hero.click();
+  const panel = page.locator(".game-picker");
+  await expect(panel).toBeVisible();
+  await press(page, 8);
+  expect(
+    await panel.evaluate((el) => el.contains(document.activeElement)),
+  ).toBe(true);
+  await panel.getByRole("option", { name: /Rogue/ }).focus();
+  await press(page, 0);
+  await expect(panel).toHaveCount(0);
+  expect((await saved(page)).selectedClass).toBe("rogue");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const select = page.getByRole("dialog").locator("select").first();
+  await select.scrollIntoViewIfNeeded();
+  await select.click();
+  await expect(panel).toBeVisible();
+  await buttons(page);
+  await press(page, 1);
+  await expect(panel).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(select).toBeFocused();
+  await press(page, 1);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 });

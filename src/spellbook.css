@@ -336,7 +336,7 @@
     height: 62px;
   }
   .spellbook-mentor > div {
-    flex: 1;
+    flex: 1 1 190px;
     min-width: 0;
   }
   .spellbook-mentor h2 {

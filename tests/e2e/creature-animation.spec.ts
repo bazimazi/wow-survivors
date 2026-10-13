@@ -67,7 +67,7 @@ test("all 35 creature crops have distinct bounded native gait frames and intact 
   await setup(page);
   const result = await page.evaluate(async () => {
     const { CREATURE_ART } = await import("/src/creature-animation.ts");
-    const { creatureCrop, createAnimationFrame } =
+    const { creatureCrop, createAnimationFrame, FRAME_SIZE } =
       await import("/src/animation-canvas.ts");
     const reports = [],
       sheets = [];
@@ -111,18 +111,24 @@ test("all 35 creature crops have distinct bounded native gait frames and intact 
           const image = createAnimationFrame(atlas, crop, art.rig, frame);
           const data = image
             .getContext("2d")!
-            .getImageData(0, 0, 144, 144).data;
+            .getImageData(0, 0, FRAME_SIZE, FRAME_SIZE).data;
           frames.push(data);
           let hash = 2166136261,
             pixels = 0;
           for (let offset = 0; offset < data.length; offset++)
             hash = Math.imul(hash ^ data[offset], 16777619);
           hashes.push(hash);
-          for (let y = 0; y < 144; y++)
-            for (let x = 0; x < 144; x++)
-              if (data[(y * 144 + x) * 4 + 3] > 0) {
+          for (let y = 0; y < FRAME_SIZE; y++)
+            for (let x = 0; x < FRAME_SIZE; x++)
+              if (data[(y * FRAME_SIZE + x) * 4 + 3] > 0) {
                 pixels++;
-                if (x < 2 || y < 2 || x >= 142 || y >= 142) edgeAlpha++;
+                if (
+                  x < 2 ||
+                  y < 2 ||
+                  x >= FRAME_SIZE - 2 ||
+                  y >= FRAME_SIZE - 2
+                )
+                  edgeAlpha++;
               }
           visible = Math.min(visible, pixels);
           c.drawImage(image, 150 + frame * 116, 40 + row * 134, 116, 116);
@@ -447,6 +453,12 @@ test("native moving 400-enemy rendering remains read-only, bounded and responsiv
         spells: g.spells,
       });
     const times = [];
+    let painted = false;
+    const drawImage = r.ctx.drawImage.bind(r.ctx);
+    r.ctx.drawImage = (...args: any[]) => {
+      if (args[0]?.dataset?.heroMotion === g.classDef.id) painted = true;
+      return drawImage(...args);
+    };
     let readOnly = true,
       maxCache = 0,
       maxPending = 0,
@@ -495,7 +507,7 @@ test("native moving 400-enemy rendering remains read-only, bounded and responsiv
         atlas.naturalWidth,
         atlas.naturalHeight,
       );
-      const prefix = `${atlas.src}:${crop.x}:${crop.y}:${crop.width}:${crop.height}:${art.rig}:`;
+      const prefix = `${atlas.src}:${crop.x}:${crop.y}:${crop.width}:${crop.height}:generic:front:${art.rig}:`;
       if ([...cachedKeys].some((key) => key.startsWith(prefix)))
         cachedCrops.add(`${art.atlas}:${art.index}`);
     }
@@ -509,6 +521,7 @@ test("native moving 400-enemy rendering remains read-only, bounded and responsiv
       maxCache,
       maxPending,
       heroCache: r.frameCache.size,
+      painted,
       averageMs: times.reduce((a, b) => a + b, 0) / times.length,
       p95Ms: times[Math.floor(times.length * 0.95)],
       finite: g.enemies.every(
@@ -525,7 +538,7 @@ test("native moving 400-enemy rendering remains read-only, bounded and responsiv
   expect(report.maxBuilt).toBeLessThanOrEqual(1);
   expect(report.maxCache).toBe(128);
   expect(report.maxPending).toBeLessThanOrEqual(128);
-  expect(report.heroCache).toBeGreaterThan(0);
+  expect(report.painted).toBe(true);
   expect(report.heroCache).toBeLessThanOrEqual(192);
   expect(report.averageMs).toBeGreaterThan(0);
   expect(report.averageMs).toBeLessThan(30);

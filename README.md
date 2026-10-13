@@ -18,6 +18,34 @@ npm run preview
 
 Preview opens the first free port starting at **4173** and accepts the same `--port` and `--no-open` options. The production build is in `dist/` and can be served by any static web host. Requires Node 20.19+ or 22.12+ and a modern browser. All artwork and fonts are bundled locally. No backend, accounts, API keys, or runtime third-party requests are required.
 
+## Development stack
+
+The game uses **Vite 8, strict TypeScript, native ES modules and Canvas 2D**, with DOM/CSS menus. `npm run dev` and `npm run preview` run the Vite CLI directly, so standard flags such as `--host`, `--port` and `--strictPort` work. Vite provides CSS hot updates and reloads changed game modules. Gameplay, rendering and persistent saves keep their existing architecture.
+
+[vite.config.ts](vite.config.ts) is the shared configuration for development, production builds, browser tests and capture scripts. [tsconfig.json](tsconfig.json) checks browser code with Vite client types; [tsconfig.node.json](tsconfig.node.json) checks the build and browser-test configuration with Node types. Run `npm run typecheck` for both, or `npm run build` to type-check and emit the optimized static site.
+
+Deploy the contents of `dist/` at the host's URL root. Runtime artwork uses `/art/` paths, so a nested hosting path requires updating those references in addition to Vite's `base` option. `vite preview` is for checking builds locally. Keep the same origin (scheme, host and port) to retain access to existing browser saves, or transfer progress with save export/import.
+
+## Combat foundations — 1.4
+
+Aim with the mouse, hold **left mouse or V** to charge your class Battle Art, then release. **Space** cancels a charge into a dodge; **right mouse or C** uses your class signature. Controller players use **LT/L2** and the right stick; touch players hold the new Battle Art button.
+
+Nine class-specific attacks add directional cleaves, piercing missiles, targeted blasts, healing beams and chain lightning. New hero sheets provide 144 movement and action poses, with charge anticipation, weapon releases and follow-through. Painted elemental impacts, projectile trails, stronger hit reactions and sound support the new combat timing.
+
+Read [the combat release notes and production milestones](docs/RELEASE-1.4.md) and [animation artwork and prompts](docs/combat-animation-art.md).
+
+The [cross-system audit](docs/VALIDATION.md#cross-system-audit--2026-10-13-14-working-tree) records the current fixes, regression coverage and remaining validation limits. Run `npx tsx scripts/class-balance.ts --current` for 81 seeded starter diagnostics with directed hordes and aimed Battle Arts enabled.
+
+## The Wilds Await — 1.3
+
+The camp is now an illustrated departure screen with an animated hero stage, a nine-class roster, compact destination choices and one launch action. Open **Camp services** for the faction, class and profession journeys; **Difficulty & build** opens your oath, relic and challenge preparation.
+
+Outdoor combat alternates pressure with recovery. The first directed horde arrives at 20 seconds, then every 35 seconds from alternating sides, with a four-second warning. A sustained 15-kill streak grants a 2.5-second Soul Surge that draws nearby gems to you. Dungeons keep their guardian and recovery structure.
+
+The battlefield now uses painted ground, trees and rocks, worn paths, illustrated landmarks and fishing ponds, glowing pickups, impact sparks, camera kicks, wounded-enemy health bars and visible dash cooldowns. Existing characters, equipment, quests and saves carry forward.
+
+Read [the release notes](docs/RELEASE-1.3.md) and [art provenance](docs/citadel-art.md).
+
 ## Class identity — 1.2
 
 **Space dashes; C uses your class signature.** Dash works from a standstill in your facing direction. Touch has a dedicated dash button; controller B / Circle dashes.
@@ -28,7 +56,7 @@ Read [the class guide and release notes](docs/RELEASE-1.2.md). Reproduce 81 seed
 
 ## Beyond the Horde — 1.1
 
-The camp now puts your next goal, hero and expedition build in reach. Use **Shape your build** before departure, or open the crown in the header for the Hall of Mastery.
+The camp now puts your next goal, hero and expedition build in reach. Use **Difficulty & build** before departure, or open the crown in the header for the Hall of Mastery.
 
 - **Three challenge settings:** Explorer reduces enemy health by 15% and incoming damage by 30%, with full progression. Adventurer retains the original challenge. Heroic adds 20% enemy health, 30% incoming damage and 15% spawn frequency, with 25% more base gold and character XP. Choose before each expedition.
 - **Four expedition oaths:** keep your original class strengths with The Unbound, trade speed for durability with The Vanguard, trade health for power with The Spellbinder, or trade armor for mobility and pickup reach with The Wayfarer. The preview shows your resulting health and damage. Oaths reset their effects after the run; your selection is saved.
@@ -162,11 +190,11 @@ Release **0.30** added weapon practice/accuracy, equipment shots/ammunition, wea
 npm test
 npx playwright install chromium
 npm run test:e2e
-npm run build
+npm run test:production
 npm run format:check
 ```
 
-`npm test` checks the headless simulation, progression, music scheduling, character gait/caching and free-port server rules. Browser tests exercise the real UI, input, native music playback, save reloads, crafting, mobile overflow and dense combat rendering. Each browser run starts its own server on the first free port and captures its actual URL. Run `node scripts/check-local-server.mjs --browser` after building to verify development/preview fallback, capture ownership and the complete browser suite with port 5173 occupied.
+`npm test` checks the headless simulation, progression, music scheduling, character gait/caching and free-port server rules. Browser tests exercise the real UI, input, native music playback, save reloads, crafting, mobile overflow and dense combat rendering. `npm run test:production` builds the game and checks the emitted site for local asset loading, rendered combat, expedition settlement and save persistence without the development server. Each browser run starts its own server on the first free port and captures its actual URL. Run `node scripts/check-local-server.mjs --browser` after building to verify development/preview fallback, capture ownership and the complete browser suite with port 5678 occupied.
 
 ```powershell
 npm run balance

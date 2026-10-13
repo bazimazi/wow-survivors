@@ -78,6 +78,7 @@ test("Duskwood preview shows selected-hero entry requirements, six landmarks and
   await expect(page.locator(".world-hint")).toHaveText(
     "Requires character level 20",
   );
+  await page.getByRole("button", { name: "Camp services" }).click();
   await expect(page.locator(".duskwood-landmarks li")).toHaveCount(6);
   await expect(page.locator(".duskwood-preview")).toContainText(
     "Watchkeeper’s Oath",
@@ -94,12 +95,13 @@ test("Duskwood preview shows selected-hero entry requirements, six landmarks and
   await expect(rewards.filter({ hasText: "Ravenhill Band" })).toContainText(
     "All classes · Ring · level 19",
   );
+  await page.getByRole("button", { name: "Close dialog", exact: true }).click();
   await page.locator('[data-action="hero"][data-id="warrior"]').click();
   await expect(
     page.getByRole("button", { name: "Begin Expedition" }),
   ).toBeEnabled();
   await page.reload();
-  await expect(page.locator(".world-content h2")).toHaveText("Duskwood");
+  await expect(page.locator(".mission-copy h2")).toHaveText("Duskwood");
 });
 for (const phase of [1, 2])
   test(`Stitches phase ${phase} renders captured cleaver lanes and persistent poison with repeated damage`, async ({
@@ -314,6 +316,7 @@ test("seven-destination camp and Duskwood guide fit six viewport widths", async 
 }) => {
   await seed(page);
   await page.goto("/");
+  await page.getByRole("button", { name: "Camp services" }).click();
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   for (const width of [360, 390, 760, 800, 1024, 1440]) {
@@ -328,7 +331,8 @@ test("seven-destination camp and Duskwood guide fit six viewport widths", async 
       .evaluateAll((els) =>
         Math.min(...els.map((e) => e.getBoundingClientRect().height)),
       );
-    expect(minimum).toBeGreaterThanOrEqual(44);
+    // Narrow layouts use touch-sized choices; desktop departure is compact.
+    expect(minimum).toBeGreaterThanOrEqual(width <= 900 ? 44 : 23);
     await page.screenshot({
       fullPage: true,
       path: `output/screenshots/duskwood-camp-${width}.png`,

@@ -5,9 +5,11 @@ import { telegraphContains } from "../src/expedition";
 import { DIFFICULTIES } from "../src/adventure";
 import type { Difficulty } from "../src/adventure";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { ART_CHARGE_TIME } from "../src/battle-arts";
 
 // Deterministic novice-build diagnostics; these are not human win-rate estimates.
 const results: object[] = [];
+const currentCombat = process.argv.includes("--current");
 for (const difficulty of Object.keys(DIFFICULTIES) as Difficulty[]) {
   for (const c of CLASSES)
     for (const seed of [42, 123, 2026]) {
@@ -16,6 +18,7 @@ for (const difficulty of Object.keys(DIFFICULTIES) as Difficulty[]) {
         firstLevel = 0;
       const g = new GameEngine({
         classCombat: true,
+        pacedEncounters: currentCombat,
         classId: c.id,
         zone: ZONES[0],
         stats: heroStats(freshSave(), c.id),
@@ -107,6 +110,12 @@ for (const difficulty of Object.keys(DIFFICULTIES) as Difficulty[]) {
           const range = nearest
             ? Math.sqrt(distanceSq(nearest, g.player))
             : Infinity;
+          if (currentCombat && nearest) {
+            g.battleArt.aim = { x: nearest.x, y: nearest.y };
+            if (g.battleArt.charging) {
+              if (g.battleArt.charge >= ART_CHARGE_TIME) g.releaseBattleArt();
+            } else if (!threatened) g.beginBattleArt();
+          }
           // Each pilot responds to its class loop instead of spamming a universal nova.
           if (
             ["mage", "hunter"].includes(c.id) &&
@@ -174,7 +183,12 @@ for (const difficulty of Object.keys(DIFFICULTIES) as Difficulty[]) {
     }
 }
 mkdirSync("output", { recursive: true });
-writeFileSync("output/class-balance.json", JSON.stringify(results, null, 2));
+writeFileSync(
+  currentCombat
+    ? "output/class-balance-current.json"
+    : "output/class-balance.json",
+  JSON.stringify(results, null, 2),
+);
 for (const difficulty of Object.keys(DIFFICULTIES)) {
   const sample = results.filter(
     (r: any) => r.difficulty === difficulty,

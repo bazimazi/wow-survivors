@@ -79,14 +79,17 @@ test("dungeon preview explains the unlock, selected-hero entry level, stages and
   await expect(page.locator(".world-hint")).toHaveText(
     "Requires character level 10",
   );
+  await page.getByRole("button", { name: "Camp services" }).click();
   await expect(page.locator(".dungeon-route li")).toHaveCount(3);
   await expect(page.locator(".dungeon-preview")).toContainText(
     "Sneed's Shredder",
   );
+  await page.getByRole("button", { name: "Close dialog", exact: true }).click();
   await page.locator('.class-card[data-id="warrior"]').click();
   await expect(
     page.getByRole("button", { name: "Begin Dungeon" }),
   ).toBeEnabled();
+  await page.getByRole("button", { name: "Camp services" }).click();
   await page.getByText("Preview dungeon equipment", { exact: true }).click();
   await expect(page.locator(".dungeon-loot-guide")).toContainText(
     "Dockmaster's Maul",
@@ -242,6 +245,7 @@ test.describe("touch dungeon", () => {
     page.on("pageerror", (e) => errors.push(e.message));
     await seed(page, prepared());
     await accelerated(page);
+    await page.getByRole("button", { name: "Camp services" }).tap();
     await page.locator(".dungeon-preview").scrollIntoViewIfNeeded();
     expect(
       await page.evaluate(
@@ -252,6 +256,7 @@ test.describe("touch dungeon", () => {
       animations: "disabled",
       path: "output/screenshots/deadmines-preview-mobile.png",
     });
+    await page.getByRole("button", { name: "Close dialog", exact: true }).tap();
     await page.getByRole("button", { name: "Begin Dungeon" }).tap();
     await toCheckpoint(page);
     await expect(page.locator(".checkpoint-choice")).toHaveCount(3);

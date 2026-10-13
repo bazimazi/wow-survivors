@@ -109,7 +109,9 @@ export function scrollControllerMenu(root: HTMLElement, amount: number) {
     }
     container = container.parentElement;
   }
-  window.scrollBy(0, amount);
+  const reader = root.querySelector<HTMLElement>(".game-reader");
+  if (reader) reader.scrollTop += amount;
+  else window.scrollBy(0, amount);
 }
 export function renderControllerHelp() {
   return `<h3>Play with a controller</h3><p class="modal-intro">Connect a controller and press a button, then release it. Standard layouts use the positions below, with Xbox / PlayStation labels.</p><p id="controller-status" class="controller-status" role="status"></p><div class="control-list controller-control-list"><div><kbd>LEFT STICK / D-PAD</kbd><span>Move / navigate menus</span></div>${CONTROLLER_BINDINGS.map((b) => `<div><kbd>${b.label}</kbd><span>${b.description}</span></div>`).join("")}<div><kbd>LT / RT · L2 / R2</kbd><span>Previous / next menu control</span></div><div><kbd>RIGHT STICK</kbd><span>Scroll menus and reviews</span></div></div><p class="modal-intro">In menus, left/right changes a focused selector. Release controls between screens. Disconnecting pauses combat; reconnect and resume when ready.</p>`;

@@ -93,7 +93,7 @@ test("all 35 creature crops render six distinct padded frames for every combat s
   await setup(page);
   const result = await page.evaluate(async () => {
     const { CREATURE_ART } = await import("/src/creature-animation.ts");
-    const { creatureCrop, createAnimationFrame } =
+    const { creatureCrop, createAnimationFrame, FRAME_SIZE } =
       await import("/src/animation-canvas.ts");
     const { combatFrame, COMBAT_STYLES } =
       await import("/src/combat-animation.ts");
@@ -149,18 +149,24 @@ test("all 35 creature crops render six distinct padded frames for every combat s
             );
             const data = frame
               .getContext("2d")!
-              .getImageData(0, 0, 144, 144).data;
+              .getImageData(0, 0, FRAME_SIZE, FRAME_SIZE).data;
             frames.push(data);
             let hash = 2166136261,
               pixels = 0;
             for (let offset = 0; offset < data.length; offset++)
               hash = Math.imul(hash ^ data[offset], 16777619);
             hashes.push(hash);
-            for (let y = 0; y < 144; y++)
-              for (let x = 0; x < 144; x++)
-                if (data[(y * 144 + x) * 4 + 3]) {
+            for (let y = 0; y < FRAME_SIZE; y++)
+              for (let x = 0; x < FRAME_SIZE; x++)
+                if (data[(y * FRAME_SIZE + x) * 4 + 3]) {
                   pixels++;
-                  if (x < 2 || y < 2 || x >= 142 || y >= 142) edgeAlpha++;
+                  if (
+                    x < 2 ||
+                    y < 2 ||
+                    x >= FRAME_SIZE - 2 ||
+                    y >= FRAME_SIZE - 2
+                  )
+                    edgeAlpha++;
                 }
             visible = Math.min(visible, pixels);
             c.drawImage(frame, 150 + pose * 116, 40 + row * 134, 116, 116);
@@ -652,7 +658,11 @@ test("missing atlases and code-drawn Mr. Smite retain attack gestures, movement,
       r.render();
       poses.push(r.creaturePose(e, 44).frame);
     }
-    return { poses, cache: r.creatureCache.size, x: g.player.x };
+    return {
+      poses,
+      cache: r.creatureCache.size,
+      x: g.player.x,
+    };
   });
   expect(fallbacks.poses.every((frame) => frame >= 14)).toBe(true);
   expect(fallbacks.cache).toBe(0);
@@ -725,7 +735,9 @@ test("native combat with 400 enemies warms boss gestures fairly and preserves st
         pickups: g.pickups,
         bossState: g.bossState,
       });
-    const times = [];
+    const times = [],
+      liveBossPoses = new Set<string>();
+    let maxLiveRigs = 0;
     let readOnly = true,
       maxCreatureBuilt = 0,
       maxHeroBuilt = 0,
@@ -752,13 +764,18 @@ test("native combat with 400 enemies warms boss gestures fairly and preserves st
       readOnly &&= before === snapshot();
       maxCreatureBuilt = Math.max(maxCreatureBuilt, creatureBuilt);
       maxHeroBuilt = Math.max(maxHeroBuilt, heroBuilt);
+      maxLiveRigs = Math.max(maxLiveRigs, r.liveSkinDraws);
+      for (const e of g.enemies.filter((actor: any) => actor.boss)) {
+        const skin = r.liveSkins.get(e);
+        if (skin?.image.width > 0) liveBossPoses.add(`${e.id}:${skin.pose}`);
+      }
       maxCache = Math.max(maxCache, r.creatureCache.size);
       maxPending = Math.max(maxPending, r.creatureCache.pendingSize);
       cachedBossFrames = Math.max(
         cachedBossFrames,
         [...r.creatureCache.frames.frames.keys()].filter(
           (key: string) =>
-            key.includes(":heavy:") && Number(key.split(":").at(-1)) >= 8,
+            Number(key.match(/:heavy:(\d+)(?::gait:\d+)?$/)?.[1]) >= 8,
         ).length,
       );
       projectiles = Math.max(
@@ -778,6 +795,8 @@ test("native combat with 400 enemies warms boss gestures fairly and preserves st
       maxCache,
       maxPending,
       priorityBuilt,
+      liveBossPoses: liveBossPoses.size,
+      maxLiveRigs,
       cachedBossFrames,
       projectiles,
       averageMs: times.reduce((a, b) => a + b, 0) / times.length,
@@ -791,8 +810,11 @@ test("native combat with 400 enemies warms boss gestures fairly and preserves st
   expect(report.maxHeroBuilt).toBeLessThanOrEqual(2);
   expect(report.maxCache).toBeLessThanOrEqual(128);
   expect(report.maxPending).toBeLessThanOrEqual(128);
-  expect(report.priorityBuilt).toBeGreaterThan(0);
-  expect(report.cachedBossFrames).toBeGreaterThanOrEqual(4);
+  expect(report.priorityBuilt + report.liveBossPoses).toBeGreaterThan(0);
+  expect(report.cachedBossFrames + report.liveBossPoses).toBeGreaterThanOrEqual(
+    4,
+  );
+  expect(report.maxLiveRigs).toBeLessThanOrEqual(6);
   expect(report.projectiles).toBeGreaterThan(0);
   expect(report.averageMs).toBeGreaterThan(0);
   expect(report.averageMs).toBeLessThan(35);

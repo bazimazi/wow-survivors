@@ -119,6 +119,15 @@ test("all combat texture rigs retain braced feet, bounded finite geometry and no
 });
 
 test("gesture classification follows actual spell identities and all nine class abilities", () => {
+  assert.equal(
+    combatStyle({
+      actor: { x: 0, y: 0 },
+      time: 0,
+      facing: 0,
+      spellKind: "projectile",
+    }),
+    "shoot",
+  );
   const cue = (id: string): CombatAction => ({
     actor: { x: 0, y: 0 },
     time: 0,
@@ -133,6 +142,8 @@ test("gesture classification follows actual spell identities and all nine class 
     "rend",
     "rupture",
     "beast",
+    "whirlwind",
+    "flurry",
   ])
     assert.equal(combatStyle(cue(id)), "strike", id);
   for (const id of ["shot", "multishot", "serpentsting", "throw", "volley"])

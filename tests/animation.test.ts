@@ -44,6 +44,29 @@ test("different frame rates and actor identities preserve distance-based gait ti
   assert.equal(a.sample(actor, { x: 28, y: 14 }, 0.24).mirror, false);
 });
 
+test("painted locomotion eases into a stride and settles without advancing planted feet", () => {
+  const a = new ActorAnimator(),
+    actor = {};
+  a.sample(actor, { x: 0, y: 0 }, 0);
+  const start = a.sample(actor, { x: 3, y: 0 }, 1 / 60);
+  assert.ok(start.strideWeight! > 0 && start.strideWeight! < 0.5);
+  const running = a.sample(actor, { x: 12, y: 0 }, 0.1);
+  assert.ok(running.strideWeight! > start.strideWeight!);
+  const stop = a.sample(actor, { x: 12, y: 0 }, 0.12);
+  assert.equal(stop.frame, -1);
+  assert.equal(stop.settleFrame, running.frame);
+  assert.equal(stop.phase, running.phase);
+  assert.ok(
+    stop.strideWeight! > 0 && stop.strideWeight! < running.strideWeight!,
+  );
+  assert.deepEqual(a.sample(actor, { x: 12, y: 0 }, 2, { frozen: true }), stop);
+  a.sample(actor, { x: 12, y: 0 }, 2.24);
+  const settled = a.sample(actor, { x: 12, y: 0 }, 2.26);
+  assert.equal(settled.strideWeight, 0);
+  assert.equal(settled.settleFrame, undefined);
+  assert.equal(settled.phase, stop.phase);
+});
+
 test("paused and frozen poses hold through repeated renders and resume from their retained phase", () => {
   const a = new ActorAnimator(),
     actor = {};

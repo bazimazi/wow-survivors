@@ -36,7 +36,7 @@ async function setup(page: Page, hero: ClassId = "mage", manual = true) {
     expect(body).toContain(marker);
     let routed = body.replace(
       marker,
-      `${marker}\nwindow.__combatGame=game;window.__combatRenderer=renderer;`,
+      `${marker}\nwindow.__combatGame=game;window.__combatRenderer=renderer;const observeDraw=renderer.ctx.drawImage.bind(renderer.ctx);renderer.ctx.drawImage=(...args)=>{if(args[0] instanceof HTMLCanvasElement && args[0].dataset.heroMotion)window.__motionSeen=true;return observeDraw(...args);};`,
     );
     if (manual) routed = routed.replaceAll("requestAnimationFrame(frame);", "");
     await route.fulfill({ response, body: routed });
@@ -91,7 +91,7 @@ test("all hero, companion and Bear Form crops render six distinct native poses f
 }) => {
   await setup(page);
   const result = await page.evaluate(async () => {
-    const { heroCrop, createAnimationFrame } =
+    const { heroCrop, createAnimationFrame, FRAME_SIZE } =
       await import("/src/animation-canvas.ts");
     const { combatFrame, COMBAT_STYLES } =
       await import("/src/combat-animation.ts");
@@ -162,18 +162,24 @@ test("all hero, companion and Bear Form crops render six distinct native poses f
           );
           const data = frame
             .getContext("2d")!
-            .getImageData(0, 0, 144, 144).data;
+            .getImageData(0, 0, FRAME_SIZE, FRAME_SIZE).data;
           frames.push(data);
           let hash = 2166136261,
             pixels = 0;
           for (let offset = 0; offset < data.length; offset++)
             hash = Math.imul(hash ^ data[offset], 16777619);
           hashes.push(hash);
-          for (let y = 0; y < 144; y++)
-            for (let x = 0; x < 144; x++) {
-              if (data[(y * 144 + x) * 4 + 3]) {
+          for (let y = 0; y < FRAME_SIZE; y++)
+            for (let x = 0; x < FRAME_SIZE; x++) {
+              if (data[(y * FRAME_SIZE + x) * 4 + 3]) {
                 pixels++;
-                if (x < 2 || y < 2 || x >= 142 || y >= 142) edgeAlpha++;
+                if (
+                  x < 2 ||
+                  y < 2 ||
+                  x >= FRAME_SIZE - 2 ||
+                  y >= FRAME_SIZE - 2
+                )
+                  edgeAlpha++;
               }
             }
           visible = Math.min(visible, pixels);
@@ -183,8 +189,8 @@ test("all hero, companion and Bear Form crops render six distinct native poses f
         }
         let upperChanged = 0;
         for (let y = 0; y < 95; y++)
-          for (let x = 0; x < 144; x++) {
-            const offset = (y * 144 + x) * 4;
+          for (let x = 0; x < FRAME_SIZE; x++) {
+            const offset = (y * FRAME_SIZE + x) * 4;
             if (
               frames[1]
                 .slice(offset, offset + 4)
@@ -396,7 +402,7 @@ test("simultaneous accepted spells finish one gesture and accepted abilities int
   expect(result.afterwards).toEqual(result.ability);
 });
 
-test("real wolf bites, imp/totem projectiles and Bear Form animate their own actor objects", async ({
+test("real wolf bites, imp/totem projectiles and Cat Form attacks animate their own actor objects", async ({
   page,
 }) => {
   await setup(page, "druid");
@@ -432,7 +438,7 @@ test("real wolf bites, imp/totem projectiles and Bear Form animate their own act
       reports,
       accepted,
       bear: r.characterPose(g.player),
-      cacheKeys: [...r.frameCache.frames.keys()],
+      bearSkin: r.liveSkins.get(g.player)?.key,
     };
   });
   for (const row of result.reports) {
@@ -445,12 +451,8 @@ test("real wolf bites, imp/totem projectiles and Bear Form animate their own act
   }
   expect(result.accepted).toBe(true);
   expect(result.bear.frame).toBeGreaterThanOrEqual(14);
-  expect(
-    result.cacheKeys.some(
-      (key: string) =>
-        key.includes("companions.png") && /:quadruped:1[4-9]$/.test(key),
-    ),
-  ).toBe(true);
+  expect(result.bearSkin).toContain("druid-forms.png");
+  expect(result.bearSkin).toContain(":quadruped");
 });
 
 test("disabled motion and live reduced motion discard combat gestures while casts still resolve", async ({
@@ -618,6 +620,8 @@ test("native moving combat with 400 enemies preserves gameplay/RNG and both cons
       maxHeroBuilt,
       maxCreatureBuilt,
       heroCache: r.frameCache.size,
+      painted: r.liveSkins.has(g.player) || !!(window as any).__motionSeen,
+      liveRigCount: r.liveSkinDraws,
       creatureCache: r.creatureCache.size,
       pending: r.creatureCache.pendingSize,
       averageMs: times.reduce((a, b) => a + b, 0) / times.length,
@@ -633,7 +637,8 @@ test("native moving combat with 400 enemies preserves gameplay/RNG and both cons
   expect(report.combatFrames).toBeGreaterThan(50);
   expect(report.maxHeroBuilt).toBeLessThanOrEqual(2);
   expect(report.maxCreatureBuilt).toBeLessThanOrEqual(1);
-  expect(report.heroCache).toBeGreaterThan(8);
+  expect(report.painted).toBe(true);
+  expect(report.liveRigCount).toBeLessThanOrEqual(6);
   expect(report.heroCache).toBeLessThanOrEqual(192);
   expect(report.creatureCache).toBeLessThanOrEqual(128);
   expect(report.pending).toBeLessThanOrEqual(128);

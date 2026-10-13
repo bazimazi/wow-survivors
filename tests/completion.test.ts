@@ -745,3 +745,34 @@ test("secondary orbit hits use their actual blade positions and Shaman totems un
   assert.equal(shaman.partner!.pet?.spellId, "totem");
   assert.ok(shaman.partner!.spells.some((spell) => spell.id === "totem"));
 });
+
+test("partner spell and companion upgrades retain rank speed and named talent bonuses", () => {
+  const g = engine("warrior", "mage"),
+    buddy = g.partner!;
+  g.level = 17;
+  g.enemies = [enemy()];
+  buddy.stats.haste = 20;
+  buddy.config.spellBonuses = { frostbolt: { haste: 30 } };
+  buddy.spells[0].timer = 0;
+  g.update(1 / 60);
+  assert.equal(buddy.spells[0].rank, 5);
+  assert.ok(
+    Math.abs(buddy.spells[0].timer - (SPELLS.frostbolt.cooldown * 0.64) / 1.5) <
+      1e-9,
+  );
+
+  const warlock = engine("warrior", "warlock"),
+    partner = warlock.partner!;
+  warlock.level = 17;
+  warlock.enemies = [enemy()];
+  partner.stats.haste = 20;
+  partner.config.spellBonuses = { imp: { haste: 30, projectiles: 2 } };
+  const imp = partner.spells.find((s) => s.id === "imp")!;
+  imp.timer = 0;
+  warlock.update(1 / 60);
+  assert.equal(
+    warlock.projectiles.filter((p) => p.spellId === "imp").length,
+    3,
+  );
+  assert.ok(Math.abs(imp.timer - (SPELLS.imp.cooldown * 0.6) / 1.5) < 1e-9);
+});

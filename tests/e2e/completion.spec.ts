@@ -429,9 +429,10 @@ test("local co-op separates keyboard movement, holds during pause, revives allie
   expect((await saved(page)).totals.runs).toBe(1);
 });
 
-test("every back-facing hero has visible, transparent, distinct native Canvas animation frames", async ({
+test("every fallback back-facing hero has visible, transparent, distinct native Canvas animation frames", async ({
   page,
 }) => {
+  await page.route(/\/art\/[a-z]+-motion\.webp$/, (route) => route.abort());
   await field(page);
   await begin(page);
   const result = await page.evaluate(async () => {
@@ -511,22 +512,30 @@ test("every back-facing hero has visible, transparent, distinct native Canvas an
   );
   const directions = await page.evaluate(() => {
     const g = (window as any).__completionGame,
-      r = (window as any).__completionRenderer,
-      original = r.sprite.bind(r),
-      sources: string[] = [];
+      r = (window as any).__completionRenderer;
+    r.animation = false;
+    const paths: string[] = [],
+      original = r.sprite.bind(r);
     r.sprite = (atlas: HTMLImageElement, ...args: any[]) => {
-      if (atlas.src.includes("hero")) sources.push(atlas.src);
+      if (atlas === r.heroAtlas || atlas === r.heroBackAtlas)
+        paths.push(atlas.src);
       return original(atlas, ...args);
     };
-    r.motionEnabled = false;
     g.player.facing = -Math.PI / 2;
     r.render();
+    const back = r.canvas.toDataURL(),
+      backPath = paths.at(-1);
     g.player.facing = Math.PI / 2;
     r.render();
-    return sources;
+    return {
+      different: back !== r.canvas.toDataURL(),
+      backPath,
+      frontPath: paths.at(-1),
+    };
   });
-  expect(directions.some((url) => url.endsWith("hero-backs.png"))).toBe(true);
-  expect(directions.some((url) => url.endsWith("hero-sprites.png"))).toBe(true);
+  expect(directions.different).toBe(true);
+  expect(directions.backPath).toContain("hero-backs.png");
+  expect(directions.frontPath).toContain("hero-sprites.png");
 });
 
 test("party collection and phone movement stay usable, and choosing the partner as leader returns to solo", async ({

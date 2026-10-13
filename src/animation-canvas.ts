@@ -1,9 +1,10 @@
-import { deformVertex } from "./animation";
+import { paintedVertex } from "./painted-rig";
+import type { PaintedProfile } from "./painted-rig";
 import type { AnimationRig } from "./animation";
 import type { CreatureAtlas } from "./creature-animation";
 
 export const FRAME_CONTENT = 128;
-export const FRAME_PADDING = 8;
+export const FRAME_PADDING = 16;
 export const FRAME_SIZE = FRAME_CONTENT + FRAME_PADDING * 2;
 export interface SpriteCrop {
   x: number;
@@ -11,6 +12,18 @@ export interface SpriteCrop {
   width: number;
   height: number;
   cutout?: { x: number; y: number; width: number; height: number };
+}
+const sources = new WeakMap<HTMLImageElement, Map<string, HTMLCanvasElement>>();
+const occupiedCells = new WeakMap<HTMLCanvasElement, Map<string, Uint8Array>>();
+export interface PaintedBlend {
+  nextFrame?: number;
+  mix: number;
+  gaitNext?: number;
+  gaitMix: number;
+  strideWeight: number;
+  restFrame: number;
+  restNext: number;
+  restMix: number;
 }
 
 /** Original atlas measurements shared by neutral sprites and their deformed frames. */
@@ -127,44 +140,115 @@ export function backHeroCrop(
   };
 }
 
-/** Rasterize an authored texture rig once; the game then draws a single cached image. */
+/** Rasterize the painted texture joints into a cached or reusable animation surface. */
 export function createAnimationFrame(
   atlas: HTMLImageElement,
   crop: SpriteCrop,
   rig: AnimationRig,
   frame: number,
+  gaitFrame?: number,
+  profile?: PaintedProfile,
+  back = false,
+  blend?: PaintedBlend,
+  target?: HTMLCanvasElement,
 ) {
-  const source = document.createElement("canvas"),
-    output = document.createElement("canvas");
-  source.width = source.height = output.width = output.height = FRAME_SIZE;
-  source
-    .getContext("2d")!
-    .drawImage(
-      atlas,
-      crop.x,
-      crop.y,
-      crop.width,
-      crop.height,
-      FRAME_PADDING,
-      FRAME_PADDING,
-      FRAME_CONTENT,
-      FRAME_CONTENT,
-    );
-  const c = output.getContext("2d")!;
-  if (crop.cutout) {
-    const mask = crop.cutout;
+  const key = `${crop.x}:${crop.y}:${crop.width}:${crop.height}:${JSON.stringify(crop.cutout)}`;
+  let crops = sources.get(atlas);
+  if (!crops) {
+    crops = new Map();
+    sources.set(atlas, crops);
+  }
+  let source = crops.get(key);
+  if (!source) {
+    source = document.createElement("canvas");
+    source.width = source.height = FRAME_SIZE;
     source
       .getContext("2d")!
-      .clearRect(
-        FRAME_PADDING + mask.x * FRAME_CONTENT,
-        FRAME_PADDING + mask.y * FRAME_CONTENT,
-        mask.width * FRAME_CONTENT,
-        mask.height * FRAME_CONTENT,
+      .drawImage(
+        atlas,
+        crop.x,
+        crop.y,
+        crop.width,
+        crop.height,
+        FRAME_PADDING,
+        FRAME_PADDING,
+        FRAME_CONTENT,
+        FRAME_CONTENT,
       );
+    if (crop.cutout) {
+      const mask = crop.cutout;
+      source
+        .getContext("2d")!
+        .clearRect(
+          FRAME_PADDING + mask.x * FRAME_CONTENT,
+          FRAME_PADDING + mask.y * FRAME_CONTENT,
+          mask.width * FRAME_CONTENT,
+          mask.height * FRAME_CONTENT,
+        );
+    }
+    // Crop textures are shared by every pose, including front/back and mounted riders.
+    if (crops.size >= 32) {
+      const oldest = crops.keys().next().value!;
+      const retired = crops.get(oldest)!;
+      crops.delete(oldest);
+      retired.width = retired.height = 0;
+    }
+    crops.set(key, source);
   }
+  const output = target || document.createElement("canvas");
+  if (output.width !== FRAME_SIZE || output.height !== FRAME_SIZE)
+    output.width = output.height = FRAME_SIZE;
+  const c = output.getContext("2d")!;
+  c.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE);
   c.imageSmoothingEnabled = true;
-  const columns = 8,
-    rows = 12;
+  const detailed =
+    !blend ||
+    [
+      "warrior",
+      "mage",
+      "rogue",
+      "hunter",
+      "paladin",
+      "priest",
+      "shaman",
+      "warlock",
+      "druid",
+    ].includes(profile || "");
+  const columns = detailed ? 8 : 6,
+    rows = detailed ? 12 : 10;
+  const grid = `${columns}:${rows}`;
+  let masks = occupiedCells.get(source);
+  if (!masks) {
+    masks = new Map();
+    occupiedCells.set(source, masks);
+  }
+  let occupied = masks.get(grid);
+  if (!occupied) {
+    // Empty texture cells have no pixels to skin. Include a one-pixel margin
+    // so antialiased outlines and triangle overlap retain every painted edge.
+    const pixels = source
+      .getContext("2d")!
+      .getImageData(0, 0, FRAME_SIZE, FRAME_SIZE).data;
+    occupied = new Uint8Array(columns * rows);
+    for (let row = 0; row < rows; row++)
+      for (let column = 0; column < columns; column++) {
+        const x0 =
+          Math.floor(FRAME_PADDING + (column * FRAME_CONTENT) / columns) - 1;
+        const x1 =
+          Math.ceil(FRAME_PADDING + ((column + 1) * FRAME_CONTENT) / columns) +
+          1;
+        const y0 = Math.floor(FRAME_PADDING + (row * FRAME_CONTENT) / rows) - 1;
+        const y1 =
+          Math.ceil(FRAME_PADDING + ((row + 1) * FRAME_CONTENT) / rows) + 1;
+        scan: for (let y = y0; y <= y1; y++)
+          for (let x = x0; x <= x1; x++)
+            if (pixels[(y * FRAME_SIZE + x) * 4 + 3]) {
+              occupied[row * columns + column] = 1;
+              break scan;
+            }
+      }
+    masks.set(grid, occupied);
+  }
   const point = (x: number, y: number) => ({
     x: FRAME_PADDING + x * FRAME_CONTENT,
     y: FRAME_PADDING + y * FRAME_CONTENT,
@@ -208,19 +292,53 @@ export function createAnimationFrame(
     c.drawImage(source, 0, 0);
     c.restore();
   };
+  // Evaluate a joint only once per vertex; adjacent triangles share the same result.
+  const vertices = Array.from({ length: rows + 1 }, (_, row) =>
+    Array.from({ length: columns + 1 }, (_, column) => {
+      const x = column / columns,
+        y = row / rows;
+      const sample = (at: number, next?: number, mix = 0) => {
+        const v = paintedVertex(x, y, rig, at, profile, back);
+        if (next !== undefined && next !== at && mix > 0) {
+          const other = paintedVertex(x, y, rig, next, profile, back);
+          v.x += (other.x - v.x) * mix;
+          v.y += (other.y - v.y) * mix;
+        }
+        return v;
+      };
+      const v = sample(frame, blend?.nextFrame, blend?.mix);
+      if (blend && frame < 8 && blend.strideWeight < 1) {
+        const rest = sample(blend.restFrame, blend.restNext, blend.restMix);
+        v.x = rest.x + (v.x - rest.x) * blend.strideWeight;
+        v.y = rest.y + (v.y - rest.y) * blend.strideWeight;
+      }
+      if (
+        gaitFrame !== undefined &&
+        gaitFrame >= 0 &&
+        frame >= 8 &&
+        frame < 26
+      ) {
+        const gait = sample(gaitFrame, blend?.gaitNext, blend?.gaitMix);
+        const lower = Math.max(0, Math.min(1, (y - 0.45) / 0.4));
+        const weight =
+          lower * lower * (3 - 2 * lower) * (blend?.strideWeight ?? 1);
+        v.x += (gait.x - x) * weight;
+        v.y += (gait.y - y) * weight;
+      }
+      return { original: point(x, y), warped: point(v.x, v.y) };
+    }),
+  );
   for (let row = 0; row < rows; row++)
     for (let column = 0; column < columns; column++) {
-      const coords = [
-        [column / columns, row / rows],
-        [(column + 1) / columns, row / rows],
-        [(column + 1) / columns, (row + 1) / rows],
-        [column / columns, (row + 1) / rows],
+      if (!occupied[row * columns + column]) continue;
+      const corners = [
+        vertices[row][column],
+        vertices[row][column + 1],
+        vertices[row + 1][column + 1],
+        vertices[row + 1][column],
       ];
-      const original = coords.map(([x, y]) => point(x, y));
-      const warped = coords.map(([x, y]) => {
-        const v = deformVertex(x, y, rig, frame);
-        return point(v.x, v.y);
-      });
+      const original = corners.map((v) => v.original),
+        warped = corners.map((v) => v.warped);
       triangle(
         [original[0], original[1], original[2]],
         [warped[0], warped[1], warped[2]],

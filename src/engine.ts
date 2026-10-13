@@ -1,3 +1,6 @@
+import { encounterBeat } from "./encounter-director";
+import { BattleArtState, segmentDistance } from "./battle-arts";
+import type { ArtWorld } from "./battle-arts";
 import {
   CLASS_KITS,
   createClassState,
@@ -119,8 +122,12 @@ export interface PeriodicEffect {
   ramp?: boolean;
 }
 export interface Projectile extends Vec {
+  battleArt?: ClassId;
+  charged?: boolean;
   classId?: ClassId;
   spellId?: string;
+  /** Rank at release; existing effects retain their form after an upgrade. */
+  spellRank?: number;
   vx: number;
   vy: number;
   damage: number;
@@ -140,6 +147,8 @@ export interface Pickup extends Vec {
 }
 export interface Area extends Vec {
   spellId?: string;
+  /** Rank at release; existing effects retain their form after an upgrade. */
+  spellRank?: number;
   radius: number;
   damage: number;
   color: string;
@@ -149,9 +158,13 @@ export interface Area extends Vec {
   slow: number;
 }
 export interface Effect extends Vec {
+  battleArt?: ClassId;
   kind: "ring" | "line" | "burst" | "class";
+  spellId?: string;
+  /** Rank at release; existing effects retain their form after an upgrade. */
+  spellRank?: number;
   classId?: ClassId;
-  motif?: "cast" | "signature" | "dash";
+  motif?: "cast" | "signature" | "dash" | "evolution";
   facing?: number;
   color: string;
   radius: number;
@@ -217,7 +230,9 @@ export type GameEvent = {
     | "discovery"
     | "encounter"
     | "shrine"
-    | "checkpoint";
+    | "checkpoint"
+    | "horde"
+    | "surge";
   classId?: ClassId;
   message?: string;
   amount?: number;
@@ -225,12 +240,23 @@ export type GameEvent = {
 };
 /** Accepted actions for optional presentation; references are never stored by the engine. */
 export interface CombatAction {
+  battleArt?: ClassId;
   actor: Vec;
   time: number;
   facing: number;
   spellId?: string;
+  spellRank?: number;
   spellKind?: SpellDef["kind"];
   ability?: ClassId;
+}
+export interface ImpactAction {
+  battleArt?: ClassId;
+  actor: Enemy | GameEngine["player"];
+  time: number;
+  facing: number;
+  damage: number;
+  critical: boolean;
+  source: string;
 }
 /** Accepted enemy actions for optional renderer observation. */
 export interface EnemyAction {
@@ -252,6 +278,7 @@ export type DeathAction =
     };
 export interface EngineConfig {
   classCombat?: boolean;
+  pacedEncounters?: boolean;
   adventure?: { difficulty: Difficulty; oath: string; relic: string };
   partner?: PartnerConfig;
   classId: ClassId;
@@ -273,6 +300,7 @@ export interface EngineConfig {
   travelId?: string;
   onEvent?: (event: GameEvent) => void;
   onAction?: (action: CombatAction) => void;
+  onImpact?: (action: ImpactAction) => void;
   onEnemyAction?: (action: EnemyAction) => void;
   onDeath?: (action: DeathAction) => void;
   onConsume?: (type: "potions" | "bombs") => boolean;
@@ -363,6 +391,51 @@ class SpatialGrid {
 }
 
 export class GameEngine {
+  readonly battleArt = new BattleArtState();
+  private artWorld(): ArtWorld {
+    return {
+      id: this.classDef.id,
+      player: this.player,
+      time: this.time,
+      power: this.stats.power + Math.max(0, this.level - 1) * 8,
+      enemies: this.enemies,
+      projectiles: this.projectiles,
+      bounds: this.movementBounds,
+      allowed:
+        this.player.hp > 0 &&
+        !this.paused &&
+        !this.choosing &&
+        !this.shrineChoice &&
+        !this.checkpoint &&
+        !this.ended,
+      damage: (enemy, damage, spell) =>
+        this.damageEnemy(
+          enemy,
+          damage,
+          spell,
+          true,
+          undefined,
+          this.classDef.id,
+        ),
+      effect: (effect) => this.addEffect(effect),
+      action: (action) => {
+        this.player.kit.motionAt = this.time;
+        this.player.kit.motionFacing = action.facing;
+        this.config.onAction?.(action);
+      },
+    };
+  }
+  beginBattleArt(): boolean {
+    const started = this.battleArt.begin(this.artWorld());
+    if (started) this.stopTravel();
+    return started;
+  }
+  releaseBattleArt(): boolean {
+    return this.battleArt.release(this.artWorld());
+  }
+  get pacedEncounters() {
+    return !!this.config.pacedEncounters;
+  }
   keystones: KeystoneId[] = [];
   rerolls = 2;
   streak = 0;
@@ -461,6 +534,9 @@ export class GameEngine {
   lastDungeonReward: string | null = null;
   private id = 0;
   private spawnTimer = 0.8;
+  private directorWave = 0;
+  private warnedWave = -1;
+  pickupSurgeUntil = 0;
   private eliteCount = 0;
   private waveCount = 0;
   private grid = new SpatialGrid();
@@ -941,20 +1017,24 @@ export class GameEngine {
                 this.spellDamage(def, state.rank),
                 def.id,
               );
-            else this.shoot(pet, target, def, state.rank, 0);
+            else {
+              const count =
+                1 + (this.config.spellBonuses?.[def.id]?.projectiles || 0);
+              for (let i = 0; i < count; i++)
+                this.shoot(
+                  pet,
+                  target,
+                  def,
+                  state.rank,
+                  (i - (count - 1) / 2) * 0.12,
+                );
+            }
             this.action(pet, target, def);
-            state.timer = def.cooldown;
+            state.timer = this.spellCooldown(def, state.rank, true);
           }
         } else
           state.timer = this.castSpell(def, state.rank)
-            ? (def.cooldown *
-                (this.config.classCombat &&
-                this.classDef.id === "druid" &&
-                p.kit.form === "cat" &&
-                def.id === this.classDef.spells[0]
-                  ? 0.55
-                  : 1)) /
-              (1 + buddy.stats.haste / 100)
+            ? this.spellCooldown(def, state.rank)
             : 0.12;
         if (this.ended || this.checkpoint) break;
       }
@@ -1098,18 +1178,28 @@ export class GameEngine {
       const facing = target
         ? Math.atan2(target.y - actor.y, target.x - actor.x)
         : this.player.facing;
-      if (!ability)
-        this.classWorld().visual(
-          actor,
-          spell?.kind === "melee" ? 95 : 45,
-          "cast",
-          facing,
-        );
+      if (!ability && !spell)
+        this.classWorld().visual(actor, 45, "cast", facing);
       if (actor === this.player) {
         this.player.kit.motionAt = this.time;
         this.player.kit.motionFacing = facing;
       }
     }
+    if (spell && ["projectile", "pet"].includes(spell.kind))
+      this.addEffect({
+        kind: "ring",
+        spellId: spell.id,
+        spellRank: this.spells.find((state) => state.id === spell.id)?.rank,
+        motif: "cast",
+        x: actor.x,
+        y: actor.y - 20,
+        radius: 28,
+        color: spell.color,
+        facing: target
+          ? Math.atan2(target.y - actor.y, target.x - actor.x)
+          : this.player.facing,
+        life: 0.3,
+      });
     this.config.onAction?.({
       actor,
       time: this.time,
@@ -1117,6 +1207,8 @@ export class GameEngine {
         ? Math.atan2(target.y - actor.y, target.x - actor.x)
         : this.player.facing,
       spellId: spell?.id,
+      spellRank:
+        spell && this.spells.find((state) => state.id === spell.id)?.rank,
       spellKind: spell?.kind,
       ability,
     });
@@ -1266,6 +1358,7 @@ export class GameEngine {
       return true;
     }
     if (this.travelRestriction) return false;
+    this.battleArt.cancel();
     this.travel.channel =
       this.travelOption!.kind === "form"
         ? TRAVEL_RULES.formSummon
@@ -1341,6 +1434,7 @@ export class GameEngine {
       );
     const speed =
       this.classDef.speed *
+      (this.battleArt.charging ? 0.55 : 1) *
       (1 + this.stats.speed / 100) *
       (this.travel.active ? 1 + this.travelOption!.speed / 100 : 1) *
       (this.config.classCombat ? classSpeed(this.classDef.id, p.kit) : 1) *
@@ -1365,9 +1459,45 @@ export class GameEngine {
     );
     if ((this.input.x || this.input.y) && p.dashTimer <= 0)
       p.facing = Math.atan2(this.input.y, this.input.x);
+    this.battleArt.update(this.artWorld(), dt);
 
     if (this.config.classCombat)
       updateClass(this.classWorld(), dt, !!(this.input.x || this.input.y));
+    const beat = encounterBeat(this.time, this.zone.duration);
+    const directed = this.config.pacedEncounters && !this.dungeonStage;
+    if (
+      directed &&
+      !this.boss &&
+      beat.warning &&
+      this.warnedWave !== beat.wave
+    ) {
+      this.warnedWave = beat.wave;
+      this.emit({
+        type: "horde",
+        message: `Horde approaching from the ${beat.direction.toLowerCase()}. Make room to escape.`,
+      });
+    }
+    if (
+      directed &&
+      !this.boss &&
+      this.time < this.zone.duration &&
+      beat.wave > this.directorWave
+    ) {
+      this.directorWave = beat.wave;
+      const count = Math.min(30, 8 + beat.wave * 3 + (this.partner ? 5 : 0));
+      const angle = (((beat.wave - 1) % 4) * Math.PI) / 2;
+      for (let i = 0; i < count; i++) {
+        const offset = (i / Math.max(1, count - 1) - 0.5) * 1.4;
+        this.spawnEnemy(
+          Math.max(
+            430,
+            Math.min(620, Math.hypot(this.width / 2, this.height / 2) * 0.8),
+          ),
+          false,
+          angle + offset,
+        );
+      }
+    }
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0 && !this.boss) {
       const spawnCount = Math.min(
@@ -1377,6 +1507,7 @@ export class GameEngine {
       for (let i = 0; i < spawnCount; i++) this.spawnEnemy();
       this.spawnTimer +=
         Math.max(0.28, 1.05 - this.time / 600) /
+        (directed ? beat.pressure : 1) /
         this.zone.difficulty /
         (this.config.adventure
           ? DIFFICULTIES[this.config.adventure.difficulty].spawn
@@ -1394,7 +1525,7 @@ export class GameEngine {
       });
     }
     const wave = Math.floor(stageTime / 45);
-    if (wave > this.waveCount && !this.boss) {
+    if (!directed && wave > this.waveCount && !this.boss) {
       this.waveCount = wave;
       for (let i = 0; i < 12 + wave * 2; i++)
         this.spawnEnemy(500, false, (i * Math.PI * 2) / (12 + wave * 2));
@@ -1527,7 +1658,7 @@ export class GameEngine {
     }
     this.grid.rebuild(this.enemies);
     for (const state of this.spells) {
-      if (this.travelling || p.hp <= 0) continue;
+      if (this.travelling || p.hp <= 0 || this.battleArt.charging) continue;
       const def = SPELLS[state.id];
       if (def.kind === "orbit") {
         state.orbitTimer -= dt;
@@ -1551,19 +1682,7 @@ export class GameEngine {
         state.timer -= dt;
         if (state.timer <= 0) {
           if (this.castSpell(def, state.rank))
-            state.timer =
-              (def.cooldown *
-                (this.config.classCombat &&
-                this.classDef.id === "druid" &&
-                this.player.kit.form === "cat" &&
-                def.id === this.classDef.spells[0]
-                  ? 0.55
-                  : 1) *
-                Math.max(0.3, 1 - (state.rank - 1) * 0.09)) /
-              (1 +
-                (this.stats.haste +
-                  (this.config.spellBonuses?.[def.id]?.haste || 0)) /
-                  100);
+            state.timer = this.spellCooldown(def, state.rank);
           else state.timer = 0.12;
         }
       }
@@ -1597,13 +1716,7 @@ export class GameEngine {
       pet.y += (dy / len) * step;
       if (!this.travelling) pet.timer -= dt;
       if (pet.timer <= 0 && target) {
-        pet.timer =
-          (def.cooldown /
-            (1 +
-              (this.stats.haste +
-                (this.config.spellBonuses?.[def.id]?.haste || 0)) /
-                100)) *
-          (1 - (state.rank - 1) * 0.1);
+        pet.timer = this.spellCooldown(def, state.rank, true);
         if (pet.spellId === "beast") {
           if (distanceSq(pet, target) < 100 ** 2) {
             this.damageEnemy(target, this.spellDamage(def, state.rank), def.id);
@@ -1640,7 +1753,13 @@ export class GameEngine {
         a.timer = 0.45;
         for (const e of this.grid.near(a, a.radius + 30))
           if (distanceSq(a, e) < (a.radius + e.radius) ** 2) {
-            this.damageEnemy(e, a.damage, a.spellId || "area");
+            this.damageEnemy(
+              e,
+              a.damage,
+              a.spellId || "area",
+              true,
+              a.spellRank,
+            );
             if (a.slow < 1) {
               e.slow = a.slow;
               e.slowUntil = this.time + 1;
@@ -1650,6 +1769,7 @@ export class GameEngine {
     }
     this.areas = this.areas.filter((a) => a.life > 0);
     for (const shot of this.projectiles) {
+      const previous = { x: shot.x, y: shot.y };
       shot.x += shot.vx * dt;
       shot.y += shot.vy * dt;
       shot.life -= dt;
@@ -1665,15 +1785,31 @@ export class GameEngine {
           }
         continue;
       }
-      for (const e of this.grid.near(shot, 45)) {
+      for (const e of this.grid.near(shot, shot.battleArt ? 90 : 45)) {
         if (
           e.dead ||
           shot.hit.has(e.id) ||
-          distanceSq(shot, e) > (e.radius + shot.radius) ** 2
+          (shot.battleArt
+            ? segmentDistance(e, previous, shot) > e.radius + shot.radius
+            : distanceSq(shot, e) > (e.radius + shot.radius) ** 2)
         )
           continue;
-        this.damageEnemy(e, shot.damage, shot.spellId || "projectile");
+        this.damageEnemy(
+          e,
+          shot.damage,
+          shot.spellId || "projectile",
+          true,
+          shot.spellRank,
+          shot.battleArt,
+        );
         shot.hit.add(e.id);
+        if (
+          shot.battleArt &&
+          shot.charged &&
+          !e.boss &&
+          ["mage", "druid"].includes(shot.battleArt)
+        )
+          e.frozenUntil = Math.max(e.frozenUntil, this.time + 0.8);
         if (shot.slow < 1) {
           e.slowUntil = this.time + 2.4;
           e.slow = shot.slow;
@@ -2763,6 +2899,24 @@ export class GameEngine {
       (rank === 5 ? 1.45 : 1)
     );
   }
+  private spellCooldown(def: SpellDef, rank: number, pet = false): number {
+    const form =
+      !pet &&
+      this.classCombat &&
+      this.classDef.id === "druid" &&
+      this.player.kit.form === "cat" &&
+      def.id === this.classDef.spells[0]
+        ? 0.55
+        : 1;
+    return (
+      (def.cooldown *
+        form *
+        Math.max(0.3, 1 - (rank - 1) * (pet ? 0.1 : 0.09))) /
+      (1 +
+        (this.stats.haste + (this.config.spellBonuses?.[def.id]?.haste || 0)) /
+          100)
+    );
+  }
   private castSpell(def: SpellDef, rank: number): boolean {
     if (
       this.classCombat &&
@@ -2802,6 +2956,18 @@ export class GameEngine {
           }
         }
       this.action(this.player, target, { ...def, kind: "melee" });
+      this.addEffect({
+        kind: "ring",
+        spellId: def.id,
+        spellRank: rank,
+        x: this.player.x,
+        y: this.player.y,
+        radius: range,
+        classId: "druid",
+        color: def.color,
+        life: 0.45,
+        facing: Math.atan2(target.y - this.player.y, target.x - this.player.x),
+      });
       this.emit({ type: "cast" });
       return true;
     }
@@ -2840,6 +3006,8 @@ export class GameEngine {
       );
       this.addEffect({
         kind: "ring",
+        spellId: def.id,
+        spellRank: rank,
         x: this.player.x,
         y: this.player.y,
         radius: 55,
@@ -2864,6 +3032,8 @@ export class GameEngine {
       }
       this.addEffect({
         kind: "ring",
+        spellId: def.id,
+        spellRank: rank,
         x: this.player.x,
         y: this.player.y,
         radius: 45,
@@ -2915,6 +3085,8 @@ export class GameEngine {
         (target.dots ||= {})[def.id] = this.periodicEffect(def, damage);
       this.addEffect({
         kind: "ring",
+        spellId: def.id,
+        spellRank: rank,
         x: target.x,
         y: target.y,
         radius: target.radius + 10,
@@ -2930,6 +3102,8 @@ export class GameEngine {
       this.damageEnemy(target, damage, def.id);
       this.addEffect({
         kind: "line",
+        spellId: def.id,
+        spellRank: rank,
         x: this.player.x,
         y: this.player.y,
         end: { x: target.x, y: target.y },
@@ -2964,11 +3138,14 @@ export class GameEngine {
         }
       this.addEffect({
         kind: "ring",
+        spellId: def.id,
+        spellRank: rank,
+        facing: Math.atan2(target.y - this.player.y, target.x - this.player.x),
         x: this.player.x,
         y: this.player.y,
         radius,
         color: def.color,
-        life: 0.38,
+        life: 0.55,
       });
       if (def.id === "holynova")
         this.player.hp = Math.min(this.player.maxHp, this.player.hp + 3 + rank);
@@ -2980,6 +3157,7 @@ export class GameEngine {
           x: pos.x,
           y: pos.y,
           spellId: def.id,
+          spellRank: rank,
           radius: def.range * (1 + (rank - 1) * 0.12) * area,
           damage: damage * 0.45,
           color: def.color,
@@ -3007,6 +3185,8 @@ export class GameEngine {
         hit.add(next.id);
         this.addEffect({
           kind: "line",
+          spellId: def.id,
+          spellRank: rank,
           x: previous.x,
           y: previous.y,
           end: { x: next.x, y: next.y },
@@ -3092,6 +3272,7 @@ export class GameEngine {
     const angle = Math.atan2(target.y - from.y, target.x - from.x) + offset;
     this.projectiles.push({
       spellId: def.id,
+      spellRank: rank,
       ...(this.config.classCombat ? { classId: this.classDef.id } : {}),
       x: from.x,
       y: from.y,
@@ -3130,9 +3311,13 @@ export class GameEngine {
     amount: number,
     source: string,
     canCrit = true,
+    spellRank?: number,
+    battleArt?: ClassId,
   ) {
     if (!this.partnerActing && this.partner?.prepared.includes(source)) {
-      this.withPartner(() => this.damageEnemy(e, amount, source, canCrit));
+      this.withPartner(() =>
+        this.damageEnemy(e, amount, source, canCrit, spellRank, battleArt),
+      );
       return;
     }
     if (e.dead || this.ended || this.checkpoint) return;
@@ -3183,6 +3368,9 @@ export class GameEngine {
       e.hp / e.maxHp < 0.3
     )
       damage *= 1.35;
+    if (this.config.classCombat)
+      damage *= classDamage(this.classWorld(), e, source);
+    // Encounter protection clamps the final damage, including class bonuses.
     if (e.boss && this.zone.id === "scarlet" && this.dungeonStageIndex === 3) {
       if (!this.commanderRevived && e.hp - damage <= e.maxHp / 2) {
         this.commanderRevived = true;
@@ -3198,9 +3386,31 @@ export class GameEngine {
       } else if (this.revivedCommander && !this.revivedCommander.dead)
         damage = Math.min(damage, Math.max(0, e.hp - 1));
     }
-    if (this.config.classCombat)
-      damage *= classDamage(this.classWorld(), e, source);
     const dealt = Math.min(e.hp, damage);
+    if (dealt > 0)
+      this.config.onImpact?.({
+        actor: e,
+        time: this.time,
+        facing: Math.atan2(e.y - this.player.y, e.x - this.player.x),
+        damage: dealt,
+        critical,
+        source,
+        battleArt,
+      });
+    // Reserve capacity for signature effects; impacts do not consume simulation RNG.
+    if (canCrit && dealt > 0 && SPELLS[source] && this.effects.length < 60)
+      this.addEffect({
+        kind: "burst",
+        spellId: source,
+        spellRank:
+          spellRank ?? this.spells.find((state) => state.id === source)?.rank,
+        x: e.x,
+        y: e.y - e.radius * 0.35,
+        radius: battleArt ? 46 : critical ? 35 : 22,
+        color: SPELLS[source].color,
+        life: 0.32,
+        facing: Math.atan2(e.y - this.player.y, e.x - this.player.x),
+      });
     if (weapon && dealt > 0) {
       this.weaponHits[weapon.type] = (this.weaponHits[weapon.type] || 0) + 1;
       if (
@@ -3279,6 +3489,21 @@ export class GameEngine {
         this.streak++;
         this.streakTimer = 5;
         this.peakStreak = Math.max(this.peakStreak, this.streak);
+        if (this.config.pacedEncounters && this.streak % 15 === 0) {
+          this.pickupSurgeUntil = this.time + 2.5;
+          this.addEffect({
+            kind: "ring",
+            x: this.player.x,
+            y: this.player.y,
+            radius: 180,
+            color: "#8ee8d0",
+            life: 0.6,
+          });
+          this.emit({
+            type: "surge",
+            message: `${this.streak} kill streak · Soul surge! Nearby gems are drawn to you.`,
+          });
+        }
         if (
           this.keystones.includes("blood") &&
           this.kills % 5 === 0 &&
@@ -3495,6 +3720,15 @@ export class GameEngine {
       taken -= absorb;
     }
     p.hp -= taken;
+    if (taken > 0)
+      this.config.onImpact?.({
+        actor: p,
+        time: this.time,
+        facing: p.facing + Math.PI,
+        damage: taken,
+        critical: false,
+        source: school,
+      });
     if (this.config.adventure && taken > 0) {
       this.damageTaken += taken;
       this.streak = 0;
@@ -3558,7 +3792,9 @@ export class GameEngine {
             : closest,
         ),
         p = actor.player;
-      const radius = 90 * (1 + actor.stats.magnet / 100),
+      const radius =
+          (this.time < this.pickupSurgeUntil ? 320 : 90) *
+          (1 + actor.stats.magnet / 100),
         dist = Math.sqrt(distanceSq(item, p));
       if (dist < radius && item.kind !== "chest") {
         const move = Math.min(dist, 360 * dt);
@@ -3808,6 +4044,7 @@ export class GameEngine {
       this.player.dashCooldown > 0
     )
       return false;
+    if (!this.partnerActing) this.battleArt.cancel();
     this.player.dashCooldown = Math.max(
       2,
       4 -
@@ -4067,7 +4304,7 @@ export class GameEngine {
         evolution: rank === 5,
         description: current
           ? rank === 5
-            ? `Evolve ${def.name}. Greatly increased ${def.kind === "buff" ? "support bonuses" : def.kind === "heal" ? "healing" : "damage"} and faster casts.`
+            ? `Transform into ${def.evolution}. Greatly increased ${def.kind === "buff" ? "support bonuses" : def.kind === "heal" ? "healing" : "damage"} and faster casts.`
             : `Increase ${def.kind === "buff" ? "support bonuses" : def.kind === "heal" ? "healing" : "damage"} by 30% and reduce cooldown.`
           : def.description,
       });
@@ -4178,8 +4415,23 @@ export class GameEngine {
         (!s && this.spells.length >= 4)
       )
         return false;
-      if (s) s.rank = Math.min(5, s.rank + 1);
-      else if (this.spells.length < 4) this.addSpell(id);
+      if (s) {
+        s.rank = Math.min(5, s.rank + 1);
+        if (s.rank === 5) {
+          const pet = this.pets.find((pet) => pet.spellId === id);
+          this.addEffect({
+            kind: "ring",
+            spellId: id,
+            spellRank: 5,
+            motif: "evolution",
+            x: pet?.x ?? this.player.x,
+            y: pet?.y ?? this.player.y,
+            radius: pet ? 90 : 125,
+            color: SPELLS[id].color,
+            life: 0.95,
+          });
+        }
+      } else if (this.spells.length < 4) this.addSpell(id);
     } else if (choice.stat && choice.value) {
       this.stats[choice.stat] += choice.value;
       if (choice.stat === "health") {

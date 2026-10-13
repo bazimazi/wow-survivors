@@ -46,6 +46,11 @@ function timing(def: SpellDef) {
       ? "Companion attacks automatically"
       : `Casts every ${def.cooldown}s`;
 }
+const summonArt: Readonly<Record<string, string>> = {
+  imp: "/art/infernal.webp",
+  totem: "/art/fire-elemental.webp",
+  beast: "/art/wrath-wolf.webp",
+};
 function spellCard(s: SaveData, id: string) {
   const c = CLASS_MAP[s.selectedClass],
     h = s.heroes[c.id],
@@ -54,7 +59,7 @@ function spellCard(s: SaveData, id: string) {
   const known = c.spells.includes(id) || h.spellbook.learned.includes(id),
     prepared = h.spellbook.prepared.includes(id);
   const restriction = t ? classTechniqueRestriction(s, id) : null;
-  return `<article class="spellbook-card ${prepared ? "prepared" : ""} ${known ? "known" : "unlearned"}" data-spell="${id}" style="--spell-color:${def.color}"><div class="spellbook-card-heading"><span class="spellbook-icon">${icon(def.icon, 28)}</span><div><small>${t ? t.school.toUpperCase() : "CORE ABILITY"} · ${known ? (t ? "LEARNED" : "FREE") : `LEVEL ${t!.level}`}</small><h3>${def.name}</h3></div></div><p>${def.description}</p><div class="spellbook-numbers"><span>${def.kind === "buff" ? "Support" : def.kind === "heal" ? "Healing" : "Damage"}<b>${def.kind === "buff" ? `${def.buff!.duration}s` : def.damage}${def.periodic ? " / tick" : ""}${def.kind === "ground" ? " base" : ""}</b></span><span>${c.resource}<b>${def.cost || 0}</b></span><span>Range<b>${def.range || "Self"}</b></span></div><small class="spellbook-timing">${timing(def)} · base values before power and ranks</small><div class="spellbook-evolution">${icon("spark", 16)} Rank 5: ${def.evolution}</div><div class="spellbook-talents"><small>${t ? `SHARES COMPATIBLE TALENTS WITH ${SPELLS[t.parent].name.toUpperCase()}` : "NAMED TALENT BONUSES"}</small><p>${bonusText(heroSpellBonuses(s)[id])}</p></div>${known ? `<button class="button quiet" data-action="review-prepare" data-id="${id}" ${prepared ? "disabled" : ""}>${prepared ? `${icon("check", 17)} Prepared` : "Prepare for expedition"}</button>` : `<button class="button ${restriction ? "quiet" : "primary"}" data-action="review-technique" data-id="${id}" ${restriction ? "disabled" : ""}>${restriction || `Learn technique · ${t!.gold} G`}</button>`}</article>`;
+  return `<article class="spellbook-card ${prepared ? "prepared" : ""} ${known ? "known" : "unlearned"}" data-spell="${id}" style="--spell-color:${def.color}"><div class="spellbook-card-heading"><span class="spellbook-icon">${icon(def.icon, 28)}</span><div><small>${t ? t.school.toUpperCase() : "CORE ABILITY"} · ${known ? (t ? "LEARNED" : "FREE") : `LEVEL ${t!.level}`}</small><h3>${def.name}</h3></div></div><p>${def.description}</p><div class="spellbook-numbers"><span>${def.kind === "buff" ? "Support" : def.kind === "heal" ? "Healing" : "Damage"}<b>${def.kind === "buff" ? `${def.buff!.duration}s` : def.damage}${def.periodic ? " / tick" : ""}${def.kind === "ground" ? " base" : ""}</b></span><span>${c.resource}<b>${def.cost || 0}</b></span><span>Range<b>${def.range || "Self"}</b></span></div><small class="spellbook-timing">${timing(def)} · base values before power and ranks</small><div class="spellbook-evolution">${summonArt[id] ? `<img class="summon-evolution-portrait" src="${summonArt[id]}" alt="" loading="lazy" />` : icon("spark", 16)}<span>Rank 5: ${def.evolution}</span></div><div class="spellbook-talents"><small>${t ? `SHARES COMPATIBLE TALENTS WITH ${SPELLS[t.parent].name.toUpperCase()}` : "NAMED TALENT BONUSES"}</small><p>${bonusText(heroSpellBonuses(s)[id])}</p></div>${known ? `<button class="button quiet" data-action="review-prepare" data-id="${id}" ${prepared ? "disabled" : ""}>${prepared ? `${icon("check", 17)} Prepared` : "Prepare for expedition"}</button>` : `<button class="button ${restriction ? "quiet" : "primary"}" data-action="review-technique" data-id="${id}" ${restriction ? "disabled" : ""}>${restriction || `Learn technique · ${t!.gold} G`}</button>`}</article>`;
 }
 export function renderSpellbook(s: SaveData) {
   const c = CLASS_MAP[s.selectedClass],

@@ -28,9 +28,13 @@ test("accepted commissions receive real landmark settlement and abandonment asks
   await page.locator('[data-id="timbermaw_survey"]').click();
   await expect(page.locator(".active-commission")).toContainText("0 / 3");
   await page.getByRole("button", { name: "Prepare in Elwynn Forest" }).click();
+  await page
+    .getByRole("button", { name: "Camp services", exact: true })
+    .click();
   await expect(page.locator(".camp-outpost")).toContainText(
     "Wisdom of the Woods",
   );
+  await page.getByRole("button", { name: "Close dialog", exact: true }).click();
   await page.getByRole("button", { name: "Begin Expedition" }).click();
   const speed = CLASS_MAP.mage.speed;
   await page.keyboard.down("d");
@@ -244,6 +248,9 @@ test.describe("touch outposts", () => {
       ),
     ).toBe(true);
     await page.getByRole("button", { name: "Expedition", exact: true }).tap();
+    await page
+      .getByRole("button", { name: "Camp services", exact: true })
+      .tap();
     await expect(page.locator(".camp-outpost")).toContainText("2 / 3");
     expect(
       await page.evaluate(

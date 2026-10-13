@@ -69,9 +69,12 @@ export function combatStyle(action: CombatAction): CombatStyle {
         : "cast";
   if (
     action.spellKind === "melee" ||
-    ["beast", "rend", "rupture"].includes(action.spellId || "")
+    ["beast", "rend", "rupture", "whirlwind", "flurry"].includes(
+      action.spellId || "",
+    )
   )
     return "strike";
+  if (!action.spellId && action.spellKind === "projectile") return "shoot";
   if (
     ["shot", "multishot", "serpentsting", "throw", "volley"].includes(
       action.spellId || "",
@@ -86,6 +89,7 @@ export interface CombatPose {
   mirror: boolean;
   style: CombatStyle;
   progress: number;
+  phase?: number;
 }
 interface Gesture {
   style: CombatStyle;
@@ -94,6 +98,7 @@ interface Gesture {
   mirror: boolean;
   priority: number;
   frozen: boolean;
+  released: boolean;
 }
 
 /** Weak renderer-only state; co-occurring casts cannot continually restart the release pose. */
@@ -105,6 +110,7 @@ export class CombatAnimator {
     time: number,
     facing: number,
     priority = 0,
+    released = false,
   ): boolean {
     if (
       ![time, facing, priority].every(Number.isFinite) ||
@@ -123,6 +129,7 @@ export class CombatAnimator {
       mirror: Math.cos(facing) < -0.2,
       priority,
       frozen: false,
+      released,
     });
     return true;
   }
@@ -148,11 +155,13 @@ export class CombatAnimator {
       return null;
     }
     const progress = gesture.age / COMBAT_DURATION;
+    const phase = gesture.released ? 2 + progress * 4 : progress * COMBAT_POSES;
     return {
-      frame: combatFrame(gesture.style, Math.floor(progress * COMBAT_POSES)),
+      frame: combatFrame(gesture.style, Math.min(5, Math.floor(phase))),
       mirror: gesture.mirror,
       style: gesture.style,
       progress,
+      phase: Math.min(5, phase),
     };
   }
 }

@@ -46,15 +46,18 @@ test("preparation explains trade-offs, persists choices and launches the selecte
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await setup(page);
-  await page.getByRole("button", { name: "Shape your build" }).click();
+  await page.getByRole("button", { name: "Difficulty & build" }).click();
   await page.getByRole("button", { name: "Explorer", exact: true }).click();
   await page.locator('[data-action="oath"][data-id="vanguard"]').click();
   expect((await saved(page)).adventure.oath).toBe("vanguard");
   await page.reload();
+  await page.getByRole("button", { name: "Difficulty & build" }).click();
   await expect(
     page.locator('[data-action="difficulty"][data-id="explorer"]'),
   ).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(".departure-build")).toContainText("The Vanguard");
+  await expect(
+    page.locator('[data-action="oath"][data-id="vanguard"]'),
+  ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Set out with this build" }).click();
   await expect(page.locator("#health-text")).toContainText("133");
   await expect(page.locator(".adventure-hud")).toBeVisible();
@@ -160,8 +163,10 @@ test("momentum and contracts reflect real combat, return once, unlock relics and
   await expect(chapter.getByRole("button", { name: "Claimed" })).toBeDisabled();
   expect((await saved(page)).gold).toBe(gold + 35);
   await page.getByRole("button", { name: "Close dialog" }).click();
+  await page.getByRole("button", { name: "Difficulty & build" }).click();
   await page.locator("#adventure-relic").selectOption("compass");
   await page.reload();
+  await page.getByRole("button", { name: "Difficulty & build" }).click();
   await expect(page.locator("#adventure-relic")).toHaveValue("compass");
 });
 test("accessibility choices persist and affect both menu and battlefield renderer", async ({

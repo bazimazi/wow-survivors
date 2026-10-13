@@ -33,6 +33,7 @@ interface Gesture {
   telegraph: boolean;
   style: CombatStyle;
   pose: CombatPose;
+  released: boolean;
 }
 
 /** Weak state follows the real warning clock; thaw cannot replay an expired attack. */
@@ -41,7 +42,7 @@ export class CreatureCombatAnimator {
   clear(actor: Enemy) {
     this.actors.delete(actor);
   }
-  trigger(action: EnemyAction): boolean {
+  trigger(action: EnemyAction, released = false): boolean {
     const { actor, time, facing, warning } = action;
     if (
       actor.dead ||
@@ -66,8 +67,12 @@ export class CreatureCombatAnimator {
       warning: telegraph ? warning : 0,
       telegraph,
       style,
+      released,
       pose: {
-        frame: combatFrame(style, telegraph && warning === 0 ? 2 : 0),
+        frame: combatFrame(
+          style,
+          (telegraph && warning === 0) || (!telegraph && released) ? 2 : 0,
+        ),
         mirror: Math.cos(facing) < -0.2,
         style,
         progress: 0,
@@ -111,11 +116,27 @@ export class CreatureCombatAnimator {
             5,
             2 + Math.floor(((age - gesture.warning) / CREATURE_RECOVERY) * 4),
           )
-      : Math.min(5, Math.floor((age / COMBAT_DURATION) * 6));
+      : Math.min(
+          5,
+          Math.floor(
+            (gesture.released ? 2 : 0) +
+              (age / COMBAT_DURATION) * (gesture.released ? 4 : 6),
+          ),
+        );
+    const phase = gesture.telegraph
+      ? age < gesture.warning
+        ? age / gesture.warning
+        : Math.min(5, 2 + ((age - gesture.warning) / CREATURE_RECOVERY) * 4)
+      : Math.min(
+          5,
+          (gesture.released ? 2 : 0) +
+            (age / COMBAT_DURATION) * (gesture.released ? 4 : 6),
+        );
     gesture.pose = {
       ...gesture.pose,
       frame: combatFrame(gesture.style, stage),
       progress: age / duration,
+      phase,
     };
     return gesture.pose;
   }

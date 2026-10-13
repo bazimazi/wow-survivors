@@ -182,9 +182,52 @@ export function drawClassEffect(
   c.fillStyle = COLORS[id];
   c.lineWidth = fx.motif === "signature" ? 3 : 2;
   c.globalAlpha = Math.min(0.8, fx.life / fx.maxLife);
-  if (particles) {
+  if (particles && fx.motif === "signature") {
     c.shadowColor = COLORS[id];
-    c.shadowBlur = 8;
+    c.shadowBlur = 12;
+  }
+  if (fx.motif === "signature") {
+    const wave = 1 - (1 - progress) ** 3;
+    c.save();
+    c.globalAlpha *= 0.45;
+    c.lineWidth = 2;
+    circle(c, 0, 0, fx.radius * wave);
+    c.lineWidth = 1;
+    circle(c, 0, 0, fx.radius * wave * 0.86);
+    if (particles) {
+      // A brief local bloom, leaving enemies and their warnings readable.
+      const light = c.createRadialGradient(0, 0, 0, 0, 0, Math.max(1, r));
+      light.addColorStop(0, COLORS[id] + "55");
+      light.addColorStop(1, COLORS[id] + "00");
+      c.fillStyle = light;
+      c.beginPath();
+      c.arc(0, 0, r, 0, TAU);
+      c.fill();
+      c.fillStyle = COLORS[id];
+      for (let i = 0; i < 14; i++) {
+        const a = i * 2.39996 + (fx.facing || 0),
+          d = r * (0.55 + (i % 4) * 0.12);
+        c.save();
+        c.translate(Math.cos(a) * d, Math.sin(a) * d - progress * 20);
+        c.rotate(a + progress);
+        if (id === "druid") {
+          c.beginPath();
+          c.ellipse(0, 0, 7, 3, 0, 0, TAU);
+          c.fill();
+        } else {
+          c.fillRect(-2, -2, 4, 4 + (1 - progress) * 9);
+        }
+        c.restore();
+      }
+    }
+    if (id === "paladin" || id === "priest") {
+      c.globalAlpha = (1 - progress) * 0.35;
+      for (let i = -2; i <= 2; i++) {
+        c.fillStyle = COLORS[id];
+        c.fillRect(i * r * 0.3 - 3, -r * 1.4, 6, r * 1.5);
+      }
+    }
+    c.restore();
   }
   if (fx.motif === "dash") {
     c.rotate(fx.facing || 0);
@@ -221,7 +264,10 @@ export function drawClassEffect(
   }
   switch (id) {
     case "warrior":
-      c.rotate(fx.facing || 0);
+      c.rotate(
+        (fx.facing || 0) +
+          (fx.motif === "signature" ? progress * TAU : progress * 1.2 - 0.6),
+      );
       c.lineWidth = fx.motif === "signature" ? 7 : 4;
       c.beginPath();
       c.arc(0, 0, r, -1.25, 1.25);
@@ -252,6 +298,8 @@ export function drawClassEffect(
       break;
     case "rogue":
       c.rotate(fx.facing || 0);
+      c.translate(progress * r * 0.2, 0);
+      c.lineWidth = 4 * (1 - progress) + 1;
       for (let i = 0; i < 3; i++) {
         c.beginPath();
         c.moveTo(-r * 0.5, -20 + i * 16);
@@ -309,6 +357,7 @@ export function drawClassEffect(
       }
       break;
     case "warlock":
+      c.rotate(-progress * 0.8);
       star(c, 0, 0, r, 5);
       circle(c, 0, 0, r * 0.8);
       for (let i = 0; i < 3; i++) {
@@ -319,6 +368,7 @@ export function drawClassEffect(
       }
       break;
     case "druid":
+      c.rotate(progress * 0.5);
       for (let i = 0; i < 5; i++) {
         c.save();
         c.rotate((i * TAU) / 5);

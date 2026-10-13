@@ -166,6 +166,7 @@ test("an omitted trial ability produces a warning in spellbook and camp without 
     "rank 3 Blizzard",
   );
   await page.getByRole("button", { name: "Expedition", exact: true }).click();
+  await page.getByRole("button", { name: "Camp services" }).click();
   await expect(page.locator(".spellbook-camp")).toContainText("Frost Nova");
   await expect(
     page.locator(".spellbook-camp .spellbook-warning"),

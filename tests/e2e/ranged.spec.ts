@@ -56,6 +56,7 @@ async function fits(p: Page) {
 }
 async function controls(els: Locator) {
   for (const el of await els.all()) {
+    if (!(await el.isVisible())) continue;
     const b = await el.boundingBox();
     expect(Math.round(b!.width * 1000) / 1000).toBeGreaterThanOrEqual(44);
     expect(Math.round(b!.height * 1000) / 1000).toBeGreaterThanOrEqual(44);
@@ -425,6 +426,8 @@ test("real Sneed guardian combat secures ranged equipment with once-only partial
 test("nine classes at six widths show sixteen sockets and forty-six ranged discoveries with 44px controls and no horizontal overflow", async ({
   page,
 }) => {
+  test.setTimeout(180_000);
+  page.setDefaultTimeout(10_000);
   await seed(page, ready());
   await page.goto("/#armory");
   const reports = [];

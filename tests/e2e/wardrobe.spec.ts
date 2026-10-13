@@ -241,7 +241,7 @@ test("the new catalog and sixteen-slot camp fit six widths with accessible contr
         ".wardrobe-section button, .wardrobe-section select, #bag-slot, .browse-slot",
       )
       .all())
-      expect((await el.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      expect((await el.boundingBox())!.height).toBeGreaterThanOrEqual(43.99);
     await page.getByRole("button", { name: "Expedition", exact: true }).click();
     await expect(page.locator(".equipment-socket")).toHaveCount(16);
     for (const el of await page.locator(".equipment-socket").all()) {

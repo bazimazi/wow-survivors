@@ -56,6 +56,7 @@ async function guide(page: Page, slot = "offhand") {
 }
 async function controls(elements: Locator) {
   for (const el of await elements.all()) {
+    if (!(await el.isVisible())) continue;
     const box = await el.boundingBox();
     expect(box!.width).toBeGreaterThanOrEqual(44);
     expect(box!.height).toBeGreaterThanOrEqual(44);

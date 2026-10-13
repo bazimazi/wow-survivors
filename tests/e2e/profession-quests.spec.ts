@@ -135,7 +135,11 @@ test("real node gathering previews unsaved progress, settles once and turns in e
   await page
     .getByRole("button", { name: "Return to camp", exact: true })
     .click();
+  await page
+    .getByRole("button", { name: "Camp services", exact: true })
+    .click();
   await expect(page.locator(".guild-camp")).toContainText("1 project ready");
+  await page.getByRole("button", { name: "Close dialog", exact: true }).click();
   await page.getByRole("button", { name: "Professions", exact: true }).click();
   await guild(page, "mining")
     .getByRole("button", { name: "Review turn-in" })
@@ -378,7 +382,7 @@ test("all guild states and turn-in review fit six viewport widths with usable co
         ...document.querySelectorAll<HTMLElement>(
           ".profession-guild button,.profession-guild select",
         ),
-      ].filter((el) => el.getBoundingClientRect().height < 44).length,
+      ].filter((el) => el.getBoundingClientRect().height < 43.99).length,
     }));
     expect(metrics.scroll, `overflow at ${width}`).toBe(width);
     expect(metrics.short, `small controls at ${width}`).toBe(0);

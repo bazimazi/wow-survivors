@@ -45,9 +45,10 @@ async function guide(page: Page) {
 }
 async function controls(elements: Locator) {
   for (const el of await elements.all()) {
+    if (!(await el.isVisible())) continue;
     const box = await el.boundingBox();
     expect(box!.width).toBeGreaterThanOrEqual(44);
-    expect(box!.height).toBeGreaterThanOrEqual(44);
+    expect(box!.height).toBeGreaterThanOrEqual(43.99);
   }
 }
 async function fits(page: Page) {

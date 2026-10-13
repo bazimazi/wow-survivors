@@ -75,7 +75,7 @@ test("all 45 creature/hero/Bear crops have six distinct padded death poses and s
   const result = await page.evaluate(async () => {
     const { CREATURE_ART } = await import("/src/creature-animation.ts"),
       { CLASSES } = await import("/src/content.ts");
-    const { creatureCrop, heroCrop, createAnimationFrame } =
+    const { creatureCrop, heroCrop, createAnimationFrame, FRAME_SIZE } =
       await import("/src/animation-canvas.ts");
     const { deathVisual, DEATH_DURATION } =
       await import("/src/death-animation.ts");
@@ -150,17 +150,25 @@ test("all 45 creature/hero/Bear crops have six distinct padded death poses and s
               entry.rig as any,
               26 + i,
             ),
-            pixels = frame.getContext("2d")!.getImageData(0, 0, 144, 144).data;
+            pixels = frame
+              .getContext("2d")!
+              .getImageData(0, 0, FRAME_SIZE, FRAME_SIZE).data;
           let hash = 2166136261,
             count = 0;
           for (let offset = 0; offset < pixels.length; offset++)
             hash = Math.imul(hash ^ pixels[offset], 16777619);
           hashes.push(hash);
-          for (let y = 0; y < 144; y++)
-            for (let x = 0; x < 144; x++)
-              if (pixels[(y * 144 + x) * 4 + 3]) {
+          for (let y = 0; y < FRAME_SIZE; y++)
+            for (let x = 0; x < FRAME_SIZE; x++)
+              if (pixels[(y * FRAME_SIZE + x) * 4 + 3]) {
                 count++;
-                if (x < 2 || y < 2 || x >= 142 || y >= 142) edgeAlpha++;
+                if (
+                  x < 2 ||
+                  y < 2 ||
+                  x >= FRAME_SIZE - 2 ||
+                  y >= FRAME_SIZE - 2
+                )
+                  edgeAlpha++;
               }
           visible = Math.min(visible, count);
           const v = deathVisual(

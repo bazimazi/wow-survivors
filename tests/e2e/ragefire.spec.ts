@@ -151,6 +151,7 @@ test("Ragefire preview uses an independent unlock, hero gate, continent and four
   await expect(page.locator(".world-hint")).toHaveText(
     "Requires character level 10",
   );
+  await page.getByRole("button", { name: "Camp services" }).click();
   await expect(page.locator(".dungeon-route li")).toHaveCount(4);
   await expect(page.locator(".dungeon-preview")).toContainText(
     "5:15 of survival, plus 4 boss fights",
@@ -158,6 +159,7 @@ test("Ragefire preview uses an independent unlock, hero gate, continent and four
   await page.getByText("Preview dungeon equipment", { exact: true }).click();
   await expect(page.locator(".dungeon-loot-guide section")).toHaveCount(4);
   await expect(page.locator(".dungeon-loot-guide section p")).toHaveCount(31);
+  await page.getByRole("button", { name: "Close dialog", exact: true }).click();
   await page.locator('[data-action="hero"][data-id="warrior"]').click();
   await expect(
     page.getByRole("button", { name: "Begin Dungeon" }),
@@ -273,6 +275,7 @@ test.describe("touch Ragefire", () => {
   }) => {
     await seed(page);
     await accelerated(page);
+    await page.getByRole("button", { name: "Camp services" }).tap();
     await page.locator(".dungeon-preview").scrollIntoViewIfNeeded();
     expect(
       await page.evaluate(
@@ -283,6 +286,7 @@ test.describe("touch Ragefire", () => {
       path: "output/screenshots/ragefire-preview-mobile.png",
       animations: "disabled",
     });
+    await page.getByRole("button", { name: "Close dialog", exact: true }).tap();
     await page.getByRole("button", { name: "Begin Dungeon" }).tap();
     for (let i = 0; i < 3; i++) {
       await toGuardianEnd(page);

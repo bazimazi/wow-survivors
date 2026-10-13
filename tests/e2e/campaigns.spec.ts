@@ -83,9 +83,11 @@ test("acceptance, real cache and shrine proof, pause preview, settled claim and 
   await campaign
     .getByRole("button", { name: "Prepare in Elwynn Forest", exact: true })
     .click();
+  await page.getByRole("button", { name: "Camp services" }).click();
   await expect(
     page.locator('[data-campaign-status="timbermaw"]'),
   ).toContainText("0 / 180");
+  await page.getByRole("button", { name: "Close dialog", exact: true }).click();
   await page
     .getByRole("button", { name: "Begin Expedition", exact: true })
     .click();

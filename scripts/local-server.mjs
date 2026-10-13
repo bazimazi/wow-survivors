@@ -10,18 +10,20 @@ export async function startLocalServer({
   open = false,
   production = false,
 } = {}) {
-  const firstPort = port ?? (production ? 4173 : 5678);
-  if (!Number.isInteger(firstPort) || firstPort < 1 || firstPort > 65535)
+  if (
+    port !== undefined &&
+    (!Number.isInteger(port) || port < 1 || port > 65535)
+  )
     throw new Error("Starting port must be an integer from 1 to 65535.");
   const options = {
     host: "127.0.0.1",
-    port: firstPort,
+    ...(port === undefined ? {} : { port }),
     strictPort: false,
     open,
   };
   const config = {
     root: projectRoot,
-    configFile: false,
+    configFile: resolve(projectRoot, "vite.config.ts"),
     clearScreen: false,
     logLevel: "error",
     server: options,

@@ -88,11 +88,13 @@ test("Shadowfang preview checks the selected hero gate and displays all thirty-t
   await expect(page.locator(".world-hint")).toHaveText(
     "Requires character level 15",
   );
+  await page.getByRole("button", { name: "Camp services" }).click();
   await expect(page.locator(".dungeon-preview")).toContainText(
     "6:30 of survival, plus 4 boss fights",
   );
   await page.getByText("Preview dungeon equipment", { exact: true }).click();
   await expect(page.locator(".dungeon-loot-guide section p")).toHaveCount(33);
+  await page.getByRole("button", { name: "Close dialog", exact: true }).click();
   await page.locator('[data-action="hero"][data-id="warrior"]').click();
   await expect(
     page.getByRole("button", { name: "Begin Dungeon" }),

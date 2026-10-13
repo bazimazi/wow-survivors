@@ -75,10 +75,10 @@ async function cli(args) {
 
 await mkdir(resolve(projectRoot, "output"), { recursive: true });
 const reports = [];
-const blocker = await occupy(5173);
+const blocker = await occupy(5678);
 try {
   for (const [mode, args, preferred] of [
-    ["dev", [], 5173],
+    ["dev", [], 5678],
     ["preview", ["--preview"], 4173],
   ]) {
     const previewBlocker = mode === "preview" ? await occupy(preferred) : null;
@@ -100,7 +100,7 @@ try {
   try {
     const capture = await openCaptureSession();
     try {
-      assert.ok(Number(new URL(capture.url).port) > 5173);
+      assert.ok(Number(new URL(capture.url).port) > 5678);
       const page = await capture.browser.newPage();
       await page.goto(capture.url);
       await page
@@ -171,7 +171,7 @@ try {
       output,
     );
     assert.ok(match, "Playwright must report its captured actual URL.");
-    assert.ok(Number(new URL(match[1]).port) > 5173);
+    assert.ok(Number(new URL(match[1]).port) > 5678);
     reports.push({ mode: "playwright", url: match[1], passed: true });
   }
   await writeFile(
