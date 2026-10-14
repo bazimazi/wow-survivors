@@ -4,6 +4,20 @@ Generated reports, captures and downloaded sources under `output/` are local evi
 
 ## Automated checks
 
+### Living heroes and Field Hunts — 2026-10-14
+
+The [browser review and expansion plan](BROWSER-REVIEW-AND-ROADMAP.md) covers all eight main menus and their 31 desktop page turns, all eight menus on phone, services/preparation/field-guide/mastery/settings dialogs, Pause, Results, all nine classes, all nine destinations, 20 guardian scenes and 11 dungeon recovery scenes. Captures use actual Chromium windows and isolated profiles. Late-game coverage uses explicit test progression and accelerated simulation time. Browser page errors were empty in these capture sessions; this is visual coverage rather than a human campaign balance assessment.
+
+The changes add continuous joints to the authored hero path, preserve moving legs during attacks, restore hit recoil to that path, and animate the camp preview at a larger texture resolution. Joint geometry is shared in a bounded 512-entry cache; source and actor surfaces are reused. Dense crowds prioritize hero motion and retain the shared creature gait cache. Stronger strides are checked for positive joint orientation and texture-padding bounds across all nine heroes and both facings, with a smaller deformation scale for robes.
+
+Optional outdoor Field Hunts have simulation-clock offers and deadlines, a fully charged Battle Art ward break, an exposure window, alternating telegraphed attacks, and once-only gold/XP/recovery rewards. Tests cover real charged attacks for all nine classes, projectile delivery, interruption, pause/choices, expiry without payouts, boss cleanup, dungeon exclusion, old history, and co-op healing after a partner's finishing blow. Recovery applies once to each living hero and never revives a fallen ally.
+
+All **546 unit tests** pass. Strict TypeScript, the production build, and repository asset checks pass. **38/38 affected browser checks** pass across animation, combat, camp, Battle Arts, menus and painted fallbacks. The final **11/11 browser recheck** adds the co-op reward case and rechecks the last animation adjustment, for **39 distinct browser cases** covered by these runs. Logs are in `output/living-combat/unit-final.log`, `build-final.log`, `browser-final.log` and `browser-hunt-final.log`.
+
+The final broad-run moving 400-enemy scene measured **26.71 ms average / 48.3 ms p95** Canvas CPU, within the existing 30/50 ms regression bounds. Its simulation/RNG stayed unchanged by rendering, cache sizes remained bounded, and one ordinary creature frame was constructed per render at most. These local measurements do not establish 60 FPS or physical phone performance. The existing large JavaScript chunk build warning remains. The simpler dense animation case measured **3.91 / 5.1 ms** average/p95.
+
+Final camp, Hunt and phone captures and a nine-class animated movement preview are under `output/living-combat/`. Detailed screen, class, destination, guardian and recovery captures are under `output/review-after/`; generated files remain ignored by Git. No new raster artwork was generated in this pass. Scarlet Monastery's locked label now comes from its actual Duskwood prerequisite definition.
+
 ### Cross-system audit — 2026-10-13 (1.4 working tree)
 
 Reviewed the existing working tree, including its in-progress 1.3/1.4 features, before applying targeted corrections. Existing uncommitted work, content, save format and progression are retained. No blanket class or encounter retuning was applied from automated win rates.

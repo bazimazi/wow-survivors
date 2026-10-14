@@ -1,4 +1,5 @@
 import { BattleFeedback } from "./battle-feedback";
+import { drawFieldHunt } from "./field-hunt-visuals";
 import { encounterBeat } from "./encounter-director";
 import { drawHeroMotion, prepareHeroMotion } from "./hero-motion";
 import {
@@ -753,7 +754,8 @@ export class GameRenderer {
       requested >= 0 &&
       requested < 40 &&
       (!motion.creature || motion.priority) &&
-      (!motion.creature || this.liveSkinDraws < 4);
+      (!motion.creature ||
+        this.liveSkinDraws < (this.game.enemies.length > 160 ? 2 : 4));
     let frame: HTMLCanvasElement | null = null;
     if (live && owner && motion) {
       const mix = idle ? idlePhase % 1 : motion.pose.blend || 0;
@@ -991,7 +993,11 @@ export class GameRenderer {
     };
   }
   private drawFrame(delta: number, interpolation: number) {
-    this.liveSkinDraws = 0;
+    // Reserve surfaces for the authored hero rigs before crowds consume the
+    // shared six-skin budget. Dense crowds sample those rigs at 30 Hz.
+    this.liveSkinDraws =
+      (this.game.player.hp > 0 ? 1 : 0) +
+      (this.game.partner?.player.hp ? 1 : 0);
     const state = this.game;
     if (!this.suspended) {
       this.positions.alpha = Math.max(0, Math.min(1, interpolation));
@@ -1106,6 +1112,10 @@ export class GameRenderer {
         );
       }
     }
+    const quarry = g.enemies.find((e) => e.id === g.hunt.enemyId && !e.dead);
+    const huntPosition = quarry || g.hunt;
+    if (this.visible(huntPosition, 100))
+      drawFieldHunt(c, g.hunt, huntPosition, g.time, this.motionEnabled);
     for (const h of g.hazards) this.telegraph(h);
     for (const l of g.landmarks) {
       if (
@@ -2236,6 +2246,17 @@ export class GameRenderer {
           ? g.battleArt.charge / ART_CHARGE_TIME
           : -1,
         this.motionEnabled && p.dashTimer > 0,
+        {
+          owner: snapshot,
+          enabled: this.motionEnabled,
+          frozen: this.suspended,
+          sampleRate: g.enemies.length > 160 ? 30 : undefined,
+          reaction: this.hits.sample(
+            snapshot,
+            this.displayTime,
+            this.motionEnabled,
+          ),
+        },
       )
     ) {
       c.restore();
@@ -2551,7 +2572,13 @@ export class GameRenderer {
         c.fillStyle = "#ead49d";
         c.font = "10px serif";
         c.textAlign = "center";
-        c.fillText("ELITE", e.x, y - 5);
+        c.fillText(
+          this.game.hunt.state === "active" && e.id === this.game.hunt.enemyId
+            ? "CHAMPION"
+            : "ELITE",
+          e.x,
+          y - 5,
+        );
       }
     }
   }
@@ -2845,6 +2872,10 @@ export class GameRenderer {
         );
     for (const item of g.pickups)
       if (item.kind === "chest") drawDot(item, "#f2d58c", 4);
+    if (g.hunt.state === "offered" || g.hunt.state === "active") {
+      const quarry = g.enemies.find((e) => e.id === g.hunt.enemyId && !e.dead);
+      drawDot(quarry || g.hunt, "#d4adff", 7);
+    }
     drawDot(g.player, "#e6d8ad", 5);
     if (g.partner) drawDot(g.partner.player, "#91cde1", 5);
     c.restore();

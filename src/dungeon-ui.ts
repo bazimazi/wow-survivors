@@ -37,9 +37,7 @@ export function dungeonOptionText(s: SaveData, id = s.selectedZone): string {
   const route = dungeonRoute(id)!;
   return zoneUnlocked(s, id)
     ? `${route.stages.length} stages · level ${route.minLevel}+`
-    : ZONES.find((z) => z.id === route.prerequisite)?.dungeon
-      ? `Clear ${ZONES.find((z) => z.id === route.prerequisite)!.name}`
-      : `Defeat the ${route.prerequisite === "westfall" ? "Westfall" : "Tirisfal"} boss`;
+    : ZONES.find((z) => z.id === id)!.unlockText;
 }
 export function renderCheckpoint(g: GameEngine): string {
   const stage = g.dungeonStage!;

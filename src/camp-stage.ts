@@ -1,6 +1,7 @@
 import { CLASS_MAP } from "./content";
 import type { ClassId } from "./content";
-import { heroCrop } from "./animation-canvas";
+import { heroCrop, createAnimationFrame } from "./animation-canvas";
+import { IDLE_FRAME, IDLE_PERIOD } from "./painted-rig";
 
 /** A high-resolution hero preview; the feet stay planted during the breathing cycle. */
 export class CampStage {
@@ -10,6 +11,7 @@ export class CampStage {
   private hero: ClassId = "warrior";
   private cutout: HTMLCanvasElement | null = null;
   private ready = false;
+  private skin: HTMLCanvasElement | null = null;
   constructor() {
     this.atlas.onload = () => {
       this.ready = true;
@@ -71,8 +73,7 @@ export class CampStage {
         );
       }
     }
-    const size = Math.min(width * 0.84, height * 0.98),
-      breath = animated ? Math.sin(this.elapsed * 2.2) * 0.006 : 0;
+    const size = Math.min(width * 0.84, height * 0.98);
     const baseline = height - 5;
     c.save();
     c.globalAlpha = 0.55;
@@ -91,8 +92,42 @@ export class CampStage {
     c.restore();
     c.save();
     c.translate(width / 2, baseline);
-    c.scale(1 - breath * 0.45, 1 + breath);
-    c.drawImage(this.cutout, -size / 2, -size, size, size);
+    if (animated) {
+      const phase = ((this.elapsed / IDLE_PERIOD) % 1) * 8;
+      this.skin = createAnimationFrame(
+        this.atlas,
+        heroCrop(
+          CLASS_MAP[this.hero].portrait,
+          this.atlas.naturalWidth,
+          this.atlas.naturalHeight,
+        ),
+        ["mage", "priest", "warlock", "druid"].includes(this.hero)
+          ? "robe"
+          : "biped",
+        IDLE_FRAME + Math.floor(phase),
+        undefined,
+        this.hero,
+        false,
+        {
+          nextFrame: IDLE_FRAME + ((Math.floor(phase) + 1) % 8),
+          mix: phase % 1,
+          gaitMix: 0,
+          strideWeight: 0,
+          restFrame: -1,
+          restNext: -1,
+          restMix: 0,
+        },
+        this.skin ?? undefined,
+        384,
+      );
+      c.drawImage(
+        this.skin,
+        -size * 0.625,
+        -size * 1.125,
+        size * 1.25,
+        size * 1.25,
+      );
+    } else c.drawImage(this.cutout, -size / 2, -size, size, size);
     c.restore();
     if (animated) {
       c.save();

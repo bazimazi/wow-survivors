@@ -131,7 +131,7 @@ export interface ArtWorld {
   projectiles: Projectile[];
   allowed: boolean;
   bounds: Vec;
-  damage(enemy: Enemy, damage: number, spell: string): void;
+  damage(enemy: Enemy, damage: number, spell: string, charged?: boolean): void;
   effect(effect: Omit<Effect, "maxLife">): void;
   action(action: CombatAction): void;
 }
@@ -219,7 +219,7 @@ export class BattleArtState {
     this.releasedPower = power;
     p.facing = angle;
     const hit = (e: Enemy) => {
-      world.damage(e, damage, art.spell);
+      world.damage(e, damage, art.spell, power >= 0.95);
       if (!e.boss && !e.dead) {
         const a =
           art.shape === "blast" && world.id === "warlock"

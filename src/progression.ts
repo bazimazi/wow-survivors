@@ -241,6 +241,7 @@ export interface RunRecord {
   loot: string[];
   date: string;
   encounters?: number;
+  hunts?: number;
   dungeonBosses?: number;
   classProof?: ClassProof;
   professionProof?: ProfessionProof[];
@@ -739,6 +740,7 @@ export function validateSave(raw: unknown): SaveData {
             gold: finite(h.gold),
             xp: finite(h.xp),
             encounters: finite(h.encounters, 0, 6),
+            hunts: finite(h.hunts, 0, 100),
             dungeonBosses: dungeonRoute(h.zoneId as string)
               ? finite(
                   h.dungeonBosses,

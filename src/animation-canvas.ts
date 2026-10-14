@@ -13,9 +13,17 @@ export interface SpriteCrop {
   height: number;
   cutout?: { x: number; y: number; width: number; height: number };
 }
-const sources = new WeakMap<HTMLImageElement, Map<string, HTMLCanvasElement>>();
+const sources = new WeakMap<
+  HTMLImageElement | HTMLCanvasElement,
+  Map<string, HTMLCanvasElement>
+>();
 const occupiedCells = new WeakMap<HTMLCanvasElement, Map<string, Uint8Array>>();
+// Joint geometry depends on the rig/pose, not the actor or source texture.
+// Share the finite key poses; live frames only interpolate their vertices.
+const jointTemplates = new Map<string, Float64Array>();
 export interface PaintedBlend {
+  detailed?: boolean;
+  motionScale?: number;
   nextFrame?: number;
   mix: number;
   gaitNext?: number;
@@ -142,7 +150,7 @@ export function backHeroCrop(
 
 /** Rasterize the painted texture joints into a cached or reusable animation surface. */
 export function createAnimationFrame(
-  atlas: HTMLImageElement,
+  atlas: HTMLImageElement | HTMLCanvasElement,
   crop: SpriteCrop,
   rig: AnimationRig,
   frame: number,
@@ -151,8 +159,11 @@ export function createAnimationFrame(
   back = false,
   blend?: PaintedBlend,
   target?: HTMLCanvasElement,
+  contentSize = FRAME_CONTENT,
 ) {
-  const key = `${crop.x}:${crop.y}:${crop.width}:${crop.height}:${JSON.stringify(crop.cutout)}`;
+  const paddingSize = contentSize / 8;
+  const surfaceSize = contentSize + paddingSize * 2;
+  const key = `${crop.x}:${crop.y}:${crop.width}:${crop.height}:${JSON.stringify(crop.cutout)}:${contentSize}`;
   let crops = sources.get(atlas);
   if (!crops) {
     crops = new Map();
@@ -161,7 +172,7 @@ export function createAnimationFrame(
   let source = crops.get(key);
   if (!source) {
     source = document.createElement("canvas");
-    source.width = source.height = FRAME_SIZE;
+    source.width = source.height = surfaceSize;
     source
       .getContext("2d")!
       .drawImage(
@@ -170,20 +181,20 @@ export function createAnimationFrame(
         crop.y,
         crop.width,
         crop.height,
-        FRAME_PADDING,
-        FRAME_PADDING,
-        FRAME_CONTENT,
-        FRAME_CONTENT,
+        paddingSize,
+        paddingSize,
+        contentSize,
+        contentSize,
       );
     if (crop.cutout) {
       const mask = crop.cutout;
       source
         .getContext("2d")!
         .clearRect(
-          FRAME_PADDING + mask.x * FRAME_CONTENT,
-          FRAME_PADDING + mask.y * FRAME_CONTENT,
-          mask.width * FRAME_CONTENT,
-          mask.height * FRAME_CONTENT,
+          paddingSize + mask.x * contentSize,
+          paddingSize + mask.y * contentSize,
+          mask.width * contentSize,
+          mask.height * contentSize,
         );
     }
     // Crop textures are shared by every pose, including front/back and mounted riders.
@@ -196,24 +207,25 @@ export function createAnimationFrame(
     crops.set(key, source);
   }
   const output = target || document.createElement("canvas");
-  if (output.width !== FRAME_SIZE || output.height !== FRAME_SIZE)
-    output.width = output.height = FRAME_SIZE;
+  if (output.width !== surfaceSize || output.height !== surfaceSize)
+    output.width = output.height = surfaceSize;
   const c = output.getContext("2d")!;
-  c.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE);
+  c.clearRect(0, 0, surfaceSize, surfaceSize);
   c.imageSmoothingEnabled = true;
   const detailed =
-    !blend ||
-    [
-      "warrior",
-      "mage",
-      "rogue",
-      "hunter",
-      "paladin",
-      "priest",
-      "shaman",
-      "warlock",
-      "druid",
-    ].includes(profile || "");
+    blend?.detailed ??
+    (!blend ||
+      [
+        "warrior",
+        "mage",
+        "rogue",
+        "hunter",
+        "paladin",
+        "priest",
+        "shaman",
+        "warlock",
+        "druid",
+      ].includes(profile || ""));
   const columns = detailed ? 8 : 6,
     rows = detailed ? 12 : 10;
   const grid = `${columns}:${rows}`;
@@ -228,21 +240,20 @@ export function createAnimationFrame(
     // so antialiased outlines and triangle overlap retain every painted edge.
     const pixels = source
       .getContext("2d")!
-      .getImageData(0, 0, FRAME_SIZE, FRAME_SIZE).data;
+      .getImageData(0, 0, surfaceSize, surfaceSize).data;
     occupied = new Uint8Array(columns * rows);
     for (let row = 0; row < rows; row++)
       for (let column = 0; column < columns; column++) {
         const x0 =
-          Math.floor(FRAME_PADDING + (column * FRAME_CONTENT) / columns) - 1;
+          Math.floor(paddingSize + (column * contentSize) / columns) - 1;
         const x1 =
-          Math.ceil(FRAME_PADDING + ((column + 1) * FRAME_CONTENT) / columns) +
-          1;
-        const y0 = Math.floor(FRAME_PADDING + (row * FRAME_CONTENT) / rows) - 1;
+          Math.ceil(paddingSize + ((column + 1) * contentSize) / columns) + 1;
+        const y0 = Math.floor(paddingSize + (row * contentSize) / rows) - 1;
         const y1 =
-          Math.ceil(FRAME_PADDING + ((row + 1) * FRAME_CONTENT) / rows) + 1;
+          Math.ceil(paddingSize + ((row + 1) * contentSize) / rows) + 1;
         scan: for (let y = y0; y <= y1; y++)
           for (let x = x0; x <= x1; x++)
-            if (pixels[(y * FRAME_SIZE + x) * 4 + 3]) {
+            if (pixels[(y * surfaceSize + x) * 4 + 3]) {
               occupied[row * columns + column] = 1;
               break scan;
             }
@@ -250,8 +261,8 @@ export function createAnimationFrame(
     masks.set(grid, occupied);
   }
   const point = (x: number, y: number) => ({
-    x: FRAME_PADDING + x * FRAME_CONTENT,
-    y: FRAME_PADDING + y * FRAME_CONTENT,
+    x: paddingSize + x * contentSize,
+    y: paddingSize + y * contentSize,
   });
   const triangle = (
     original: { x: number; y: number }[],
@@ -292,17 +303,53 @@ export function createAnimationFrame(
     c.drawImage(source, 0, 0);
     c.restore();
   };
+  const templates = new Map<number, Float64Array>();
+  for (const at of new Set([
+    frame,
+    blend?.nextFrame,
+    gaitFrame,
+    blend?.gaitNext,
+    blend?.restFrame,
+    blend?.restNext,
+  ])) {
+    if (at === undefined) continue;
+    const key = `${grid}:${rig}:${profile}:${back}:${at}`;
+    let values = jointTemplates.get(key);
+    if (!values) {
+      values = new Float64Array((columns + 1) * (rows + 1) * 2);
+      for (let row = 0; row <= rows; row++)
+        for (let column = 0; column <= columns; column++) {
+          const v = paintedVertex(
+            column / columns,
+            row / rows,
+            rig,
+            at,
+            profile,
+            back,
+          );
+          const index = (row * (columns + 1) + column) * 2;
+          values[index] = v.x;
+          values[index + 1] = v.y;
+        }
+      if (jointTemplates.size >= 512)
+        jointTemplates.delete(jointTemplates.keys().next().value!);
+      jointTemplates.set(key, values);
+    }
+    templates.set(at, values);
+  }
   // Evaluate a joint only once per vertex; adjacent triangles share the same result.
   const vertices = Array.from({ length: rows + 1 }, (_, row) =>
     Array.from({ length: columns + 1 }, (_, column) => {
       const x = column / columns,
         y = row / rows;
+      const index = (row * (columns + 1) + column) * 2;
       const sample = (at: number, next?: number, mix = 0) => {
-        const v = paintedVertex(x, y, rig, at, profile, back);
+        const points = templates.get(at)!;
+        const v = { x: points[index], y: points[index + 1] };
         if (next !== undefined && next !== at && mix > 0) {
-          const other = paintedVertex(x, y, rig, next, profile, back);
-          v.x += (other.x - v.x) * mix;
-          v.y += (other.y - v.y) * mix;
+          const other = templates.get(next)!;
+          v.x += (other[index] - v.x) * mix;
+          v.y += (other[index + 1] - v.y) * mix;
         }
         return v;
       };
@@ -325,7 +372,11 @@ export function createAnimationFrame(
         v.x += (gait.x - x) * weight;
         v.y += (gait.y - y) * weight;
       }
-      return { original: point(x, y), warped: point(v.x, v.y) };
+      const scale = blend?.motionScale ?? 1;
+      return {
+        original: point(x, y),
+        warped: point(x + (v.x - x) * scale, y + (v.y - y) * scale),
+      };
     }),
   );
   for (let row = 0; row < rows; row++)

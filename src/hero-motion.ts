@@ -2,6 +2,8 @@ import type { ActorPose } from "./animation";
 import type { ClassId } from "./content";
 import { combatKey } from "./combat-animation";
 import { spriteIslands } from "./sprite-islands";
+import { createAnimationFrame, FRAME_SIZE } from "./animation-canvas";
+import { IDLE_FRAME, IDLE_PERIOD } from "./painted-rig";
 
 export const HERO_MOTION_PATHS: Record<ClassId, string> = {
   warrior: "/art/warrior-motion.webp",
@@ -39,6 +41,69 @@ interface Sheet {
   pending: Promise<void>;
 }
 const sheets = new Map<ClassId, Sheet>();
+const skins = new WeakMap<
+  object,
+  {
+    image: HTMLCanvasElement;
+    signature: string;
+    bucket: number;
+    texture: string;
+  }
+>();
+
+/** Continuous joint motion layered over the authored silhouettes, with running feet
+ * retained during casts. The same surface is reused for each actor. */
+export function heroJointPose(
+  pose: ActorPose,
+  time: number,
+  charge = -1,
+  id?: ClassId,
+) {
+  const idlePhase = ((((time / IDLE_PERIOD) % 1) + 1) % 1) * 8;
+  const gait = pose.frame >= 0 && pose.frame < 8 ? pose.frame : pose.gaitFrame;
+  const frame =
+    charge >= 0
+      ? 8 + (charge < 0.28 ? 0 : 1)
+      : pose.frame >= 0
+        ? pose.frame
+        : (pose.settleFrame ?? IDLE_FRAME + Math.floor(idlePhase));
+  const gaitPose = frame >= 0 && frame < 8;
+  return {
+    frame,
+    gait: gait !== undefined && gait >= 0 ? gait : undefined,
+    blend: {
+      motionScale: gaitPose
+        ? ["mage", "priest", "warlock", "druid"].includes(id || "")
+          ? 1.3
+          : 1.8
+        : frame >= IDLE_FRAME
+          ? 1.4
+          : 0.65,
+      nextFrame:
+        charge >= 0
+          ? frame
+          : gaitPose
+            ? (frame + 1) % 8
+            : pose.frame < 0 && pose.settleFrame === undefined
+              ? IDLE_FRAME + ((Math.floor(idlePhase) + 1) % 8)
+              : pose.nextFrame,
+      mix:
+        charge >= 0
+          ? 0
+          : gaitPose
+            ? (pose.phase * 8) % 1
+            : pose.frame < 0
+              ? idlePhase % 1
+              : (pose.blend ?? (pose.phase * 8) % 1),
+      gaitNext: gait !== undefined && gait >= 0 ? (gait + 1) % 8 : undefined,
+      gaitMix: (pose.phase * 8) % 1,
+      strideWeight: pose.strideWeight ?? 1,
+      restFrame: IDLE_FRAME + Math.floor(idlePhase),
+      restNext: IDLE_FRAME + ((Math.floor(idlePhase) + 1) % 8),
+      restMix: idlePhase % 1,
+    },
+  };
+}
 
 export function prepareHeroMotion(id: ClassId): Promise<void> {
   const existing = sheets.get(id);
@@ -112,15 +177,50 @@ export function drawHeroMotion(
   facing: number,
   charge = -1,
   dash = false,
+  {
+    owner = c,
+    enabled = true,
+    frozen = false,
+    reaction,
+    sampleRate,
+  }: {
+    owner?: object;
+    enabled?: boolean;
+    frozen?: boolean;
+    reaction?: { x: number; y: number; angle: number };
+    sampleRate?: number;
+  } = {},
 ): boolean {
   const sheet = sheets.get(id);
   if (!sheet?.ready) return false;
   const back = Math.sin(facing) < -0.35;
-  const frame = heroMotionFrame(pose, back, charge);
   const moving = pose.frame >= 0 && pose.frame < 8;
-  const action = combatKey(pose.frame);
+  // One run texture supplies a coherent body; its hips, knees, arms and cloth
+  // move continuously instead of swapping four nearly identical illustrations.
+  const frame =
+    moving || (pose.frame < 0 && pose.strideWeight)
+      ? back
+        ? 4
+        : 0
+      : heroMotionFrame(pose, back, charge);
+  const key = combatKey(pose.frame);
+  const nextKey = combatKey(pose.nextFrame ?? pose.frame);
+  const action = key
+    ? {
+        reach:
+          key.reach +
+          ((nextKey?.reach ?? key.reach) - key.reach) * (pose.blend ?? 0),
+        lean:
+          key.lean +
+          ((nextKey?.lean ?? key.lean) - key.lean) * (pose.blend ?? 0),
+      }
+    : null;
   const idle = !moving && !action && charge < 0;
   c.save();
+  if (enabled && reaction) {
+    c.translate(reaction.x, reaction.y);
+    c.rotate(reaction.angle);
+  }
   c.scale(Math.cos(facing) < 0 ? -1 : 1, 1);
   const bob = moving
     ? Math.sin(pose.phase * Math.PI * 4) * 2.2
@@ -129,9 +229,37 @@ export function drawHeroMotion(
       : 0;
   c.translate(action ? action.reach * 4 : dash ? 7 : 0, bob);
   c.rotate(dash ? 0.18 : action ? action.lean * 0.035 : 0);
-  if (idle) c.scale(1, 1 + Math.sin(time * 2.6) * 0.009);
   c.imageSmoothingEnabled = true;
-  c.drawImage(sheet.frames[frame], -64, -100);
+  if (enabled) {
+    const joints = heroJointPose(pose, time, charge, id);
+    const signature = `${id}:${frame}:${JSON.stringify(joints)}`;
+    const texture = `${id}:${frame}`;
+    const bucket = sampleRate ? Math.floor(time * sampleRate) : time;
+    let skin = skins.get(owner);
+    if (
+      !skin ||
+      (!frozen &&
+        skin.signature !== signature &&
+        (skin.texture !== texture || skin.bucket !== bucket))
+    ) {
+      const target = skin?.image || document.createElement("canvas");
+      createAnimationFrame(
+        sheet.frames[frame],
+        { x: 0, y: 16, width: 128, height: 88 },
+        ["mage", "priest", "warlock", "druid"].includes(id) ? "robe" : "biped",
+        joints.frame,
+        joints.gait,
+        id,
+        back,
+        { ...joints.blend, detailed: !sampleRate },
+        target,
+      );
+      target.dataset.heroMotion = id;
+      skin = { image: target, signature, bucket, texture };
+      skins.set(owner, skin);
+    }
+    c.drawImage(skin.image, -80, -95, FRAME_SIZE, 110);
+  } else c.drawImage(sheet.frames[frame], -64, -100);
   c.restore();
   return true;
 }

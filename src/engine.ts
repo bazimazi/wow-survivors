@@ -1,4 +1,5 @@
 import { encounterBeat } from "./encounter-director";
+import { FieldHunt, HUNT_NAMES } from "./field-hunt";
 import { BattleArtState, segmentDistance } from "./battle-arts";
 import type { ArtWorld } from "./battle-arts";
 import {
@@ -232,7 +233,8 @@ export type GameEvent = {
     | "shrine"
     | "checkpoint"
     | "horde"
-    | "surge";
+    | "surge"
+    | "hunt";
   classId?: ClassId;
   message?: string;
   amount?: number;
@@ -279,6 +281,7 @@ export type DeathAction =
 export interface EngineConfig {
   classCombat?: boolean;
   pacedEncounters?: boolean;
+  fieldHunts?: boolean;
   adventure?: { difficulty: Difficulty; oath: string; relic: string };
   partner?: PartnerConfig;
   classId: ClassId;
@@ -392,6 +395,7 @@ class SpatialGrid {
 
 export class GameEngine {
   readonly battleArt = new BattleArtState();
+  readonly hunt = new FieldHunt();
   private artWorld(): ArtWorld {
     return {
       id: this.classDef.id,
@@ -408,7 +412,7 @@ export class GameEngine {
         !this.shrineChoice &&
         !this.checkpoint &&
         !this.ended,
-      damage: (enemy, damage, spell) =>
+      damage: (enemy, damage, spell, charged) =>
         this.damageEnemy(
           enemy,
           damage,
@@ -416,6 +420,7 @@ export class GameEngine {
           true,
           undefined,
           this.classDef.id,
+          charged,
         ),
       effect: (effect) => this.addEffect(effect),
       action: (action) => {
@@ -1540,6 +1545,7 @@ export class GameEngine {
       });
     }
 
+    this.updateFieldHunt();
     this.updatePeriodicEffects(dt);
     if (this.ended || this.checkpoint) return;
     this.grid.rebuild(this.enemies);
@@ -1599,7 +1605,47 @@ export class GameEngine {
       )
         this.enemyAction(e, "contact");
       e.attackTimer -= dt;
-      if (e.boss) {
+      if (this.hunt.state === "active" && e.id === this.hunt.enemyId) {
+        if (
+          e.attackTimer <= 0 &&
+          length < 650 &&
+          this.hunt.exposedUntil <= this.time
+        ) {
+          e.attackTimer = 4.8;
+          const charging = this.hunt.attackIndex++ % 2 === 0;
+          const warning = charging ? 1.05 : 0.9;
+          e.frozenUntil = Math.max(e.frozenUntil, this.time + warning);
+          const end = {
+            x: clamp(
+              e.x + (dx / length) * Math.min(280, length + 60),
+              -bounds.x,
+              bounds.x,
+            ),
+            y: clamp(
+              e.y + (dy / length) * Math.min(280, length + 60),
+              -bounds.y,
+              bounds.y,
+            ),
+          };
+          this.warn({
+            x: e.x,
+            y: e.y,
+            shape: charging ? "line" : "circle",
+            radius: charging ? 24 : 112,
+            ...(charging ? { end, chargeId: e.id } : {}),
+            casterId: e.id,
+            warning,
+            damage: e.damage * 1.4,
+          });
+          this.enemyAction(
+            e,
+            "telegraph",
+            warning,
+            charging ? 0 : 1,
+            Math.atan2(dy, dx),
+          );
+        }
+      } else if (e.boss) {
         const phase = e.hp < e.maxHp * 0.5 ? 2 : 1;
         if (phase !== this.bossState.phase) {
           this.bossState.phase = phase;
@@ -1801,6 +1847,7 @@ export class GameEngine {
           true,
           shot.spellRank,
           shot.battleArt,
+          shot.charged,
         );
         shot.hit.add(e.id);
         if (
@@ -2698,6 +2745,60 @@ export class GameEngine {
       null
     );
   }
+  get nearbyHunt() {
+    return (
+      this.player.hp > 0 &&
+      this.hunt.state === "offered" &&
+      Math.hypot(this.hunt.x - this.player.x, this.hunt.y - this.player.y) < 110
+    );
+  }
+  private updateFieldHunt() {
+    if (!this.config.fieldHunts || this.zone.dungeon) return;
+    const event = this.hunt.update(
+      this.time,
+      this.zone.duration,
+      this.player,
+      this.movementBounds,
+      !!this.boss,
+    );
+    if (event === "offered")
+      this.emit({
+        type: "hunt",
+        message:
+          "A Field Hunt has appeared. Follow the violet marker and press F to awaken its champion.",
+      });
+    if (event === "expired") {
+      const enemy = this.enemies.find((e) => e.id === this.hunt.enemyId);
+      if (enemy) {
+        enemy.dead = true;
+        delete enemy.dots;
+      }
+      this.hazards = this.hazards.filter(
+        (h) => h.casterId !== this.hunt.enemyId,
+      );
+    }
+  }
+  private awakenHunt() {
+    if (
+      !this.nearbyHunt ||
+      this.time >= this.hunt.expiresAt ||
+      this.enemies.length >= 400
+    )
+      return false;
+    const enemy = this.spawnEnemy(0, true, 0, false, this.zone.enemies[2]);
+    if (!enemy) return false;
+    enemy.x = this.hunt.x;
+    enemy.y = this.hunt.y;
+    enemy.hp = enemy.maxHp = enemy.maxHp * 0.85;
+    enemy.attackTimer = 2;
+    this.hunt.begin(enemy.id, this.time);
+    this.stopTravel();
+    this.emit({
+      type: "hunt",
+      message: `${HUNT_NAMES[this.zone.id] || "The Rift Champion"} awakened. Fully charge a Battle Art to break its ward, then strike while exposed.`,
+    });
+    return true;
+  }
   interact(): boolean {
     if (
       this.paused ||
@@ -2707,6 +2808,7 @@ export class GameEngine {
       this.ended
     )
       return false;
+    if (this.nearbyHunt) return this.awakenHunt();
     const l = this.nearbyLandmark;
     if (!l) return false;
     l.discovered = true;
@@ -3313,10 +3415,19 @@ export class GameEngine {
     canCrit = true,
     spellRank?: number,
     battleArt?: ClassId,
+    charged = false,
   ) {
     if (!this.partnerActing && this.partner?.prepared.includes(source)) {
       this.withPartner(() =>
-        this.damageEnemy(e, amount, source, canCrit, spellRank, battleArt),
+        this.damageEnemy(
+          e,
+          amount,
+          source,
+          canCrit,
+          spellRank,
+          battleArt,
+          charged,
+        ),
       );
       return;
     }
@@ -3370,6 +3481,24 @@ export class GameEngine {
       damage *= 1.35;
     if (this.config.classCombat)
       damage *= classDamage(this.classWorld(), e, source);
+    const wasWarded =
+      this.hunt.state === "active" &&
+      e.id === this.hunt.enemyId &&
+      this.hunt.exposedUntil <= this.time;
+    damage *= this.hunt.damageMultiplier(
+      e.id,
+      this.time,
+      !!battleArt && charged,
+    );
+    if (wasWarded && this.hunt.exposedUntil > this.time) {
+      e.frozenUntil = Math.max(e.frozenUntil, this.time + 0.65);
+      this.hazards = this.hazards.filter((h) => h.casterId !== e.id);
+      this.emit({
+        type: "hunt",
+        message:
+          "Ward broken! The champion takes increased damage for five seconds.",
+      });
+    }
     // Encounter protection clamps the final damage, including class bonuses.
     if (e.boss && this.zone.id === "scarlet" && this.dungeonStageIndex === 3) {
       if (!this.commanderRevived && e.hp - damage <= e.maxHp / 2) {
@@ -3485,6 +3614,26 @@ export class GameEngine {
       delete e.dots;
       this.config.onDeath?.({ kind: "enemy", actor: e, time: this.time });
       this.kills++;
+      if (this.hunt.defeat(e.id, this.time)) {
+        const reward = 45 + Math.floor(this.time / 95) * 15;
+        this.gold += reward;
+        this.pickups.push({ x: e.x, y: e.y, kind: "xp", value: 24 });
+        for (const hero of [
+          this.partnerActing ? this.primaryActor! : this.player,
+          ...(this.partner ? [this.partner.player] : []),
+        ]) {
+          if (hero.hp <= 0) continue;
+          hero.hp = Math.min(hero.maxHp, hero.hp + hero.maxHp * 0.15);
+          hero.dashCooldown = 0;
+          hero.activeCooldown = 0;
+        }
+        this.hazards = this.hazards.filter((h) => h.casterId !== e.id);
+        this.pickupSurgeUntil = this.time + 2.5;
+        this.emit({
+          type: "hunt",
+          message: `Field Hunt complete · +${reward} gold, 24 run XP, 15% healing and abilities refreshed.`,
+        });
+      }
       if (this.config.adventure) {
         this.streak++;
         this.streakTimer = 5;
@@ -4563,6 +4712,7 @@ export class GameEngine {
           }
         : {}),
       encounters: this.completedEncounters,
+      hunts: this.hunt.completed,
       ...(this.campaignSnapshots.length
         ? {
             campaignProof: this.campaignSnapshots.map((snapshot) => ({

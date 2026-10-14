@@ -631,6 +631,7 @@ test("native moving combat with 400 enemies preserves gameplay/RNG and both cons
       ),
     };
   });
+  console.log("Combat animation Canvas CPU:", JSON.stringify(report));
   expect(report.readOnly).toBe(true);
   expect(report.count).toBe(400);
   expect(report.finite).toBe(true);
@@ -645,7 +646,6 @@ test("native moving combat with 400 enemies preserves gameplay/RNG and both cons
   expect(report.averageMs).toBeGreaterThan(0);
   expect(report.averageMs).toBeLessThan(30);
   expect(report.p95Ms).toBeLessThan(50);
-  console.log("Combat animation Canvas CPU:", JSON.stringify(report));
   await writeFile(
     "output/combat-render-0.21.json",
     JSON.stringify(report, null, 2) + "\n",

@@ -1,4 +1,6 @@
 import { encounterBeat } from "./encounter-director";
+import { mountHuntHud, updateHuntHud, renderHuntResult } from "./field-hunt-ui";
+import "./field-hunt.css";
 import { BATTLE_ARTS } from "./battle-arts";
 import { mountBattleArtInput, updateBattleArtHud } from "./battle-art-input";
 import { dismissGamePicker } from "./game-picker";
@@ -834,7 +836,7 @@ function showControls() {
       )
       .join(
         "",
-      )}</div><p class="modal-intro">Elites arrive every two minutes. Collect their treasure, gather materials, and defeat the final boss to win. Follow the compass to six landmarks in each zone. Shrines grant expedition blessings, guarded caches award equipment, and rituals reward holding a circle for 20 seconds. Press F nearby or tap the interaction button. Gold, character XP, loot, and materials return to camp even when you fall.</p>${renderControllerHelp()}${button("close-modal", "Ready for adventure", "button primary full-width")}`,
+      )}</div><p class="modal-intro">Elites arrive every two minutes. Collect their treasure, gather materials, and defeat the final boss to win. Follow the compass to six landmarks in each zone. Shrines grant expedition blessings, guarded caches award equipment, and rituals reward holding a circle for 20 seconds. Press F nearby or tap the interaction button. Violet Field Hunt markers offer optional champion duels. Approach one and press F, break the ward with a fully charged Battle Art, then strike during its five-second opening. Winning restores health and refreshes your dash and signature. Gold, character XP, loot, and materials return to camp even when you fall.</p>${renderControllerHelp()}${button("close-modal", "Ready for adventure", "button primary full-width")}`,
     "controls",
   );
 }
@@ -961,7 +963,7 @@ function showResult(result: RunRecord, reputationEarned: number) {
   sound.reward();
   const mats = Object.entries(result.materials);
   showModal(
-    `<div class="result-emblem ${result.victory ? "victory" : ""}">${icon(result.victory ? "crown" : "sword", 38)}</div><div class="eyebrow centered">${result.victory ? (result.zoneId === "deadmines" ? "THE BROTHERHOOD IS BROKEN" : result.zoneId === "ragefire" ? "THE SEARING BLADE IS SILENCED" : result.zoneId === "shadowfang" ? "THE MOONLIT CURSE IS BROKEN" : "THE FOREST WILL REMEMBER") : "THE ROAD DOES NOT END HERE"}</div><h2 id="modal-title">${result.victory ? "A legend begins." : "Until the next adventure."}</h2><p class="modal-intro centered">${CLASS_MAP[result.classId].name} · ${ZONES.find((z) => z.id === result.zoneId)!.name}</p><div class="result-stats"><div><b>${time(result.time)}</b><small>Survived</small></div><div><b>${result.kills}</b><small>Defeated</small></div><div><b>${result.level}</b><small>Run level</small></div></div><div class="result-rewards"><span>${icon("coin", 21)}<b>+${result.gold}</b> gold</span><span>${icon("spark", 21)}<b>+${result.xp}</b> character XP</span></div>${mats.length ? `<div class="result-materials">${mats.map(([m, n]) => `<span>${icon(MATERIALS[m as Material].icon, 16)} ${n} ${MATERIALS[m as Material].name}</span>`).join("")}</div>` : ""}${result.loot.length ? `<div class="result-loot">${result.loot.map((id) => `<span style="color:${RARITY_COLORS[GEAR_MAP[id].rarity]}">${icon(GEAR_MAP[id].icon, 23)} ${GEAR_MAP[id].name}</span>`).join("")}</div>` : ""}${dungeonRoute(result.zoneId) ? renderDungeonResult(result) : `<div class="result-exploration">${icon("compass", 19)}<b>${result.encounters || 0} / 6</b> landmarks completed</div>`}${renderEquipmentResult(save, result)}${renderFactionResult(save, result, reputationEarned)}${renderSkillCaps(save)}${renderTrialStatus(save)}${renderProfessionQuestStatus(save)}${renderCampaignStatus(save)}${result.party ? `<p class="result-level">Your ${CLASS_MAP[result.party.classId].name} partner also earns ${result.xp} character XP. The party’s gold, treasure and materials are paid once.</p>` : ""}<p class="result-level">Your ${CLASS_MAP[result.classId].name} is now character level <b>${save.heroes[result.classId].level}</b>. ${availableTalents(save.heroes[result.classId])} talent points available.</p>${renderAdventureResult(result)}${button("camp", `Return to camp ${icon("arrow", 18)}`, "button quiet full-width")}${button("retry", `One more adventure ${icon("play", 18)}`, "button primary full-width")}`,
+    `<div class="result-emblem ${result.victory ? "victory" : ""}">${icon(result.victory ? "crown" : "sword", 38)}</div><div class="eyebrow centered">${result.victory ? (result.zoneId === "deadmines" ? "THE BROTHERHOOD IS BROKEN" : result.zoneId === "ragefire" ? "THE SEARING BLADE IS SILENCED" : result.zoneId === "shadowfang" ? "THE MOONLIT CURSE IS BROKEN" : "THE FOREST WILL REMEMBER") : "THE ROAD DOES NOT END HERE"}</div><h2 id="modal-title">${result.victory ? "A legend begins." : "Until the next adventure."}</h2><p class="modal-intro centered">${CLASS_MAP[result.classId].name} · ${ZONES.find((z) => z.id === result.zoneId)!.name}</p><div class="result-stats"><div><b>${time(result.time)}</b><small>Survived</small></div><div><b>${result.kills}</b><small>Defeated</small></div><div><b>${result.level}</b><small>Run level</small></div></div><div class="result-rewards"><span>${icon("coin", 21)}<b>+${result.gold}</b> gold</span><span>${icon("spark", 21)}<b>+${result.xp}</b> character XP</span></div>${mats.length ? `<div class="result-materials">${mats.map(([m, n]) => `<span>${icon(MATERIALS[m as Material].icon, 16)} ${n} ${MATERIALS[m as Material].name}</span>`).join("")}</div>` : ""}${result.loot.length ? `<div class="result-loot">${result.loot.map((id) => `<span style="color:${RARITY_COLORS[GEAR_MAP[id].rarity]}">${icon(GEAR_MAP[id].icon, 23)} ${GEAR_MAP[id].name}</span>`).join("")}</div>` : ""}${dungeonRoute(result.zoneId) ? renderDungeonResult(result) : `<div class="result-exploration">${icon("compass", 19)}<b>${result.encounters || 0} / 6</b> landmarks completed</div>`}${renderEquipmentResult(save, result)}${renderFactionResult(save, result, reputationEarned)}${renderSkillCaps(save)}${renderTrialStatus(save)}${renderProfessionQuestStatus(save)}${renderCampaignStatus(save)}${result.party ? `<p class="result-level">Your ${CLASS_MAP[result.party.classId].name} partner also earns ${result.xp} character XP. The party’s gold, treasure and materials are paid once.</p>` : ""}<p class="result-level">Your ${CLASS_MAP[result.classId].name} is now character level <b>${save.heroes[result.classId].level}</b>. ${availableTalents(save.heroes[result.classId])} talent points available.</p>${renderAdventureResult(result)}${renderHuntResult(result)}${button("camp", `Return to camp ${icon("arrow", 18)}`, "button quiet full-width")}${button("retry", `One more adventure ${icon("play", 18)}`, "button primary full-width")}`,
     "result",
     "result-modal",
   );
@@ -977,6 +979,20 @@ function announceBattle(kicker: string, title: string, detail: string) {
   announcementUntil = (game?.time || 0) + 3.5;
 }
 function handleGameEvent(event: GameEvent) {
+  if (event.type === "hunt") {
+    const h = game?.hunt;
+    announceBattle(
+      "OPTIONAL FIELD HUNT",
+      h?.state === "complete"
+        ? "Champion defeated"
+        : h?.exposedUntil && h.exposedUntil > (game?.time || 0)
+          ? "Ward broken"
+          : h?.state === "active"
+            ? "The hunt begins"
+            : "A champion awaits",
+      event.message || "",
+    );
+  }
   if (event.type === "horde")
     announceBattle(
       "THE HORDE GATHERS",
@@ -1056,6 +1072,7 @@ function startGame() {
   game = new GameEngine({
     classCombat: true,
     pacedEncounters: true,
+    fieldHunts: true,
     adventure: {
       difficulty: save.adventure.difficulty,
       oath: save.adventure.oath,
@@ -1168,6 +1185,7 @@ function startGame() {
   renderer.highContrast = save.settings.highContrast;
   updateHud();
   setupTouch();
+  mountHuntHud(app);
   battleArtInput = mountBattleArtInput(game, renderer);
   refreshControllerHints();
 }
@@ -1186,6 +1204,7 @@ let spellMarkup = "";
 function updateHud() {
   if (game) {
     updateBattleArtHud(game);
+    updateHuntHud(game);
     const beat = encounterBeat(game.time, game.zone.duration);
     const stage = document.getElementById("director-stage"),
       fill = document.getElementById("director-fill"),
@@ -1439,7 +1458,7 @@ function updateHud() {
     "landmark-button",
   ) as HTMLButtonElement | null;
   if (interactButton) {
-    interactButton.hidden = !nearby;
+    interactButton.hidden = !nearby || game.nearbyHunt;
     interactButton.disabled =
       game.paused || game.choosing || !!game.shrineChoice || game.ended;
     interactButton.title = nearby
@@ -1457,7 +1476,7 @@ function updateHud() {
     );
   const preview = document.getElementById("landmark-preview");
   if (preview) {
-    preview.hidden = !nearby;
+    preview.hidden = !nearby || game.nearbyHunt;
     preview.textContent = nearby
       ? ENCOUNTER_RULES[nearby.kind].description
       : "";

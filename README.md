@@ -28,6 +28,12 @@ Deploy the contents of `dist/` at the host's URL root. Runtime artwork uses `/ar
 
 ## Combat foundations — 1.4
 
+### Living heroes and Field Hunts
+
+Hero movement now uses continuous joints for legs, arms and cloth, with running feet retained under attacks, hit recoil and an articulated camp preview. Outdoor expeditions offer optional **Field Hunts** from 40 seconds: approach the violet rune and press **F**, fully charge your Battle Art to break the champion's ward, then strike during its five-second opening. Winning awards gold and run XP, restores health and refreshes your dash and signature. Hunts pause with combat and leave dungeon pacing intact.
+
+See the [browser review and expansion plan](docs/BROWSER-REVIEW-AND-ROADMAP.md) for the screen findings, exact mechanics and the next production milestones.
+
 Aim with the mouse, hold **left mouse or V** to charge your class Battle Art, then release. **Space** cancels a charge into a dodge; **right mouse or C** uses your class signature. Controller players use **LT/L2** and the right stick; touch players hold the new Battle Art button.
 
 Nine class-specific attacks add directional cleaves, piercing missiles, targeted blasts, healing beams and chain lightning. New hero sheets provide 144 movement and action poses, with charge anticipation, weapon releases and follow-through. Painted elemental impacts, projectile trails, stronger hit reactions and sound support the new combat timing.
